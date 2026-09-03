@@ -158,40 +158,40 @@
 - [x] 9. Iteration 1 チェックポイント（MVP）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
-- [ ] 10. ドメイン: DailyPickSelector（決定的選出）
-  - [ ] 10.1 `DailyPickSelector` を実装する
+- [x] 10. ドメイン: DailyPickSelector（決定的選出）
+  - [x] 10.1 `DailyPickSelector` を実装する
     - `src/domain/DailyPickSelector.ts` に `pick(ids, day, salt): string | null` を実装する。id を辞書順で安定ソートし、`CalendarDay` + salt + ソート済み id 列を連結した文字列を FNV-1a 系の決定的ハッシュで 32bit 値 `h` にし、`index = h mod count` の id を返す。空配列は null。`Math.random()` は使用しない
     - `src/domain/dailyMessage.ts` に「今日の相棒」用の短いメッセージ生成関数（最大50文字を保証）を実装する
     - _Requirements: 5.1, 5.2, 5.3, 5.5_
 
-  - [ ]* 10.2 今日の一枚の決定性・要素性のプロパティテスト
+  - [x]* 10.2 今日の一枚の決定性・要素性のプロパティテスト
     - **Property 14: 今日の一枚は暦日内で決定的かつコレクションの要素**（同一 day+salt で常に同一 id・コレクションの要素、salt 変更後もコレクションの要素）
     - **Validates: Requirements 5.1, 5.2, 5.3**
     - `// Feature: chara-collection, Property 14` タグ・`numRuns: 100`
 
-  - [ ]* 10.3 メッセージ50文字以下のプロパティテスト
+  - [x]* 10.3 メッセージ50文字以下のプロパティテスト
     - **Property 15: 今日のメッセージは50文字以下**（併記メッセージの文字数は50以下）
     - **Validates: Requirements 5.5**
     - `// Feature: chara-collection, Property 15` タグ・`numRuns: 100`
 
-- [ ] 11. ガチャの Hook と画面
-  - [ ] 11.1 `useDailyGacha` を実装する
+- [x] 11. ガチャの Hook と画面
+  - [x] 11.1 `useDailyGacha` を実装する
     - `src/hooks/useDailyGacha.ts` に `partner`・`message`・`loadToday()`・`reroll()` を実装する。`fetchAll` で id を集め、当日暦日（端末ローカル）に紐づく salt を `localStorage` から読む（無ければ 0、日付変化でリセット）。`DailyPickSelector.pick` で選出し、同一暦日は再オープンでも同じ結果を返す。`reroll` は salt を +1 して保存・再計算する。0 件時は登録要求状態にする（要件5.6）
     - _Requirements: 5.1, 5.2, 5.3, 5.6_
 
-  - [ ] 11.2 `DailyGachaView` を実装し App に配線する
+  - [x] 11.2 `DailyGachaView` を実装し App に配線する
     - `src/components/DailyGachaView.tsx`: `useDailyGacha` に接続し「今日の相棒」を写真・名前・短いメッセージとともに表示、引き直しボタンを提供、0 件時は `EmptyStateView` で登録を促す（要件5.4, 5.5, 5.6）。App のナビゲーションにガチャ画面を追加する
     - _Requirements: 5.3, 5.4, 5.5, 5.6_
 
-  - [ ]* 11.3 useDailyGacha の暦日固定・0件ガードのユニットテスト
+  - [x]* 11.3 useDailyGacha の暦日固定・0件ガードのユニットテスト
     - 同一暦日内の再 `loadToday` で同じ結果を返すこと、日付変化で salt がリセットされること、0 件時に登録要求を表示することを検証する
     - _Requirements: 5.2, 5.6_
 
-- [ ] 12. Iteration 2 チェックポイント（今日の一枚ガチャ）
+- [x] 12. Iteration 2 チェックポイント（今日の一枚ガチャ）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
 - [ ] 13. ドメイン: TournamentEngine（トーナメント）
-  - [ ] 13.1 `TournamentEngine` を実装する
+  - [~] 13.1 `TournamentEngine` を実装する
     - `src/domain/TournamentEngine.ts` に `createTournament(contestants, shuffle?)` ファクトリと、`currentPair`・`champion`・`selectWinner(id)` を実装する。開始時に注入シャッフル（テスト時は恒等/固定順）で一度並べ替え、各ラウンドでキューから 2 件ずつ `BattlePair` を構成。奇数の余り 1 件は不戦勝で次ラウンドへ繰上げ、勝者を次ラウンドへ、敗者を除外し、勝ち残り 1 件で champion を確定する（有限回で終了）
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
@@ -211,11 +211,11 @@
     - `// Feature: chara-collection, Property 13` タグ・`numRuns: 100`
 
 - [ ] 14. 対戦の Hook と画面
-  - [ ] 14.1 `useRankingBattle` を実装する
+  - [~] 14.1 `useRankingBattle` を実装する
     - `src/hooks/useRankingBattle.ts` に `currentPair`・`champion`・`canStart`・`start()`・`choose(side)`・`reset()` を実装する。`fetchAll` で全 Character を取得し 2 件未満は `canStart=false`（開始せずメッセージ、要件4.6）。`start` で `createTournament` を生成、`choose` で `selectWinner` を呼ぶ。進行状態は in-memory のみで永続化せず、ページ再読み込み/再起動時は初期化される（要件4.7）
     - _Requirements: 4.1, 4.2, 4.3, 4.5, 4.6, 4.7_
 
-  - [ ] 14.2 `RankingBattleView` を実装し App に配線する
+  - [~] 14.2 `RankingBattleView` を実装し App に配線する
     - `src/components/RankingBattleView.tsx`: 現在の `BattlePair` 2 件を並べて表示し一方を選択させる。最終勝者を「最も好きなキャラ」として表示。2 件未満は開始せずメッセージ表示（要件4.6）。App のナビゲーションに対戦画面を追加する
     - _Requirements: 4.1, 4.2, 4.3, 4.5, 4.6_
 
@@ -223,15 +223,15 @@
     - 2 件未満で開始せずメッセージを表示すること（要件4.6）、`reset()`／再マウントで進行状態が初期化されること（要件4.7）を検証する
     - _Requirements: 4.6, 4.7_
 
-- [ ] 15. Iteration 3 チェックポイント（ランキング対戦）
+- [~] 15. Iteration 3 チェックポイント（ランキング対戦）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
 - [ ] 16. 編集・削除機能
-  - [ ] 16.1 RegistrationForm の編集モードを実装する
+  - [~] 16.1 RegistrationForm の編集モードを実装する
     - `useRegistration(editing)` に既存 Character の属性を初期表示（要件6.1）し、写真を差し替え可能にする（要件6.4）。`save()` で要件1と同じ検証を行い、`CharacterStore.update` で上書き（件数不変）、完了を通知する（要件6.2, 6.3）
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 16.2 CharacterDetailView に削除フローを配線する
+  - [~] 16.2 CharacterDetailView に削除フローを配線する
     - 編集・削除の導線を提供し、削除時は確認を求める。キャンセルで元表示に戻し（要件6.6）、確認で `useCollection.remove(id)`（`CharacterStore.delete`）を呼び削除完了を通知する（要件6.5, 6.7）
     - _Requirements: 6.5, 6.6, 6.7_
 
@@ -245,7 +245,7 @@
     - _Requirements: 6.5, 6.6, 6.7_
 
 - [ ] 17. エラー / 空状態ハンドリングの全画面配線
-  - [ ] 17.1 hooks 層のエラーマッピングを整備し各画面に反映する
+  - [~] 17.1 hooks 層のエラーマッピングを整備し各画面に反映する
     - design.md「Error Handling」表に従い、`StoreError`（`quotaExceeded`/`writeFailed`/`loadFailed`/`capacityReached`）・`PhotoError`・`FieldError` をユーザー向けメッセージへマッピングする共通ヘルパを `src/hooks/errorMessages.ts` に実装し、`RegistrationForm`・`CollectionView`・`DailyGachaView`・`RankingBattleView` に配線する。容量超過は不要データ削除の促し、その他保存失敗は再試行の促し、いずれも入力・保存済みデータを破棄しない
     - _Requirements: 1.3, 1.10, 1.11, 1.12, 2.2, 2.4, 2.7, 2.9, 3.2, 3.7, 4.6, 5.6, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
@@ -254,12 +254,12 @@
     - _Requirements: 2.2, 3.7, 8.1, 8.4, 8.5_
 
 - [ ] 18. PWA 仕上げ: Manifest とオフライン確認
-  - [ ] 18.1 Web App Manifest とアイコン・Service Worker precache を確定する
+  - [~] 18.1 Web App Manifest とアイコン・Service Worker precache を確定する
     - `vite.config.ts` の `VitePWA` に Manifest（`name`/`short_name`「キャラ図鑑」相当、`display: 'standalone'`、`orientation: 'portrait'`、`start_url: '.'`、`scope: '.'`、`theme_color`/`background_color` をパステルトークンに一致）と 192/512（`maskable` 含む）アイコンを設定する。Workbox によるアプリシェル（JS/CSS/HTML/アイコン）precache を有効化し `autoUpdate` を設定する
     - iOS Safari 向けにホーム画面追加手順の案内 UI を追加し、`navigator.storage.persist()` を best-effort で呼ぶ（要件3.7 の非破壊方針を維持）
     - _Requirements: 3.4, 3.5, 3.8, 7.2, 7.3_
 
-- [ ] 19. Iteration 4 / 最終チェックポイント（仕上げ）
+- [~] 19. Iteration 4 / 最終チェックポイント（仕上げ）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
 ## Notes

@@ -23,16 +23,27 @@ export interface CollectionViewProps {
   onAdd: () => void;
   /** 一覧内の 1 件が選択されたときのハンドラ（詳細へ遷移）。要件2.8 */
   onSelect: (character: Character) => void;
+  /** 「今日の相棒（ガチャ）」導線が押されたときのハンドラ（ガチャ画面へ遷移）。要件5.4 */
+  onOpenGacha: () => void;
 }
 
-export function CollectionView({ onAdd, onSelect }: CollectionViewProps): JSX.Element {
+export function CollectionView({
+  onAdd,
+  onSelect,
+  onOpenGacha,
+}: CollectionViewProps): JSX.Element {
   const { characters, loadState, reload } = useCollection();
 
   return (
     <main className="collection-view">
       <header className="collection-view__header">
         <h1>お友達図鑑</h1>
-        <PastelButton onClick={onAdd}>新規登録 ✚</PastelButton>
+        <div className="collection-view__actions">
+          <PastelButton variant="secondary" onClick={onOpenGacha}>
+            今日の相棒 🎁
+          </PastelButton>
+          <PastelButton onClick={onAdd}>新規登録 ✚</PastelButton>
+        </div>
       </header>
 
       {/* 読み込み失敗: 保存済みデータは保持しつつ再試行手段を提示する（要件2.9）。 */}
