@@ -1,0 +1,384 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Vite + React + TS プロジェクト scaffold と PWA / フォルダ基盤のセットアップ": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416422426
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416442299
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417456837
+      }
+    ],
+    "2. デザインシステム（CSS トークン）とグローバルスタイルの実装": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416424181
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417463310
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417654325
+      }
+    ],
+    "3. ドメインの型定義（Character と補助値型）": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416424356
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417464171
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417655544
+      }
+    ],
+    "4.1 `CharacterStore` インターフェースと `IndexedDbCharacterStore`（idb）を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416424604
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417669431
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417822931
+      }
+    ],
+    "4.2 `InMemoryCharacterStore` と失敗スタブ Store を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416424720
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417833487
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418039269
+      }
+    ],
+    "5.1 `CharacterValidator` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416424931
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417670541
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417823859
+      }
+    ],
+    "5.5 `PhotoProcessor` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425069
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417671682
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417824777
+      }
+    ],
+    "6.1 `PhotoFrame` と `PhotoInput` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425159
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417834270
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418038497
+      }
+    ],
+    "6.2 `PastelButton`・`FavoriteLevelPicker`・`EmptyStateView`・`CharacterCard` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425274
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417835417
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417844512
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418046503
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418207352
+      }
+    ],
+    "7.1 `useCollection` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425370
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418231511
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418353461
+      }
+    ],
+    "7.2 `useRegistration` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425521
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418230650
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418499436
+      }
+    ],
+    "8.1 `RegistrationForm`（新規登録）を実装し配線する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425619
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418507232
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418828190
+      }
+    ],
+    "8.2 `CollectionView` と `CharacterDetailView` を実装し App に配線する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425707
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418514745
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418829466
+      }
+    ],
+    "9. Iteration 1 チェックポイント（MVP）": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425803
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418835911
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418867904
+      }
+    ],
+    "10.1 `DailyPickSelector` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416425910
+      },
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418875805
+      }
+    ],
+    "11.1 `useDailyGacha` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426006
+      }
+    ],
+    "11.2 `DailyGachaView` を実装し App に配線する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426196
+      }
+    ],
+    "12. Iteration 2 チェックポイント（今日の一枚ガチャ）": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426304
+      }
+    ],
+    "13.1 `TournamentEngine` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426408
+      }
+    ],
+    "14.1 `useRankingBattle` を実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426504
+      }
+    ],
+    "14.2 `RankingBattleView` を実装し App に配線する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426616
+      }
+    ],
+    "15. Iteration 3 チェックポイント（ランキング対戦）": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426719
+      }
+    ],
+    "16.1 RegistrationForm の編集モードを実装する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426822
+      }
+    ],
+    "16.2 CharacterDetailView に削除フローを配線する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416426938
+      }
+    ],
+    "17.1 hooks 層のエラーマッピングを整備し各画面に反映する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416427054
+      }
+    ],
+    "18.1 Web App Manifest とアイコン・Service Worker precache を確定する": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416427156
+      }
+    ],
+    "19. Iteration 4 / 最終チェックポイント（仕上げ）": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788416427281
+      }
+    ],
+    "5. ドメイン: CharacterValidator と PhotoProcessor": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788417824928
+      }
+    ],
+    "4. Persistence 層: CharacterStore インターフェースと実装": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418039368
+      }
+    ],
+    "6. 再利用可能 UI コンポーネント（MVP 分）": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418207484
+      }
+    ],
+    "7. Hooks: useCollection と useRegistration": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418499584
+      }
+    ],
+    "8. MVP 画面: RegistrationForm と CollectionView / CharacterDetailView の配線": [
+      {
+        "executionId": "0c248da0-9508-4c08-9e7c-2b52d18010a1",
+        "chatSessionId": "sess_ad832ee2-9dac-4394-9224-1b165a1993cc",
+        "timestamp": 1788418829568
+      }
+    ]
+  }
+}

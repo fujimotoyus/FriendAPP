@@ -1,0 +1,540 @@
+/*
+ * Global styles for chara-collection (キャラ図鑑).
+ * モバイルポートレート基準のレスポンシブ基盤・横スクロールなし・44×44 CSS px の
+ * タッチ領域・角丸を多用したかわいくポップなベーススタイルをトークンで実装する
+ * （design.md「Design Theme and Design System」）。
+ *
+ * Requirements: 7.6 (横スクロールなしのレスポンシブ), 7.7 (44×44 タッチ領域),
+ *               7.4 (パステル配色), 7.5 (角丸), 7.8 (rem 追従)
+ */
+
+/* ---------------------------------------------------------------------------
+ * Reset / box model
+ * ------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  /* 固定 px を避け、ブラウザ/OS の文字サイズ設定に追従させる (要件7.8) */
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden; /* 横スクロールを発生させない (要件7.6) */
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 画像・メディアがコンテナ幅を超えて横スクロールを生まないようにする (要件7.6) */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* フォームコントロールはフォント設定を継承（rem 追従・要件7.8） */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+ * Layout — モバイルポートレート基準、最大幅で中央寄せ、フレックス縦積み
+ * ------------------------------------------------------------------------- */
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-md);
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography — 丸みのあるポップな見出し / 可読性重視の本文
+ * ------------------------------------------------------------------------- */
+h1,
+h2,
+h3 {
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+h1 {
+  font-size: var(--font-size-2xl);
+}
+
+h2 {
+  font-size: var(--font-size-xl);
+}
+
+h3 {
+  font-size: var(--font-size-lg);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* ---------------------------------------------------------------------------
+ * Touch targets — すべてのインタラクティブ要素を最小 44×44 CSS px に (要件7.7)
+ * ------------------------------------------------------------------------- */
+.touch-target {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* インタラクティブ要素の既定タッチ領域も 44px 以上を確保する (要件7.7) */
+button,
+a[role='button'],
+input[type='button'],
+input[type='submit'],
+input[type='file'],
+[role='button'] {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+}
+
+/* ---------------------------------------------------------------------------
+ * Base interactive styling — 角丸多用のかわいくポップな見た目 (要件7.4, 7.5)
+ * ------------------------------------------------------------------------- */
+button {
+  cursor: pointer;
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-medium); /* 角丸 (要件7.5) */
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: var(--font-weight-medium);
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+button:hover {
+  background-color: var(--color-primary-hover);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 入力欄も柔らかい角丸に (要件7.5) */
+input,
+textarea,
+select {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background-color: var(--color-surface);
+}
+
+/* アクセシブルなフォーカス表示 */
+:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Card / surface — カードや写真枠は大きめの角丸と柔らかい影で立体感を出す
+ * ------------------------------------------------------------------------- */
+.card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-large); /* 角丸大 (要件7.5) */
+  padding: var(--space-md);
+  box-shadow: var(--shadow-card);
+}
+
+/* 写真枠は角丸大でクリップする */
+.photo-frame {
+  border-radius: var(--radius-large);
+  overflow: hidden;
+  background-color: var(--color-border);
+}
+
+.photo-frame > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------------------------------------------------------------------------
+ * PhotoFrame placeholder — 写真が無い / デコード失敗時の代替表示 (要件2.4)
+ * ------------------------------------------------------------------------- */
+.photo-frame__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 6rem;
+  aspect-ratio: 1 / 1;
+  background-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.photo-frame__placeholder-icon {
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------------------
+ * PhotoInput — ネイティブ input を隠し、かわいいラベルをタップ領域にする
+ * (要件1.2, 7.5, 7.7)
+ * ------------------------------------------------------------------------- */
+.photo-input__label {
+  display: inline-flex;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-medium); /* 角丸 (要件7.5) */
+  background-color: var(--color-secondary);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.photo-input__label:hover {
+  filter: brightness(0.97);
+}
+
+.photo-input__label:active {
+  transform: scale(0.97);
+}
+
+/* ネイティブのファイル入力は視覚的に隠すが、ラベル経由で操作可能に保つ。
+ * display:none だと一部支援技術から辿れないため、視覚的非表示に留める。 */
+.photo-input__field {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  /* label で 44px を確保しているため、隠した input 自体の最小サイズ規則を無効化する。 */
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * PastelButton — 主要アクション用ボタン (要件7.5, 7.7)
+ * バリアントで primary(ピンク) / secondary(ミント) のパステル配色を切り替える。
+ * ------------------------------------------------------------------------- */
+.pastel-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-medium); /* 角丸中 (要件7.5) */
+  font-weight: var(--font-weight-bold);
+  transition: background-color 0.15s ease, filter 0.15s ease, transform 0.1s ease;
+}
+
+.pastel-button--primary {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.pastel-button--primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.pastel-button--secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-text-primary);
+}
+
+.pastel-button--secondary:hover {
+  filter: brightness(0.97);
+}
+
+.pastel-button:active {
+  transform: scale(0.97);
+}
+
+.pastel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * FavoriteLevelPicker — 1〜5 のかわいいハート選択 (要件1.7, 7.7)
+ * 各ハートは 44×44 CSS px 以上のタッチ領域を持つ。
+ * ------------------------------------------------------------------------- */
+.favorite-level-picker {
+  display: inline-flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.favorite-level-picker__item {
+  padding: var(--space-xs);
+  border: none;
+  border-radius: var(--radius-pill);
+  background-color: transparent;
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  transition: transform 0.1s ease;
+}
+
+.favorite-level-picker__item:hover {
+  transform: scale(1.1);
+}
+
+.favorite-level-picker__item:active {
+  transform: scale(0.95);
+}
+
+/* ---------------------------------------------------------------------------
+ * EmptyStateView — 空状態のフレンドリな案内 (要件2.7, 5.6, 8.6)
+ * ------------------------------------------------------------------------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.empty-state__icon {
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+}
+
+.empty-state__message {
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-base);
+}
+
+/* ---------------------------------------------------------------------------
+ * CharacterCard — 図鑑一覧のカード (要件2.3, 2.5, 2.6)
+ * .card の角丸大・柔らかい影を用い、写真・名前・ニックネームを縦積みで表示する。
+ * ------------------------------------------------------------------------- */
+.character-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+/* タップ可能なカードはボタン既定色を打ち消し、面色・左寄せ・全幅にする。 */
+.character-card--interactive {
+  background-color: var(--color-surface);
+  color: inherit;
+  text-align: left;
+  align-items: stretch;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.character-card--interactive:hover {
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.character-card--interactive:active {
+  transform: scale(0.99);
+}
+
+.character-card__photo {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.character-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.character-card__name {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.character-card__nickname {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+ * CollectionView — 一覧のヘッダー・グリッド・読み込み失敗表示 (要件2.1, 2.7, 2.9)
+ * モバイルポートレート基準の 2 カラムグリッドで、横スクロールを発生させない (要件7.6)。
+ * ------------------------------------------------------------------------- */
+.collection-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.collection-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+/* 読み込み失敗時の再試行導線 (要件2.9) */
+.collection-view__error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--radius-large);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  color: var(--color-text-primary);
+}
+
+/* 一覧グリッド: 2 カラム。狭幅でも横スクロールなし (要件7.6) */
+.collection-view__grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.collection-view__grid-item {
+  display: flex;
+}
+
+.collection-view__grid-item > .character-card {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+ * RegistrationForm — 登録/編集フォームの縦積みレイアウトとエラー表示
+ * (要件1.2〜1.7, 1.10〜1.12, 8.1〜8.5)
+ * ------------------------------------------------------------------------- */
+.registration-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.registration-form__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.registration-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.registration-form__label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.registration-form__textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+/* 写真プレビューはポートレート基準で正方に近い枠にする */
+.registration-form__photo-preview {
+  width: 100%;
+  max-width: 16rem;
+  aspect-ratio: 1 / 1;
+}
+
+/* 入力エラー・保存失敗などのメッセージ (要件1.3, 1.10〜1.12, 8.1〜8.5) */
+.registration-form__error {
+  color: var(--color-primary-hover);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.registration-form__actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * CharacterDetailView — 詳細表示 (要件2.8)
+ * ------------------------------------------------------------------------- */
+.character-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.character-detail__header {
+  display: flex;
+}
+
+.character-detail__photo {
+  width: 100%;
+  max-width: 20rem;
+  aspect-ratio: 1 / 1;
+  align-self: center;
+}
+
+.character-detail__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.character-detail__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.character-detail__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.character-detail__value,
+.character-detail__memo {
+  color: var(--color-text-primary);
+  line-height: var(--line-height-base);
+  white-space: pre-wrap;
+}
