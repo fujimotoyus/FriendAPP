@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CollectionView（図鑑一覧）— 登録済み Character の一覧表示。
  *
  * {@link useCollection} から一覧・読み込み状態・再試行（reload）を受け取り、
@@ -31,7 +31,7 @@ export function CollectionView({ onAdd, onSelect }: CollectionViewProps): JSX.El
   return (
     <main className="collection-view">
       <header className="collection-view__header">
-        <h1>キャラ図鑑</h1>
+        <h1>お友達図鑑</h1>
         <PastelButton onClick={onAdd}>新規登録 ✚</PastelButton>
       </header>
 
@@ -68,3 +68,4 @@ export function CollectionView({ onAdd, onSelect }: CollectionViewProps): JSX.El
     </main>
   );
 }
+

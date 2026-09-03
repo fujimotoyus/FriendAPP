@@ -1,4 +1,4 @@
-/// <reference types="vitest/config" />
+﻿/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
       manifest: {
-        name: 'キャラ図鑑',
-        short_name: 'キャラ図鑑',
+        name: 'お友達図鑑',
+        short_name: 'お友達図鑑',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '.',
@@ -23,9 +23,16 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    host: true,
+    // Cloudflare Tunnel (trycloudflare.com) 経由の一時公開URLからのアクセスを許可する。
+    // 動作確認用途。恒久運用時は本番デプロイを推奨。
+    allowedHosts: ['.trycloudflare.com'],
+  },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
   },
 });
+

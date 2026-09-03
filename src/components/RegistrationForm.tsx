@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RegistrationForm — キャラクターの新規登録 / 編集フォーム。
  *
  * {@link useRegistration} を用いて入力保持用の {@link CharacterDraft} を編集し、
@@ -146,7 +146,18 @@ export function RegistrationForm({
             alt="登録する写真のプレビュー"
             className="registration-form__photo-preview"
           />
-          <PhotoInput onSelect={handlePhotoSelect} onCancel={handlePhotoCancel} />
+          <div className="registration-form__photo-actions">
+            <PhotoInput
+              source="camera"
+              onSelect={handlePhotoSelect}
+              onCancel={handlePhotoCancel}
+            />
+            <PhotoInput
+              source="library"
+              onSelect={handlePhotoSelect}
+              onCancel={handlePhotoCancel}
+            />
+          </div>
           {photoFieldError ? (
             <p className="registration-form__error" role="alert">
               {photoFieldError}
@@ -251,3 +262,4 @@ export function RegistrationForm({
     </main>
   );
 }
+

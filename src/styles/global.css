@@ -538,3 +538,10 @@ select {
   line-height: var(--line-height-base);
   white-space: pre-wrap;
 }
+
+/* 写真取り込みボタン（写真をとる / フォトからえらぶ）の横並び (要件1.2) */
+.registration-form__photo-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
