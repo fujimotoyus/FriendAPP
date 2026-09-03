@@ -195,8 +195,6 @@ export function useRegistration(
   const save = useCallback(async (): Promise<SaveResult> => {
     // 前回のエラー状態をクリアしてから再評価する。
     setStoreError(null);
-    // 【一時デバッグ】診断用の詳細もクリアする（後で削除予定）。
-    setStoreErrorDetail(null);
 
     // 1. 入力検証（写真必須・文字数・お気に入り度）。要件1.3, 8.1
     const errors = validate(draft);
@@ -221,8 +219,6 @@ export function useRegistration(
       } catch (error) {
         // 件数取得の失敗はストアエラーとして扱い、入力は保持する（要件8.5）。
         setStoreError(readStoreError(error));
-        // 【一時デバッグ】元例外の内容を UI に出せるよう保持する（後で削除予定）。
-        setStoreErrorDetail(readStoreErrorDetail(error));
         return 'storeError';
       }
     }
@@ -258,8 +254,6 @@ export function useRegistration(
     } catch (error) {
       // 4. 保存失敗。入力を保持したまま失敗を提示する（要件1.12, 3.2, 8.4, 8.5）。
       setStoreError(readStoreError(error));
-      // 【一時デバッグ】元例外の内容を UI に出せるよう保持する（後で削除予定）。
-      setStoreErrorDetail(readStoreErrorDetail(error));
       return 'storeError';
     }
   }, [draft, store, editing]);
@@ -269,7 +263,6 @@ export function useRegistration(
     fieldErrors,
     photoError,
     storeError,
-    storeErrorDetail,
     setField,
     pickPhoto,
     save,
