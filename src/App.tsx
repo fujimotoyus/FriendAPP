@@ -3,6 +3,7 @@ import type { Character } from './domain/types';
 import { CharacterDetailView } from './components/CharacterDetailView';
 import { CollectionView } from './components/CollectionView';
 import { DailyGachaView } from './components/DailyGachaView';
+import { RankingBattleView } from './components/RankingBattleView';
 import { RegistrationForm } from './components/RegistrationForm';
 
 /**
@@ -11,8 +12,9 @@ import { RegistrationForm } from './components/RegistrationForm';
  * - `add`:    新規登録フォーム（{@link RegistrationForm}）
  * - `detail`: キャラクター詳細（{@link CharacterDetailView}）
  * - `gacha`:  今日の一枚ガチャ（{@link DailyGachaView}）
+ * - `battle`: ランキング対戦（{@link RankingBattleView}）
  */
-type View = 'list' | 'add' | 'detail' | 'gacha';
+type View = 'list' | 'add' | 'detail' | 'gacha' | 'battle';
 
 /**
  * Application root. `useState` によるシンプルな画面遷移で 一覧 / 登録 / 詳細 を
@@ -26,7 +28,9 @@ type View = 'list' | 'add' | 'detail' | 'gacha';
  *
  * 今日の一枚ガチャ画面（{@link DailyGachaView}）は一覧ヘッダーの「今日の相棒」導線から開き、
  * ガチャ画面からは一覧へ戻るか、0 件時は登録フォームへ遷移できる（要件5.4, 5.6）。
- * 対戦・編集・削除の各画面は後続タスクで配線する。
+ * ランキング対戦画面（{@link RankingBattleView}）も一覧ヘッダーの「対戦」導線から開き、
+ * 対戦画面からは一覧へ戻るか、2 件未満時は登録フォームへ遷移できる（要件4.1, 4.8）。
+ * 編集・削除の各画面は後続タスクで配線する。
  */
 export default function App(): JSX.Element {
   const [view, setView] = useState<View>('list');
@@ -49,6 +53,11 @@ export default function App(): JSX.Element {
     setView('gacha');
   };
 
+  // ランキング対戦画面を開く（要件4.1）。
+  const goToBattle = (): void => {
+    setView('battle');
+  };
+
   // 一覧から 1 件を選択して詳細へ。
   const goToDetail = (character: Character): void => {
     setSelected(character);
@@ -69,6 +78,7 @@ export default function App(): JSX.Element {
           onAdd={goToAdd}
           onSelect={goToDetail}
           onOpenGacha={goToGacha}
+          onOpenBattle={goToBattle}
         />
       ) : null}
 
@@ -82,6 +92,10 @@ export default function App(): JSX.Element {
 
       {view === 'gacha' ? (
         <DailyGachaView onBack={goToList} onRegister={goToAdd} />
+      ) : null}
+
+      {view === 'battle' ? (
+        <RankingBattleView onBack={goToList} onRegister={goToAdd} />
       ) : null}
     </div>
   );

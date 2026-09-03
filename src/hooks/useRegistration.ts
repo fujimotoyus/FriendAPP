@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useRegistration — キャラクター登録 / 編集の View-State（ViewModel 相当）
  *
  * RegistrationForm が用いる hook（design.md「Hooks / View-State」「フロー1: 写真付き登録」）。
@@ -38,6 +38,29 @@ const CAPACITY_LIMIT = 1000;
 
 /** 新規登録時の初期お気に入り度（1〜5 の中間値）。要件1.7 */
 const DEFAULT_FAVORITE_LEVEL = 3;
+
+/**
+ * 一意な id を生成する。`crypto.randomUUID()` はセキュアコンテキスト（HTTPS）かつ
+ * 対応ブラウザでのみ利用できるため、利用できない環境ではフォールバックで生成する。
+ * これにより一部の端末・ブラウザで id 生成に失敗して保存が落ちるのを防ぐ。
+ */
+function generateId(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c && typeof c.randomUUID === 'function') {
+    return c.randomUUID();
+  }
+  if (c && typeof c.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    c.getRandomValues(bytes);
+    // RFC4122 v4 相当のビットを立てる。
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  // 最終フォールバック（暗号的ではないが一意性は実用上十分）。
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+}
 
 /**
  * {@link useRegistration.save} の結果。
@@ -172,6 +195,8 @@ export function useRegistration(
   const save = useCallback(async (): Promise<SaveResult> => {
     // 前回のエラー状態をクリアしてから再評価する。
     setStoreError(null);
+    // 【一時デバッグ】診断用の詳細もクリアする（後で削除予定）。
+    setStoreErrorDetail(null);
 
     // 1. 入力検証（写真必須・文字数・お気に入り度）。要件1.3, 8.1
     const errors = validate(draft);
@@ -196,6 +221,8 @@ export function useRegistration(
       } catch (error) {
         // 件数取得の失敗はストアエラーとして扱い、入力は保持する（要件8.5）。
         setStoreError(readStoreError(error));
+        // 【一時デバッグ】元例外の内容を UI に出せるよう保持する（後で削除予定）。
+        setStoreErrorDetail(readStoreErrorDetail(error));
         return 'storeError';
       }
     }
@@ -217,7 +244,7 @@ export function useRegistration(
         await store.update(character);
       } else {
         const character: Character = {
-          id: crypto.randomUUID(),
+          id: generateId(),
           name: draft.name,
           nickname: draft.nickname,
           memo: draft.memo,
@@ -231,6 +258,8 @@ export function useRegistration(
     } catch (error) {
       // 4. 保存失敗。入力を保持したまま失敗を提示する（要件1.12, 3.2, 8.4, 8.5）。
       setStoreError(readStoreError(error));
+      // 【一時デバッグ】元例外の内容を UI に出せるよう保持する（後で削除予定）。
+      setStoreErrorDetail(readStoreErrorDetail(error));
       return 'storeError';
     }
   }, [draft, store, editing]);
@@ -240,6 +269,7 @@ export function useRegistration(
     fieldErrors,
     photoError,
     storeError,
+    storeErrorDetail,
     setField,
     pickPhoto,
     save,
@@ -257,3 +287,4 @@ function readStoreError(error: unknown): StoreError {
   }
   return { kind: 'writeFailed' };
 }
+

@@ -10,7 +10,7 @@
 
 1. **キャラ図鑑（Character Collection）**: 写真付きキャラクターの登録・一覧表示・詳細表示・編集・削除（要件1, 2, 6）
 2. **今日の一枚ガチャ（Daily Gacha）**: 同一暦日内で固定される「今日の相棒」のランダム選出と引き直し（要件5）
-3. **ランキング対戦（Ranking Battle）**: 全キャラクターによる勝ち抜きトーナメント（不戦勝対応）で一番のお気に入りを決定（要件4）
+3. **ランキング対戦（Ranking Battle）**: 全キャラクターによる勝ち抜きトーナメント（不戦勝対応）で一番のお気に入りを自動判定して決定（要件4）。各対戦の勝者は利用者が選ぶのではなく、**Chara_App がランダム要素を含めてちょうど1件を自動判定**する。対戦の様子・勝敗は、実行のたびにランダムに変わる **Battle_Commentary（それっぽい実況テキスト）** として表示し、同一の組み合わせでも**実行ごとに勝者・実況が変動**しうる。
 
 ### 技術方針
 
@@ -55,7 +55,8 @@ graph TD
     subgraph Domain["Domain 層 (純粋 TypeScript)"]
         VAL[CharacterValidator 入力検証]
         GACHA[DailyPickSelector 決定的選出]
-        TOUR[TournamentEngine トーナメント]
+        TOUR[TournamentEngine トーナメント 自動判定]
+        COMM[BattleCommentator 実況生成]
         IMG[PhotoProcessor 画像検証/変換]
     end
 
@@ -91,6 +92,7 @@ graph TD
     UG --> LS
     UB --> STORE
     UB --> TOUR
+    UB --> COMM
 
     STORE --> IDB
     STORE --> MEM
@@ -101,7 +103,7 @@ graph TD
 
 - **UI 層（React コンポーネント）**: 画面描画とユーザー操作の受け取りのみ。状態は hooks から受け取り、ロジックを持たない。パステルテーマ・角丸・rem による文字サイズ追従・44×44 CSS px のタッチ領域・横スクロールなしのレスポンシブはここで担保する（要件7.4〜7.8）。
 - **Hooks + View-State 層**: 画面状態（ローディング／エラー／入力値）の保持と、ユースケースの調停。React hooks（`useState` / `useEffect` / `useReducer`）で実装し、Domain 層と Persistence 層を呼び出す。MVVM の ViewModel に相当する責務を担う（本設計では「MV 的分離」と呼ぶ）。
-- **Domain 層（純粋 TypeScript）**: 副作用を持たないフレームワーク非依存のモジュール。`CharacterValidator`（バリデーション）、`DailyPickSelector`（決定的選出）、`TournamentEngine`（トーナメント）、`PhotoProcessor`（画像形式・サイズ検証と正規化）。React にも IndexedDB にも依存しないため、単体テストと property-based testing の主対象となる。
+- **Domain 層（純粋 TypeScript）**: 副作用を持たないフレームワーク非依存のモジュール。`CharacterValidator`（バリデーション）、`DailyPickSelector`（決定的選出）、`TournamentEngine`（トーナメントの勝者自動判定）、`BattleCommentator`（実況テキスト生成）、`PhotoProcessor`（画像形式・サイズ検証と正規化）。React にも IndexedDB にも依存しないため、単体テストと property-based testing の主対象となる。乱数を用いる `TournamentEngine`・`BattleCommentator` も、乱数生成器（rng）を外部注入することで純粋性・決定的テスト容易性を保つ。
 - **Persistence 層**: `CharacterStore` インターフェースで永続化を抽象化し、既定実装は `IndexedDbCharacterStore`（`idb` 経由）。テスト時は `InMemoryCharacterStore` に差し替える。すべての操作は非同期（`Promise`）。
 - **PWA 基盤**: `vite-plugin-pwa` が生成する Service Worker（アプリシェルのプリキャッシュ／オフライン提供）と Web App Manifest（ホーム画面追加）。写真取得の `<input type="file">`、およびガチャの salt を保持する `localStorage` もこの層に属する。
 
@@ -151,7 +153,7 @@ function CollectionView(): JSX.Element {
 
 #### RankingBattleView（ランキング対戦）
 
-現在の `BattlePair` 2 件を並べて表示し、一方を選択させる（要件4.1, 4.2, 4.3）。最終的に勝者 1 件を「最も好きなキャラ」として表示（要件4.5）。2 件未満なら開始せずメッセージ表示（要件4.6）。ページ再読み込み時は進行状態を破棄して初期化する（要件4.7）。
+現在の `BattlePair` 2 件を並べて表示する（要件4.1）。勝敗は利用者が選ぶのではなく、**Chara_App が自動的に勝者を判定**し、ランダムに変わる実況（`Battle_Commentary`）と勝敗結果を表示して自動進行する（要件4.2, 4.3）。利用者の操作は対戦を進めるための「開始」「次へ／自動再生」のみで、**勝敗の選択は行わない**。各対戦の実況表示後、勝者を次ラウンドへ進め、勝ち残りが 2 件以上ある間は次の `BattlePair` を提示する（要件4.4）。同一の組み合わせでも実行ごとに勝者・実況が変動しうる（要件4.5）。最終的に勝者 1 件を「最も好きなキャラ」として表示（要件4.7）。2 件未満なら開始せずメッセージ表示（要件4.8）。ページ再読み込み時は進行状態を破棄して初期化する（要件4.9）。
 
 #### 再利用可能コンポーネント
 
@@ -192,14 +194,15 @@ function useDailyGacha(): {
   reroll: () => Promise<void>;              // salt をインクリメント
 };
 
-// ランキング対戦（要件4）
+// ランキング対戦（要件4）— 勝敗はアプリが自動判定し自動進行する（利用者の勝敗選択なし）
 function useRankingBattle(): {
-  currentPair: BattlePair | null;
-  champion: Character | null;
-  canStart: boolean;                        // 2 件以上か
-  start: () => Promise<void>;
-  choose: (side: BattleSide) => void;
-  reset: () => void;                        // 進行状態は非永続、再読み込みで初期化
+  currentPair: BattlePair | null;           // 現在提示中の対戦ペア（要件4.1）
+  currentCommentary: BattleOutcome | null;  // 直近の対戦の実況 + 勝敗結果（要件4.2, 4.3）
+  champion: Character | null;               // 勝ち残り1件確定時（要件4.7）
+  canStart: boolean;                         // 2 件以上か（要件4.8）
+  start: () => Promise<void>;                // 対戦を開始し最初のペアを提示（要件4.1）
+  advance: () => void;                       // 次の対戦へ進める。呼ぶたびに現ペアの勝者を rng で自動判定し実況を生成（要件4.2〜4.4）
+  reset: () => void;                         // 進行状態は非永続、再読み込みで初期化（要件4.9）
 };
 ```
 
@@ -219,13 +222,23 @@ interface DailyPickSelector {
   // reroll は salt を増やして再計算（呼び出し側が salt を管理）
 }
 
-// トーナメント（要件4）
+// トーナメント（要件4）— 勝者はアプリが rng を用いて自動判定する（利用者選択なし）
 interface TournamentEngine {
-  readonly currentPair: BattlePair | null;  // 不戦勝は自動で次ラウンドへ繰上げ
-  readonly champion: string | null;         // 勝者 1 件確定時
-  selectWinner(id: string): void;           // 現在ペアの勝者を選ぶ
+  readonly currentPair: BattlePair | null;   // 不戦勝は自動で次ラウンドへ繰上げ（要件4.1, 4.6）
+  readonly champion: string | null;          // 勝ち残り 1 件確定時（要件4.7）
+  readonly lastResult: { winner: string; loser: string } | null; // 直近の対戦結果（勝者id・敗者id）
+  advance(): void;                            // 現ペアの勝者を rng で自動決定し次状態へ遷移（要件4.2, 4.4）
 }
-// ファクトリ: createTournament(contestants: string[], shuffle?: (a: string[]) => string[])
+// ファクトリ: createTournament(contestants: string[], rng: () => number, shuffle?: (a: string[]) => string[])
+//   rng: () => number は [0,1) の一様乱数。本番は Math.random、テストは固定/シード rng を注入する（決定的テスト容易性のため純粋性を保つ）。
+//   advance() は currentPair の 2 件から rng を用いてちょうど 1 件を勝者に決定し、勝者を次ラウンドのキューへ進め、敗者を除外する。
+
+// 実況生成（要件4.3, 4.5）— それっぽい実況テキストを rng でランダムに生成する純粋モジュール
+interface BattleCommentator {
+  // テンプレート集から rng で 1 つ選び、勝者/敗者名を差し込んだ実況文字列を返す。
+  // 同一 pair でも rng により文面が変わりうる（実行ごとに変動）。rng 注入により決定性テスト可能。
+  narrate(pair: { winner: string; loser: string }, rng: () => number): string;
+}
 
 // 画像検証・正規化（要件1.10, 8.2, 8.3）
 interface PhotoProcessor {
@@ -319,7 +332,12 @@ interface CalendarDay {      // 端末ローカル暦日（要件5.2）
 }
 
 interface BattlePair { left: string; right: string; }   // 不戦勝は Pair を生成しない
-type BattleSide = 'left' | 'right';
+// 対戦結果（勝敗はアプリが自動判定するため BattleSide は廃止。実況テキストを含む）
+interface BattleOutcome {
+  winner: string;      // 勝者 Character の id（要件4.2）
+  loser: string;       // 敗者 Character の id
+  commentary: string;  // 実行のたびにランダムに変わる実況テキスト（要件4.3, 4.5）
+}
 
 type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
@@ -422,7 +440,7 @@ sequenceDiagram
 
 「今日の相棒」の固定は、当日暦日（`CalendarDay`）と現在の salt を `localStorage` に保存し、同一暦日内の再オープン時に同じ salt で再計算することで実現する（要件5.2）。日付が変わると salt を 0 にリセットする。
 
-### フロー3: ランキング対戦のトーナメント進行（不戦勝・再読み込みリセット込み、要件4）
+### フロー3: ランキング対戦のトーナメント進行（自動判定・実況・不戦勝・再読み込みリセット込み、要件4）
 
 ```mermaid
 sequenceDiagram
@@ -431,26 +449,31 @@ sequenceDiagram
     participant H as useRankingBattle
     participant ST as CharacterStore
     participant TE as TournamentEngine
+    participant CO as BattleCommentator
 
     U->>BV: 対戦開始
     BV->>H: start()
     H->>ST: fetchAll()
     alt 2件未満
         ST-->>H: <2件
-        H-->>BV: 2件以上必要メッセージ（要件4.6）
+        H-->>BV: 2件以上必要メッセージ（要件4.8）
     else 2件以上
-        H->>TE: createTournament(contestants)
-        TE-->>H: currentPair（奇数なら1件を不戦勝で繰上げ）（要件4.1, 4.4）
+        H->>TE: createTournament(contestants, rng)
+        TE-->>H: currentPair（奇数なら1件を不戦勝で繰上げ）（要件4.1, 4.6）
+        H-->>BV: BattlePair 表示（勝敗選択なし）
         loop 勝者確定まで
-            H-->>BV: BattlePair 表示
-            U->>BV: 一方を選択
-            BV->>H: choose(side)
-            H->>TE: selectWinner(id)
-            TE-->>H: 次の pair または champion（要件4.3, 4.5）
+            U->>BV: 次へ進める（自動再生でも可、勝敗選択はしない）
+            BV->>H: advance()
+            H->>TE: advance()
+            TE-->>H: 現ペアの勝者を rng で自動判定（lastResult: winner/loser）（要件4.2）
+            H->>CO: narrate({winner, loser}, rng)
+            CO-->>H: 実況テキスト（実行ごとに変動しうる）（要件4.3, 4.5）
+            H-->>BV: currentCommentary（実況+勝敗）を表示し勝者を次へ（要件4.3, 4.4）
+            TE-->>H: 次の currentPair または champion（要件4.4, 4.7）
         end
-        H-->>BV: 勝者を「最も好きなキャラ」表示
+        H-->>BV: champion を「最も好きなキャラ」表示（要件4.7）
     end
-    Note over H,TE: 進行状態は永続化しない。ページ再読み込み/再起動時は reset() で初期化（要件4.7）
+    Note over H,TE: 進行状態は永続化しない。ページ再読み込み/再起動時は reset() で初期化（要件4.9）
 ```
 
 ## Algorithms
@@ -468,17 +491,26 @@ sequenceDiagram
 
 この設計により「同一暦日は固定」「再オープンでも同じ」「引き直しで変化」を、乱数状態の永続化なしに満たせる。純粋関数 `DailyPickSelector.pick(ids, day, salt)` は同一入力に対し常に同一出力を返すため、property-based testing で決定性・要素性を検証できる。
 
-### トーナメントのブラケット生成と不戦勝処理
+### トーナメントのブラケット生成と自動勝敗判定・不戦勝処理
 
-全 Character を対象に勝ち抜き戦を行う（要件4）。
+全 Character を対象に勝ち抜き戦を行う（要件4）。勝敗は利用者が選ぶのではなく、注入された乱数生成器 `rng: () => number`（[0,1)）を用いて Chara_App が自動判定する。
 
 1. 開始時、`contestants` を注入されたシャッフル関数（テスト時は恒等関数または固定順）で一度だけ並べ替え、初期ラウンドのキューとする。
-2. 各ラウンドはキューから 2 件ずつ取り出して `BattlePair` を構成する。ユーザーが勝者を選ぶと勝者を次ラウンドのキューへ追加する。
-3. **不戦勝（要件4.4）**: ラウンドの残りが 1 件（奇数の余り）になった場合、その 1 件は対戦せず次ラウンドのキューへそのまま繰り上げる。1 ラウンドにつき不戦勝は最大 1 件。
-4. あるラウンドを消化し切ったら次ラウンドへ移る。勝ち残りが 1 件になった時点でその 1 件を champion とする（要件4.5）。
-5. 各選択で敗者はキューから除外され、勝ち残り総数は単調減少する。したがって `N >= 2` の任意のコレクションと任意の選択列に対して、有限回で champion が 1 件に確定する（**終了保証**）。
+2. 各ラウンドはキューから 2 件ずつ取り出して `BattlePair` を構成する。`advance()` を呼ぶと、現ペアの 2 件から **rng を用いてちょうど 1 件を勝者に自動決定**（例: `rng() < 0.5` で left、そうでなければ right）し、勝者を次ラウンドのキューへ追加、敗者を除外する（要件4.2, 4.4）。決定した勝者・敗者は `lastResult` として公開し、実況生成に用いる。
+3. **不戦勝（要件4.6）**: ラウンドの残りが 1 件（奇数の余り）になった場合、その 1 件は対戦せず次ラウンドのキューへそのまま繰り上げる。1 ラウンドにつき不戦勝は最大 1 件。
+4. あるラウンドを消化し切ったら次ラウンドへ移る。勝ち残りが 1 件になった時点でその 1 件を champion とする（要件4.7）。
+5. 各対戦で敗者はキューから除外され、勝ち残り総数は単調減少する。したがって `N >= 2` の任意のコレクションと **任意の rng シード列**に対して、有限回で champion が 1 件に確定する（**終了保証**）。勝者の選択は rng に依存するが、勝ち残りが単調減少する事実は rng の値に依存しないため、終了性は rng によらず保証される。
 
-進行状態（キュー・現在の pair・勝者）は hooks / エンジン内のメモリにのみ保持し、永続化しない。ページ再読み込み時は状態が失われ、`reset()` 相当で初期状態に戻る（要件4.7）。
+**毎回結果が変わる根拠（要件4.5）**: `advance()` の勝敗は rng の値に応じて確率的に決まるため、同一の `BattlePair`・同一コレクションでも rng の系列が変われば勝者が変わりうる。本番は `Math.random` を rng として渡し、実行のたびに異なる勝者列が生じうる。
+
+### 対戦実況（Battle_Commentary）の生成
+
+各対戦の勝敗が決まると、`BattleCommentator.narrate({ winner, loser }, rng)` が実況テキストを生成する（要件4.3）。
+
+1. 複数の実況テンプレート（例: 「{winner} が {loser} を圧倒！」「接戦の末、{winner} が {loser} を下した！」など）を持つ。
+2. `rng` を用いてテンプレートを 1 つ選び、勝者・敗者の名前（またはニックネーム）を差し込んで文字列化する。
+3. テンプレートが複数あるため、**同一の対戦結果でも rng の値が変われば異なる実況文面が生成されうる**（実行のたびにランダムに変わる、要件4.5）。
+4. `narrate` は純粋関数であり、副作用を持たない。rng を外部注入するため、固定/シード rng を渡せば決定的に出力を検証できる（property-based testing 対応）。
 
 ## Persistence Design
 
@@ -610,31 +642,37 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 **Validates: Requirements 2.3, 2.5, 2.6, 2.8**
 
-### Property 11: トーナメントは唯一の勝者で終了する
+### Property 11: トーナメントは唯一の勝者で自動終了する
 
-*任意の* 2 件以上の Character 集合と *任意の* 選択列について、対戦を最後まで進めると、進行中は常に現在の `BattlePair` が入力集合内の相異なる 2 件で構成され、最終的に入力集合の要素ちょうど 1 件が champion として確定して終了する。
+*任意の* 2 件以上の Character 集合と *任意の* rng シード列について、対戦を最後まで自動進行させると、進行中は常に現在の `BattlePair` が入力集合内の相異なる 2 件で構成され、最終的に入力集合の要素ちょうど 1 件が champion として確定して終了する（利用者の勝敗選択を要しない）。
 
-**Validates: Requirements 4.1, 4.2, 4.5**
+**Validates: Requirements 4.1, 4.2, 4.7**
 
-### Property 12: 対戦の進行は敗者を除外し勝者を進める
+### Property 12: 自動判定は敗者を除外し勝者を進める
 
-*任意の* 対戦の各選択について、選ばれた Character は次の対戦へ進み、選ばれなかった Character は以降のいずれの対戦にも現れず、勝ち残り総数は単調に減少する。
+*任意の* rng シード列と各対戦について、rng により自動判定で選ばれた勝者は次の対戦へ進み、選ばれなかった敗者は以降のいずれの対戦にも現れず、勝ち残り総数は単調に減少する。
 
-**Validates: Requirements 4.3**
+**Validates: Requirements 4.2, 4.4**
 
 ### Property 13: 奇数ラウンドの不戦勝
 
 *任意の* 対象件数が奇数のラウンドについて、ちょうど 1 件が対戦せずに次ラウンドへ進み（不戦勝）、当該ラウンドのすべての Character が過不足なく次ラウンドへ引き継がれる。
 
-**Validates: Requirements 4.4**
+**Validates: Requirements 4.6**
 
-### Property 14: 今日の一枚は暦日内で決定的かつコレクションの要素
+### Property 14: 対戦実況は妥当で実行ごとに変動しうる
+
+*任意の* `BattleOutcome`（勝者・敗者）と *任意の* rng について、`BattleCommentator.narrate` は空でない実況文字列を返し、その中に勝者を表す情報（勝者名／ニックネーム）が差し込まれている。加えて、実況テンプレートは複数存在し、rng の値を変えると同一の対戦結果に対して**複数の異なる実況文面が生成されうる**（すなわち出力は rng に依存して変動しうる）。
+
+**Validates: Requirements 4.3, 4.5**
+
+### Property 15: 今日の一枚は暦日内で決定的かつコレクションの要素
 
 *任意の* 空でない Character コレクションと *任意の* 固定した `CalendarDay` および salt について、`DailyPickSelector.pick` は常にコレクションに属する同一の id を返す（再計算・再呼び出しでも不変）。引き直し（salt 変更）後の結果も常にコレクションの要素である。
 
 **Validates: Requirements 5.1, 5.2, 5.3**
 
-### Property 15: 今日のメッセージは50文字以下
+### Property 16: 今日のメッセージは50文字以下
 
 *任意の* 選出された「今日の相棒」について、併記される短いメッセージの文字数は 50 以下である。
 
@@ -660,8 +698,8 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 再起動時の復元失敗 | Store / hooks | 失敗表示・保存済みデータを消失させない | 3.7 |
 | 上限1,000件到達 | Store（persistence） | 新規登録を拒否し通知 | 2.2 |
 | コレクション0件（一覧/ガチャ） | hooks | 空状態メッセージ・登録手順/登録要求 | 2.7, 5.6, 8.6 |
-| 対戦が2件未満 | hooks | 開始せず「2件以上必要」表示 | 4.6 |
-| 対戦中の再読み込み/再起動 | hooks | 進行状態を破棄し初期化（非永続） | 4.7 |
+| 対戦が2件未満 | hooks | 開始せず「2件以上必要」表示 | 4.8 |
+| 対戦中の再読み込み/再起動 | hooks | 進行状態を破棄し初期化（非永続） | 4.9 |
 
 ## Testing Strategy
 
@@ -670,7 +708,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 ### 方針: ユニットテスト + プロパティテストの併用
 
 - **ユニットテスト（Vitest + React Testing Library）**: 具体例・エッジケース・エラー分岐・UI 分岐（空状態、ファイル選択キャンセル/ブロック、削除確認、写真読込失敗のプレースホルダー、対戦2件未満、対戦中リセット等）を検証する。
-- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜15）を、広い入力空間にわたって検証する。
+- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜16）を、広い入力空間にわたって検証する。
 
 ### 実行環境の注記
 
@@ -683,7 +721,8 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 各プロパティテストには、対応する設計プロパティを参照するコメントを付与する。タグ形式:
   `// Feature: chara-collection, Property {number}: {property_text}`
 - 各 Correctness Property は **単一の** プロパティテストで実装する。
-- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと任意の選択列（トーナメント）。
+- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）。
+- 乱数を用いる `TournamentEngine` と `BattleCommentator` は rng（`() => number`）を外部注入するため、テストでは固定/シード rng（例: 値の系列を返すスタブ）を渡して決定的に検証する。本番は `Math.random` を注入する。
 
 ### プロパティ ↔ テスト対応
 
@@ -699,17 +738,19 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 8 | 削除は対象1件のみ | `InMemoryCharacterStore` |
 | 9 | createdAt 降順整列 | `CharacterStore.fetchAll` |
 | 10 | 表示ビューの必須情報 | カード/詳細の表示モデル導出関数 |
-| 11 | 唯一の勝者で終了 | `TournamentEngine` |
-| 12 | 敗者除外・単調減少 | `TournamentEngine` |
-| 13 | 奇数ラウンドの不戦勝 | `TournamentEngine` |
-| 14 | 暦日内決定的・要素性 | `DailyPickSelector` |
-| 15 | メッセージ50文字以下 | メッセージ生成関数 |
+| 11 | 唯一の勝者で自動終了（rng シード列） | `TournamentEngine`（rng 注入） |
+| 12 | 自動判定の敗者除外・単調減少（rng シード列） | `TournamentEngine`（rng 注入） |
+| 13 | 奇数ラウンドの不戦勝 | `TournamentEngine`（rng 注入） |
+| 14 | 実況の妥当性・実行ごとの変動（複数テンプレート＋rng） | `BattleCommentator`（rng 注入） |
+| 15 | 暦日内決定的・要素性 | `DailyPickSelector` |
+| 16 | メッセージ50文字以下 | メッセージ生成関数 |
 
 ### ユニットテスト（例示・エッジ・エラー分岐）
 
 - ファイル選択キャンセル/ブロック時に入力保持・再取得を促す（要件1.11, 8.3）
 - 空コレクション時の空状態表示（要件2.7, 5.6, 8.6）
-- 対戦2件未満のガード（要件4.6）／対戦中の再読み込みでのリセット（要件4.7）
+- 対戦2件未満のガード（要件4.8）／対戦中の再読み込みでのリセット（要件4.9）
+- 実況（`Battle_Commentary`）は複数テンプレートから rng でランダム生成し、rng を固定/シードして決定的にテストする（勝者/敗者名の差し込み・非空文字列を検証、要件4.3, 4.5）
 - 削除の確認要求・キャンセル・確定（要件6.5, 6.6）
 - 上限1,000件のエッジケース（要件2.2）
 - 一覧写真1件の読込失敗時のプレースホルダー（要件2.4）
@@ -783,8 +824,8 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件1（写真付き登録） | `RegistrationForm` / `useRegistration` / `CharacterValidator` / `PhotoProcessor` / `PhotoInput` / フロー1 / Property 1〜5, 7 |
 | 要件2（一覧表示・図鑑） | `CollectionView` / `useCollection` / `CharacterCard` / `EmptyStateView` / `fetchAll`（降順）/ 上限1,000件 / Property 8〜10 |
 | 要件3（オフライン保存） | `CharacterStore` / `IndexedDbCharacterStore`（idb）/ Blob 写真 / Service Worker / Persistence Design / PWA Design / Property 5, 7 |
-| 要件4（ランキング対戦） | `RankingBattleView` / `useRankingBattle` / `TournamentEngine` / フロー3 / トーナメントアルゴリズム / Property 11〜13 |
-| 要件5（今日の一枚ガチャ） | `DailyGachaView` / `useDailyGacha` / `DailyPickSelector` / localStorage salt / フロー2 / 決定的選出アルゴリズム / Property 14, 15 |
+| 要件4（ランキング対戦） | `RankingBattleView` / `useRankingBattle`（`advance` 自動進行）/ `TournamentEngine`（rng 自動判定）/ `BattleCommentator`（実況生成）/ フロー3 / 自動判定トーナメントアルゴリズム / Property 11〜14 |
+| 要件5（今日の一枚ガチャ） | `DailyGachaView` / `useDailyGacha` / `DailyPickSelector` / localStorage salt / フロー2 / 決定的選出アルゴリズム / Property 15, 16 |
 | 要件6（編集・削除） | `RegistrationForm`（編集）/ `CharacterDetailView`（削除確認）/ `CharacterStore.update` / `delete` / Property 6, 8 |
 | 要件7（PWA・かわいいデザイン） | PWA Design（Manifest/Service Worker）/ Design Theme and Design System（CSS トークン/角丸/rem/44px/レスポンシブ） |
 | 要件8（空状態・入力エラー） | `CharacterValidator` / `EmptyStateView` / Error Handling マッピング表 / Property 1〜4, 7 |

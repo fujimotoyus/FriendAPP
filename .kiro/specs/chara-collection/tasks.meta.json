@@ -376,6 +376,16 @@
         "executionId": "f6a77629-0035-4822-8e7b-4d81740d5426",
         "chatSessionId": "sess_1d2a938c-0d63-47ea-9c14-8dd07ae097b3",
         "timestamp": 1788428858953
+      },
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441993599
+      },
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788442326140
       }
     ],
     "15. Iteration 3 チェックポイント（ランキング対戦）": [
@@ -388,6 +398,16 @@
         "executionId": "f6a77629-0035-4822-8e7b-4d81740d5426",
         "chatSessionId": "sess_1d2a938c-0d63-47ea-9c14-8dd07ae097b3",
         "timestamp": 1788428859246
+      },
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788442331603
+      },
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788442386100
       }
     ],
     "16.1 RegistrationForm の編集モードを実装する": [
@@ -518,6 +538,56 @@
         "executionId": "f6a77629-0035-4822-8e7b-4d81740d5426",
         "chatSessionId": "sess_1d2a938c-0d63-47ea-9c14-8dd07ae097b3",
         "timestamp": 1788438936235
+      }
+    ],
+    "13.1 `TournamentEngine` を実装する（勝者は rng で自動判定）": [
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441564233
+      },
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441728762
+      }
+    ],
+    "13.2 `BattleCommentator` を実装する": [
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441565018
+      },
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441729527
+      }
+    ],
+    "13. ドメイン: TournamentEngine（自動判定）と BattleCommentator（実況）": [
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441729623
+      }
+    ],
+    "14.1 `useRankingBattle` を実装する（自動判定・自動進行）": [
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441736194
+      },
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788441992572
+      }
+    ],
+    "14. 対戦の Hook と画面": [
+      {
+        "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
+        "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
+        "timestamp": 1788442326262
       }
     ]
   }

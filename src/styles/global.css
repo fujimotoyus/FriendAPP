@@ -614,3 +614,107 @@ select {
   color: var(--color-text-secondary);
   line-height: var(--line-height-base);
 }
+
+/* ---------------------------------------------------------------------------
+ * RankingBattleView — ランキング対戦 (要件4.1, 4.2, 4.3, 4.4, 4.7, 4.8)
+ * 現在の対戦ペア 2 件を並べ、実況・勝敗を自動進行で表示する。勝敗選択ボタンは無し。
+ * ------------------------------------------------------------------------- */
+.ranking-battle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.ranking-battle__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.ranking-battle__loading {
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+}
+
+/* 対戦アリーナ: 左右のコンテスタントを VS を挟んで横並び（横スクロールは出さない）。 */
+.ranking-battle__arena {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-md);
+  border-radius: var(--radius-large);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.ranking-battle__contestant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
+.ranking-battle__photo {
+  width: 100%;
+  max-width: 9rem;
+  aspect-ratio: 1 / 1;
+}
+
+.ranking-battle__name {
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.ranking-battle__versus {
+  flex: 0 0 auto;
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+/* 実況＋勝敗結果（実行ごとに変動しうる）。 */
+.ranking-battle__commentary {
+  padding: var(--space-md);
+  border-radius: var(--radius-medium);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-base);
+  text-align: center;
+}
+
+.ranking-battle__controls {
+  display: flex;
+  justify-content: center;
+}
+
+/* 最終勝者（最も好きなキャラ）: 写真・名前を中央寄せで強調表示。 */
+.ranking-battle__champion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-md);
+  border-radius: var(--radius-large);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+.ranking-battle__champion-title {
+  color: var(--color-text-secondary);
+}
+
+.ranking-battle__champion-photo {
+  width: 100%;
+  max-width: 16rem;
+  aspect-ratio: 1 / 1;
+}
+
+.ranking-battle__champion-name {
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}

@@ -79,9 +79,23 @@ export interface BattlePair {
 }
 
 /**
- * ランキング対戦で選択された側。要件4.3
+ * ランキング対戦の 1 対戦の結果（実況テキストを含む）。
+ *
+ * 勝敗は利用者が選ぶのではなく Chara_App が rng を用いて自動判定するため、
+ * 旧 `BattleSide`（利用者の左右選択）は廃止した。`winner` / `loser` は勝者・敗者
+ * Character の **id** を保持し（要件4.2）、`commentary` には {@link ../domain/BattleCommentator.narrate}
+ * が生成した、実行のたびに変動しうる実況テキストを保持する（要件4.3, 4.5）。
+ *
+ * 参照: design.md「補助的な値型 / BattleOutcome」、要件4.2, 4.3, 4.5
  */
-export type BattleSide = 'left' | 'right';
+export interface BattleOutcome {
+  /** 勝者 Character の id。要件4.2 */
+  winner: string;
+  /** 敗者 Character の id */
+  loser: string;
+  /** 実行のたびにランダムに変わる実況テキスト。要件4.3, 4.5 */
+  commentary: string;
+}
 
 /**
  * 成功 / 失敗を型で表す判別可能ユニオン（例外の代替）。

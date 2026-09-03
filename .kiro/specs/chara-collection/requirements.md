@@ -32,8 +32,9 @@
 - **Registration_Form**: キャラクターを新規登録・編集する入力画面。React画面/コンポーネントとして提供される
 - **Character_Photo**: キャラクターに紐づく画像データ。端末の写真/カメラから、ブラウザのファイル選択（input[type=file]）で取り込んだ画像であり、1件あたり端末の写真1枚相当のサイズを上限の目安とする。対応する画像形式はブラウザが標準で扱える画像形式（JPEG、PNG、WebPなど）に準ずる
 - **Favorite_Level**: キャラクターへのお気に入り度合いを表す属性（1〜5の整数）
-- **Ranking_Battle**: 全登録キャラクターを対象にトーナメント（勝ち抜き）形式で対戦させ、最も好きな1件を決めるモード
+- **Ranking_Battle**: 全登録キャラクターを対象にトーナメント（勝ち抜き）形式で自動対戦させ、最も好きな1件を決めるモード。各Battle_Pairの勝敗はChara_Appがランダム要素を含めて自動的に判定し、試行のたびに結果が変動する
 - **Battle_Pair**: ランキング対戦で同時に提示される2件のキャラクターの組
+- **Battle_Commentary**: Battle_Pairの対戦の様子および勝敗結果を、実行のたびにランダムに変わる、それっぽい実況として表現するテキスト
 - **不戦勝（Bye）**: ランキング対戦のあるラウンドで対象Characterが奇数の場合に、対戦せず次のラウンドへ進む1件の扱い
 - **Daily_Gacha**: 登録済みキャラクターから1件をランダムに選び「今日の相棒」として表示するモード。同一暦日（利用者の端末ローカルの日付）内は選択結果を固定する
 - **PWA**: Webアプリをネイティブアプリのように端末へインストール・オフライン利用できる仕組み（Web App Manifest + Service Worker）
@@ -94,17 +95,19 @@
 
 ### 要件4: ランキング対戦モード
 
-**ユーザーストーリー:** カップルとして、キャラクター同士を「どっちが好き？」で勝ち抜かせたい。そうすることで、二人の一番のお気に入りを決めて盛り上がれる。
+**ユーザーストーリー:** カップルとして、キャラクター同士をトーナメントで自動的に勝ち抜かせ、そのバトルの様子を実況で楽しみたい。そうすることで、二人の一番のお気に入りを決めて盛り上がれる。
 
 #### 受け入れ基準
 
-1. WHEN 利用者がRanking_Battleを開始する, THE Chara_App SHALL Character_Storeの全Characterからトーナメントの組み合わせを生成し、最初のBattle_Pairを並べて表示する
-2. WHILE Ranking_Battleが進行中である間, THE Chara_App SHALL 提示中のBattle_Pairの2件から一方を選ぶ選択操作を提供する
-3. WHEN 利用者がBattle_Pairの一方を選択する, THE Chara_App SHALL 選択されたCharacterを勝者として次の対戦へ進め、勝ち残りが2件以上ある間は次のBattle_Pairを提示する
-4. IF あるラウンドの対象Characterが奇数である場合, THEN THE Chara_App SHALL 1件を不戦勝として次のラウンドへ進める
-5. WHEN 勝ち残ったCharacterが1件のみとなる, THE Chara_App SHALL 当該Characterを最も好きなキャラクターとして表示する
-6. IF Character_Storeに保存されたCharacterが2件未満の場合, THEN THE Chara_App SHALL Ranking_Battleを開始せず、対戦には2件以上の登録が必要である旨のメッセージを表示する
-7. IF Ranking_Battleの進行中にアプリが再読み込みまたは再起動された場合, THEN THE Chara_App SHALL 進行中の対戦状態を破棄し、対戦を初期状態に戻す
+1. WHEN 利用者がRanking_Battleを開始する, THE Chara_App SHALL Character_Storeに保存された全Character（2件以上）からトーナメントの組み合わせを生成し、最初のBattle_Pairの2件のCharacterを並べて表示する
+2. WHEN 1件のBattle_Pairが提示される, THE Chara_App SHALL 当該Battle_Pairの2件のCharacterからランダム要素を含めてちょうど1件を勝者として自動的に判定し、利用者の勝敗選択を必要とせずに勝者を決定する
+3. WHEN Battle_Pairの勝者が自動判定される, THE Chara_App SHALL 当該対戦の様子および勝敗結果を、実行のたびにランダムに変わるBattle_Commentaryとして表示する
+4. WHEN Battle_PairのBattle_Commentaryが表示された後, THE Chara_App SHALL 勝者を次のラウンドへ進め、かつ現ラウンドで未対戦の勝ち残りが2件以上ある間は次のBattle_Pairを提示する
+5. WHEN 同一のBattle_Pairの組み合わせに対してRanking_Battleが複数回実行される, THE Chara_App SHALL 実行ごとに勝者およびBattle_Commentaryが変動しうる結果を生成する
+6. IF あるラウンドの対象Characterが奇数件である場合, THEN THE Chara_App SHALL 当該ラウンドの対戦に割り当てられなかった1件を不戦勝（Bye）として、対戦を行わずに次のラウンドへ進める
+7. WHEN 勝ち残ったCharacterが1件のみとなる, THE Chara_App SHALL 当該Characterを最も好きなキャラクターとして表示する
+8. IF Character_Storeに保存されたCharacterが2件未満の場合, THEN THE Chara_App SHALL Ranking_Battleを開始せず、対戦には2件以上の登録が必要である旨のメッセージを表示する
+9. IF Ranking_Battleの進行中にアプリが再読み込みまたは再起動された場合, THEN THE Chara_App SHALL 進行中の対戦状態を破棄し、対戦を初期状態に戻す
 
 ### 要件5: 今日の一枚ガチャモード
 

@@ -38,7 +38,7 @@
 
 - [x] 3. ドメインの型定義（Character と補助値型）
   - `src/domain/types.ts` に `Character`（`id: string`・`name`・`nickname`・`memo`・`favoriteLevel: number`・`photo: Blob`・`createdAt: number`）を定義する（design.md「Data Models」）
-  - 補助値型 `CharacterDraft`・`CalendarDay`・`BattlePair`・`BattleSide`・`Result<T, E>`・`StoreError`・`PhotoError`・`FieldError` を定義する
+  - 補助値型 `CharacterDraft`・`CalendarDay`・`BattlePair`・`BattleOutcome`（`winner: string`・`loser: string`・`commentary: string`）・`Result<T, E>`・`StoreError`・`PhotoError`・`FieldError` を定義する
   - _Requirements: 1.4, 1.5, 1.6, 1.7, 1.8, 3.3, 2.1_
 
 - [x] 4. Persistence 層: CharacterStore インターフェースと実装
@@ -165,14 +165,14 @@
     - _Requirements: 5.1, 5.2, 5.3, 5.5_
 
   - [x]* 10.2 今日の一枚の決定性・要素性のプロパティテスト
-    - **Property 14: 今日の一枚は暦日内で決定的かつコレクションの要素**（同一 day+salt で常に同一 id・コレクションの要素、salt 変更後もコレクションの要素）
+    - **Property 15: 今日の一枚は暦日内で決定的かつコレクションの要素**（同一 day+salt で常に同一 id・コレクションの要素、salt 変更後もコレクションの要素）
     - **Validates: Requirements 5.1, 5.2, 5.3**
-    - `// Feature: chara-collection, Property 14` タグ・`numRuns: 100`
+    - `// Feature: chara-collection, Property 15` タグ・`numRuns: 100`
 
   - [x]* 10.3 メッセージ50文字以下のプロパティテスト
-    - **Property 15: 今日のメッセージは50文字以下**（併記メッセージの文字数は50以下）
+    - **Property 16: 今日のメッセージは50文字以下**（併記メッセージの文字数は50以下）
     - **Validates: Requirements 5.5**
-    - `// Feature: chara-collection, Property 15` タグ・`numRuns: 100`
+    - `// Feature: chara-collection, Property 16` タグ・`numRuns: 100`
 
 - [x] 11. ガチャの Hook と画面
   - [x] 11.1 `useDailyGacha` を実装する
@@ -190,40 +190,49 @@
 - [x] 12. Iteration 2 チェックポイント（今日の一枚ガチャ）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
-- [ ] 13. ドメイン: TournamentEngine（トーナメント）
-  - [~] 13.1 `TournamentEngine` を実装する
-    - `src/domain/TournamentEngine.ts` に `createTournament(contestants, shuffle?)` ファクトリと、`currentPair`・`champion`・`selectWinner(id)` を実装する。開始時に注入シャッフル（テスト時は恒等/固定順）で一度並べ替え、各ラウンドでキューから 2 件ずつ `BattlePair` を構成。奇数の余り 1 件は不戦勝で次ラウンドへ繰上げ、勝者を次ラウンドへ、敗者を除外し、勝ち残り 1 件で champion を確定する（有限回で終了）
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+- [x] 13. ドメイン: TournamentEngine（自動判定）と BattleCommentator（実況）
+  - [x] 13.1 `TournamentEngine` を実装する（勝者は rng で自動判定）
+    - `src/domain/TournamentEngine.ts` に `createTournament(contestants, rng, shuffle?)` ファクトリを実装する。`rng: () => number` は [0,1) の一様乱数を外部注入し、本番は `Math.random`、テストは固定/シード rng を渡す。`currentPair`・`champion`・`lastResult`（`{ winner, loser }`）・`advance()` を実装する。開始時に注入シャッフル（テスト時は恒等/固定順）で一度並べ替え、各ラウンドでキューから 2 件ずつ `BattlePair` を構成する。`advance()` は現ペアの 2 件から rng でちょうど 1 件を勝者に自動決定し（例: `rng() < 0.5` で left）、勝者を次ラウンドのキューへ進め、敗者を除外する。奇数の余り 1 件は不戦勝で次ラウンドへ繰上げ、勝ち残り 1 件で champion を確定する（有限回で終了。終了性は rng に非依存）。利用者による `selectWinner` は廃止する
+    - _Requirements: 4.1, 4.2, 4.4, 4.6, 4.7_
 
-  - [ ]* 13.2 唯一の勝者で終了のプロパティテスト
-    - **Property 11: トーナメントは唯一の勝者で終了する**（2件以上・任意選択列で、進行中は相異なる2件の pair、最終的に要素ちょうど1件が champion で終了）
-    - **Validates: Requirements 4.1, 4.2, 4.5**
-    - `// Feature: chara-collection, Property 11` タグ・`numRuns: 100`
+  - [x] 13.2 `BattleCommentator` を実装する
+    - `src/domain/BattleCommentator.ts` に `narrate(pair: { winner: string; loser: string }, rng: () => number): string` を実装する。複数の実況テンプレート（例: 「{winner} が {loser} を圧倒！」「接戦の末、{winner} が {loser} を下した！」等）を持ち、rng でテンプレートを 1 つ選び勝者/敗者名を差し込む。純粋関数で副作用を持たず rng を外部注入するため、同一の対戦結果でも rng の値により文面が変動しうる
+    - _Requirements: 4.3, 4.5_
 
-  - [ ]* 13.3 敗者除外・単調減少のプロパティテスト
-    - **Property 12: 対戦の進行は敗者を除外し勝者を進める**（勝者は次へ進み敗者は以降現れず、勝ち残り総数は単調減少）
-    - **Validates: Requirements 4.3**
-    - `// Feature: chara-collection, Property 12` タグ・`numRuns: 100`
+  - [ ]* 13.3 唯一の勝者で自動終了のプロパティテスト
+    - **Property 11: トーナメントは唯一の勝者で自動終了する**（2件以上・任意の rng シード列で、進行中は相異なる2件の pair、最終的に要素ちょうど1件が champion として確定して終了し、利用者の勝敗選択を要しない）
+    - **Validates: Requirements 4.1, 4.2, 4.7**
+    - 対象: `TournamentEngine`（rng 注入）。`// Feature: chara-collection, Property 11` タグ・`numRuns: 100`
 
-  - [ ]* 13.4 奇数ラウンドの不戦勝のプロパティテスト
+  - [ ]* 13.4 自動判定の敗者除外・単調減少のプロパティテスト
+    - **Property 12: 自動判定は敗者を除外し勝者を進める**（rng による自動判定で選ばれた勝者は次の対戦へ進み、敗者は以降のいずれの対戦にも現れず、勝ち残り総数は単調減少）
+    - **Validates: Requirements 4.2, 4.4**
+    - 対象: `TournamentEngine`（rng 注入）。`// Feature: chara-collection, Property 12` タグ・`numRuns: 100`
+
+  - [ ]* 13.5 奇数ラウンドの不戦勝のプロパティテスト
     - **Property 13: 奇数ラウンドの不戦勝**（奇数件のラウンドでちょうど1件が不戦勝で次へ、全 Character が過不足なく次ラウンドへ引き継がれる）
-    - **Validates: Requirements 4.4**
-    - `// Feature: chara-collection, Property 13` タグ・`numRuns: 100`
+    - **Validates: Requirements 4.6**
+    - 対象: `TournamentEngine`（rng 注入）。`// Feature: chara-collection, Property 13` タグ・`numRuns: 100`
 
-- [ ] 14. 対戦の Hook と画面
-  - [~] 14.1 `useRankingBattle` を実装する
-    - `src/hooks/useRankingBattle.ts` に `currentPair`・`champion`・`canStart`・`start()`・`choose(side)`・`reset()` を実装する。`fetchAll` で全 Character を取得し 2 件未満は `canStart=false`（開始せずメッセージ、要件4.6）。`start` で `createTournament` を生成、`choose` で `selectWinner` を呼ぶ。進行状態は in-memory のみで永続化せず、ページ再読み込み/再起動時は初期化される（要件4.7）
-    - _Requirements: 4.1, 4.2, 4.3, 4.5, 4.6, 4.7_
+  - [ ]* 13.6 対戦実況の妥当性・変動性のプロパティテスト
+    - **Property 14: 対戦実況は妥当で実行ごとに変動しうる**（`narrate` は非空で勝者を表す情報を含む実況文字列を返し、実況テンプレートは複数存在し rng の値を変えると同一の対戦結果に対して複数の異なる実況文面が生成されうる）
+    - **Validates: Requirements 4.3, 4.5**
+    - 対象: `BattleCommentator`（rng 注入）。`// Feature: chara-collection, Property 14` タグ・`numRuns: 100`
 
-  - [~] 14.2 `RankingBattleView` を実装し App に配線する
-    - `src/components/RankingBattleView.tsx`: 現在の `BattlePair` 2 件を並べて表示し一方を選択させる。最終勝者を「最も好きなキャラ」として表示。2 件未満は開始せずメッセージ表示（要件4.6）。App のナビゲーションに対戦画面を追加する
-    - _Requirements: 4.1, 4.2, 4.3, 4.5, 4.6_
+- [x] 14. 対戦の Hook と画面
+  - [x] 14.1 `useRankingBattle` を実装する（自動判定・自動進行）
+    - `src/hooks/useRankingBattle.ts` に `currentPair`・`currentCommentary`（`BattleOutcome`）・`champion`・`canStart`・`start()`・`advance()`・`reset()` を実装する。`fetchAll` で全 Character を取得し 2 件未満は `canStart=false`（開始せずメッセージ、要件4.8）。`start` で `createTournament`（rng に `Math.random` を注入）を生成し最初のペアを提示。`advance()` は呼ぶたびに現ペアの勝者を rng で自動判定し `BattleCommentator.narrate` で実況を生成して `currentCommentary` に反映し、勝者を次ラウンドへ進める。利用者の勝敗選択（`choose(side)`）は廃止する。進行状態は in-memory のみで永続化せず、ページ再読み込み/再起動時は初期化される（要件4.9）
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.8, 4.9_
 
-  - [ ]* 14.3 useRankingBattle の2件未満ガード・リセットのユニットテスト
-    - 2 件未満で開始せずメッセージを表示すること（要件4.6）、`reset()`／再マウントで進行状態が初期化されること（要件4.7）を検証する
-    - _Requirements: 4.6, 4.7_
+  - [x] 14.2 `RankingBattleView` を実装し App に配線する
+    - `src/components/RankingBattleView.tsx`: 現在の `BattlePair` 2 件を並べて表示する。勝敗は利用者が選ばず、アプリが自動判定する。ランダムに変わる実況（`currentCommentary`）と勝敗結果を表示して自動進行する（利用者の操作は「開始」「次へ／自動再生」のみで勝敗選択はしない）。最終勝者を「最も好きなキャラ」として表示。2 件未満は開始せずメッセージ表示（要件4.8）。App のナビゲーションに対戦画面を追加する
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.8_
 
-- [~] 15. Iteration 3 チェックポイント（ランキング対戦）
+  - [ ]* 14.3 useRankingBattle の2件未満ガード・初期化・実況のユニットテスト
+    - 2 件未満で開始せずメッセージを表示すること（要件4.8）、`reset()`／再マウントで進行状態が初期化されること（要件4.9）、実況が複数テンプレートから rng でランダム生成され rng を固定/シードすると決定的に検証できること（勝者/敗者名の差し込み・非空、要件4.3, 4.5）を検証する
+    - _Requirements: 4.3, 4.5, 4.8, 4.9_
+
+- [x] 15. Iteration 3 チェックポイント（ランキング対戦）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
 - [ ] 16. 編集・削除機能
@@ -267,7 +276,7 @@
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜15）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜16）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -282,8 +291,8 @@
     { "id": 3, "tasks": ["8.1", "8.2", "7.3", "7.4"] },
     { "id": 4, "tasks": ["8.3", "8.4", "10.1"] },
     { "id": 5, "tasks": ["11.1", "10.2", "10.3"] },
-    { "id": 6, "tasks": ["11.2", "11.3", "13.1"] },
-    { "id": 7, "tasks": ["14.1", "13.2", "13.3", "13.4"] },
+    { "id": 6, "tasks": ["11.2", "11.3", "13.1", "13.2"] },
+    { "id": 7, "tasks": ["14.1", "13.3", "13.4", "13.5", "13.6"] },
     { "id": 8, "tasks": ["14.2", "14.3", "16.1"] },
     { "id": 9, "tasks": ["16.2", "16.3", "16.4"] },
     { "id": 10, "tasks": ["17.1"] },

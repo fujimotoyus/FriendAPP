@@ -25,12 +25,15 @@ export interface CollectionViewProps {
   onSelect: (character: Character) => void;
   /** 「今日の相棒（ガチャ）」導線が押されたときのハンドラ（ガチャ画面へ遷移）。要件5.4 */
   onOpenGacha: () => void;
+  /** 「対戦（ランキング対戦）」導線が押されたときのハンドラ（対戦画面へ遷移）。要件4.1 */
+  onOpenBattle: () => void;
 }
 
 export function CollectionView({
   onAdd,
   onSelect,
   onOpenGacha,
+  onOpenBattle,
 }: CollectionViewProps): JSX.Element {
   const { characters, loadState, reload } = useCollection();
 
@@ -41,6 +44,9 @@ export function CollectionView({
         <div className="collection-view__actions">
           <PastelButton variant="secondary" onClick={onOpenGacha}>
             今日の相棒 🎁
+          </PastelButton>
+          <PastelButton variant="secondary" onClick={onOpenBattle}>
+            対戦 ⚔️
           </PastelButton>
           <PastelButton onClick={onAdd}>新規登録 ✚</PastelButton>
         </div>
