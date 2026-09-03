@@ -1,4 +1,4 @@
----
+﻿---
 inclusion: always
 ---
 
@@ -12,7 +12,8 @@ inclusion: always
 
 ## 既知の注意点
 
-- src/hooks/useRegistration.ts に一時デバッグコード (storeErrorDetail state と未定義の readStoreErrorDetail 参照) が残っている。そのため tsc -b (npm run typecheck) は失敗するが、Vercel のビルドは vite build のみなので公開デプロイには影響しない。将来クリーンアップする場合はここを参照。
+- (解消済み 2025) 過去に src/hooks/useRegistration.ts に一時デバッグコード (storeErrorDetail state と未定義の readStoreErrorDetail 参照) が残っており、新規登録時に実行時例外 (未定義参照) で登録が失敗していた。該当コードは削除済みで、現在は tsc -b (npm run typecheck) も通る。
+- ローカルで npm 実行時は PowerShell の ExecutionPolicy により npm.ps1 がブロックされることがある。その場合は node ./node_modules/vite/bin/vite.js build や node ./node_modules/vitest/vitest.mjs run のように node 経由で直接起動する。
 
 ## 外部公開の別手段
 
@@ -25,4 +26,4 @@ inclusion: always
 
 ## 公開 URL
 
-- 公開 URL は未確認 (TODO: ユーザーに確認して追記)。過去の疎通確認ログ (vercelcheck.log) ではサイトタイトルが「お友達図鑑」で HTTP 200 を返していた。
+- 公開 URL: https://friend-app-psi.vercel.app/ (サイトタイトル「お友達図鑑」、HTTP 200 を確認済み)。
