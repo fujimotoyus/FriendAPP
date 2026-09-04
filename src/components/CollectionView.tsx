@@ -14,6 +14,7 @@
  */
 import type { Character } from '../domain/types';
 import { useCollection } from '../hooks/useCollection';
+import { storeErrorMessage } from '../hooks/errorMessages';
 import { CharacterCard } from './CharacterCard';
 import { EmptyStateView } from './EmptyStateView';
 import { PastelButton } from './PastelButton';
@@ -55,7 +56,7 @@ export function CollectionView({
       {/* 読み込み失敗: 保存済みデータは保持しつつ再試行手段を提示する（要件2.9）。 */}
       {loadState === 'failed' ? (
         <div className="collection-view__error" role="alert">
-          <p>読み込みに失敗しました。もう一度お試しください。</p>
+          <p>{storeErrorMessage({ kind: 'loadFailed' })}</p>
           <PastelButton variant="secondary" onClick={() => void reload()}>
             再試行
           </PastelButton>

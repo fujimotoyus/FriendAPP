@@ -1,4 +1,4 @@
-# Implementation Plan
+﻿# Implementation Plan
 
 実装計画: chara-collection（キャラ図鑑 / PWA）
 
@@ -235,12 +235,12 @@
 - [x] 15. Iteration 3 チェックポイント（ランキング対戦）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
-- [ ] 16. 編集・削除機能
-  - [~] 16.1 RegistrationForm の編集モードを実装する
+- [x] 16. 編集・削除機能
+  - [x] 16.1 RegistrationForm の編集モードを実装する
     - `useRegistration(editing)` に既存 Character の属性を初期表示（要件6.1）し、写真を差し替え可能にする（要件6.4）。`save()` で要件1と同じ検証を行い、`CharacterStore.update` で上書き（件数不変）、完了を通知する（要件6.2, 6.3）
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [~] 16.2 CharacterDetailView に削除フローを配線する
+  - [x] 16.2 CharacterDetailView に削除フローを配線する
     - 編集・削除の導線を提供し、削除時は確認を求める。キャンセルで元表示に戻し（要件6.6）、確認で `useCollection.remove(id)`（`CharacterStore.delete`）を呼び削除完了を通知する（要件6.5, 6.7）
     - _Requirements: 6.5, 6.6, 6.7_
 
@@ -253,8 +253,8 @@
     - 削除確認の要求・キャンセルで非削除・確定で削除通知を検証する（要件6.5, 6.6, 6.7）
     - _Requirements: 6.5, 6.6, 6.7_
 
-- [ ] 17. エラー / 空状態ハンドリングの全画面配線
-  - [~] 17.1 hooks 層のエラーマッピングを整備し各画面に反映する
+- [x] 17. エラー / 空状態ハンドリングの全画面配線
+  - [x] 17.1 hooks 層のエラーマッピングを整備し各画面に反映する
     - design.md「Error Handling」表に従い、`StoreError`（`quotaExceeded`/`writeFailed`/`loadFailed`/`capacityReached`）・`PhotoError`・`FieldError` をユーザー向けメッセージへマッピングする共通ヘルパを `src/hooks/errorMessages.ts` に実装し、`RegistrationForm`・`CollectionView`・`DailyGachaView`・`RankingBattleView` に配線する。容量超過は不要データ削除の促し、その他保存失敗は再試行の促し、いずれも入力・保存済みデータを破棄しない
     - _Requirements: 1.3, 1.10, 1.11, 1.12, 2.2, 2.4, 2.7, 2.9, 3.2, 3.7, 4.6, 5.6, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
@@ -262,13 +262,13 @@
     - 上限1,000件到達通知（要件2.2）、復元失敗時の非破壊（要件3.7）、favoriteLevel 不正時のメッセージ（要件8.1）、容量不足と再試行の各メッセージ（要件8.4, 8.5）を検証する
     - _Requirements: 2.2, 3.7, 8.1, 8.4, 8.5_
 
-- [ ] 18. PWA 仕上げ: Manifest とオフライン確認
-  - [~] 18.1 Web App Manifest とアイコン・Service Worker precache を確定する
+- [x] 18. PWA 仕上げ: Manifest とオフライン確認
+  - [x] 18.1 Web App Manifest とアイコン・Service Worker precache を確定する
     - `vite.config.ts` の `VitePWA` に Manifest（`name`/`short_name`「キャラ図鑑」相当、`display: 'standalone'`、`orientation: 'portrait'`、`start_url: '.'`、`scope: '.'`、`theme_color`/`background_color` をパステルトークンに一致）と 192/512（`maskable` 含む）アイコンを設定する。Workbox によるアプリシェル（JS/CSS/HTML/アイコン）precache を有効化し `autoUpdate` を設定する
     - iOS Safari 向けにホーム画面追加手順の案内 UI を追加し、`navigator.storage.persist()` を best-effort で呼ぶ（要件3.7 の非破壊方針を維持）
     - _Requirements: 3.4, 3.5, 3.8, 7.2, 7.3_
 
-- [~] 19. Iteration 4 / 最終チェックポイント（仕上げ）
+- [x] 19. Iteration 4 / 最終チェックポイント（仕上げ）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
 ## Notes

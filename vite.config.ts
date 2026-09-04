@@ -10,6 +10,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
+      // アプリシェル(JS/CSS/HTML)に加えてアイコン SVG も precache に含める。
+      includeAssets: ['icon.svg'],
       manifest: {
         name: 'お友達図鑑',
         short_name: 'お友達図鑑',
@@ -19,7 +21,14 @@ export default defineConfig({
         scope: '.',
         theme_color: '#ffb6c8',
         background_color: '#fff8f0',
-        icons: [],
+        icons: [
+          {
+            src: 'icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
       },
     }),
   ],

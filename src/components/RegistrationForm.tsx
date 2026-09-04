@@ -23,7 +23,8 @@
  */
 import type { FormEvent } from 'react';
 import { useRegistration } from '../hooks/useRegistration';
-import type { Character, FieldError, PhotoError, StoreError } from '../domain/types';
+import { photoErrorMessage, storeErrorMessage } from '../hooks/errorMessages';
+import type { Character, FieldError } from '../domain/types';
 import {
   MEMO_MAX_LENGTH,
   NAME_MAX_LENGTH,
@@ -50,34 +51,6 @@ function fieldErrorMessage(
 ): string | null {
   const found = errors.find((error) => error.field === field);
   return found ? found.message : null;
-}
-
-/** {@link PhotoError} をユーザー向けメッセージへマッピングする（要件1.10, 1.11, 8.2, 8.3）。 */
-function photoErrorMessage(error: PhotoError): string {
-  switch (error.kind) {
-    case 'unsupportedFormat':
-      return '対応していない画像形式です。JPEG・PNG・WebP のいずれかを選んでください。';
-    case 'tooLarge':
-      return '画像サイズが大きすぎます。もう少し小さい画像を選んでください。';
-    case 'acquisitionFailed':
-      return '写真を取り込めませんでした。もう一度お試しください。';
-    case 'cancelled':
-      return '写真が選択されませんでした。もう一度写真を選んでください。';
-  }
-}
-
-/** {@link StoreError} をユーザー向けメッセージへマッピングする（要件1.12, 2.2, 8.4, 8.5）。 */
-function storeErrorMessage(error: StoreError): string {
-  switch (error.kind) {
-    case 'quotaExceeded':
-      return '端末の空き容量が足りず保存できませんでした。不要なデータを削除してからお試しください。';
-    case 'capacityReached':
-      return '登録できるのは1,000件までです。不要なキャラクターを削除してからお試しください。';
-    case 'writeFailed':
-      return '保存に失敗しました。もう一度お試しください。';
-    case 'loadFailed':
-      return '保存に失敗しました。もう一度お試しください。';
-  }
 }
 
 export function RegistrationForm({

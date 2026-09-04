@@ -546,6 +546,34 @@ select {
   white-space: pre-wrap;
 }
 
+/* 編集・削除の操作行と削除確認 (要件6.5, 6.6, 6.7) */
+.character-detail__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.character-detail__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+}
+
+.character-detail__confirm-message {
+  margin: 0;
+  color: var(--color-text-primary);
+  line-height: var(--line-height-base);
+}
+
+/* 削除は破壊的操作だが、既存トークン内で他ボタンと区別できるよう淡いアクセント枠にする。 */
+.character-detail__delete {
+  border: 2px solid var(--color-primary-hover);
+}
+
 /* 写真取り込みボタン（写真をとる / フォトからえらぶ）の横並び (要件1.2) */
 .registration-form__photo-actions {
   display: flex;

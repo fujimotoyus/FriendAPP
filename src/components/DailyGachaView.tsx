@@ -13,6 +13,7 @@
  * Requirements: 5.3, 5.4, 5.5, 5.6
  */
 import { useDailyGacha } from '../hooks/useDailyGacha';
+import { storeErrorMessage } from '../hooks/errorMessages';
 import { EmptyStateView } from './EmptyStateView';
 import { PastelButton } from './PastelButton';
 import { PhotoFrame } from './PhotoFrame';
@@ -56,7 +57,7 @@ export function DailyGachaView({
       {/* 読み込み失敗: 保存済みデータは保持しつつ簡潔に通知する。 */}
       {state === 'failed' ? (
         <div className="daily-gacha__error" role="alert">
-          <p>読み込みに失敗しました。もう一度お試しください。</p>
+          <p>{storeErrorMessage({ kind: 'loadFailed' })}</p>
         </div>
       ) : null}
 
