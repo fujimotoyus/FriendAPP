@@ -12,6 +12,15 @@ export default defineConfig({
       devOptions: { enabled: true },
       // アプリシェル(JS/CSS/HTML)に加えてアイコン SVG も precache に含める。
       includeAssets: ['icon.svg'],
+      // 新しい Service Worker を即時有効化し、全クライアントを制御下に置く。
+      // これにより新デプロイ後に古いアプリシェルがキャッシュから配信され続けるのを防ぐ
+      // （main.tsx の onNeedRefresh による自動リロードと合わせて即時反映を保証する）。
+      workbox: {
+        clientsClaim: true,
+        skipWaiting: true,
+        // 古いバージョンの precache を確実に掃除する。
+        cleanupOutdatedCaches: true,
+      },
       manifest: {
         name: 'お友達図鑑',
         short_name: 'お友達図鑑',
@@ -44,4 +53,3 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
   },
 });
-
