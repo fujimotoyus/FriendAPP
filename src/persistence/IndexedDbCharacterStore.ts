@@ -102,22 +102,9 @@ function isStoreErrorException(value: unknown): value is StoreErrorException {
  */
 function toWriteStoreError(error: unknown): StoreError {
   if (isQuotaExceeded(error)) {
-    return { kind: 'quotaExceeded', detail: describeError(error) };
+    return { kind: 'quotaExceeded' };
   }
-  return { kind: 'writeFailed', detail: describeError(error) };
-}
-
-/**
- * 【一時デバッグ】元例外の name / message を文字列化する。原因確定後に削除する。
- */
-function describeError(error: unknown): string {
-  if (error && typeof error === 'object') {
-    const name = 'name' in error ? String((error as { name?: unknown }).name) : 'Error';
-    const message =
-      'message' in error ? String((error as { message?: unknown }).message) : '';
-    return `${name}: ${message}`;
-  }
-  return String(error);
+  return { kind: 'writeFailed' };
 }
 
 /**

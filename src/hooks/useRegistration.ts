@@ -65,11 +65,6 @@ export interface UseRegistrationResult {
   fieldErrors: FieldError[];
   photoError: PhotoError | null;
   storeError: StoreError | null;
-  /**
-   * 【一時デバッグ】本番PWAでの保存失敗の真因を特定するため、丸める前の元例外の
-   * name / message を保持する。原因確定後に削除する。
-   */
-  storeErrorDetail: string | null;
   setField: <K extends keyof CharacterDraft>(key: K, value: CharacterDraft[K]) => void;
   pickPhoto: (files: FileList | null) => Promise<void>;
   save: () => Promise<SaveResult>;
@@ -99,20 +94,6 @@ function createInitialDraft(editing?: Character): CharacterDraft {
 }
 
 /**
- * 【一時デバッグ】捕捉した例外から、画面表示用の詳細文字列（name: message）を作る。
- * 原因確定後に削除する。
- */
-function describeError(error: unknown): string {
-  if (error && typeof error === 'object') {
-    const name = 'name' in error ? String((error as { name?: unknown }).name) : 'Error';
-    const message =
-      'message' in error ? String((error as { message?: unknown }).message) : '';
-    return `${name}: ${message}`;
-  }
-  return String(error);
-}
-
-/**
  * キャラクターの新規登録 / 編集の View-State を提供する hook。
  */
 export function useRegistration(
@@ -125,8 +106,6 @@ export function useRegistration(
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
   const [photoError, setPhotoError] = useState<PhotoError | null>(null);
   const [storeError, setStoreError] = useState<StoreError | null>(null);
-  // 【一時デバッグ】原因確定用の詳細（後で削除）。
-  const [storeErrorDetail, setStoreErrorDetail] = useState<string | null>(null);
 
   const setField = useCallback(
     <K extends keyof CharacterDraft>(key: K, value: CharacterDraft[K]): void => {
@@ -146,10 +125,9 @@ export function useRegistration(
       let result;
       try {
         result = await validateAndProcess(file);
-      } catch (error) {
-        // 画像の読み出し（ArrayBuffer 変換）自体が失敗した場合。
+      } catch {
+        // 画像の読み出し（ArrayBuffer 変換）自体が失敗した場合（要件1.11, 8.3）。
         setPhotoError({ kind: 'acquisitionFailed' });
-        setStoreErrorDetail('pickPhoto: ' + describeError(error));
         return;
       }
 
@@ -166,7 +144,6 @@ export function useRegistration(
 
   const save = useCallback(async (): Promise<SaveResult> => {
     setStoreError(null);
-    setStoreErrorDetail(null);
 
     const errors = validate(draft);
     if (errors.length > 0) {
@@ -186,7 +163,7 @@ export function useRegistration(
           return 'storeError';
         }
       } catch (error) {
-        { const se = readStoreError(error); setStoreError(se); setStoreErrorDetail('count/' + se.kind + ': ' + (se.detail ?? describeError(error))); }
+        setStoreError(readStoreError(error));
         return 'storeError';
       }
     }
@@ -217,7 +194,7 @@ export function useRegistration(
       }
       return 'saved';
     } catch (error) {
-      { const se = readStoreError(error); setStoreError(se); setStoreErrorDetail('save/' + se.kind + ': ' + (se.detail ?? describeError(error))); }
+      setStoreError(readStoreError(error));
       return 'storeError';
     }
   }, [draft, store, editing]);
@@ -227,7 +204,6 @@ export function useRegistration(
     fieldErrors,
     photoError,
     storeError,
-    storeErrorDetail,
     setField,
     pickPhoto,
     save,
