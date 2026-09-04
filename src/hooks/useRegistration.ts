@@ -185,8 +185,7 @@ export function useRegistration(
           return 'storeError';
         }
       } catch (error) {
-        setStoreError(readStoreError(error));
-        setStoreErrorDetail('count: ' + describeError(error));
+        { const se = readStoreError(error); setStoreError(se); setStoreErrorDetail('count/' + se.kind + ': ' + (se.detail ?? describeError(error))); }
         return 'storeError';
       }
     }
@@ -217,8 +216,7 @@ export function useRegistration(
       }
       return 'saved';
     } catch (error) {
-      setStoreError(readStoreError(error));
-      setStoreErrorDetail('save: ' + describeError(error));
+      { const se = readStoreError(error); setStoreError(se); setStoreErrorDetail('save/' + se.kind + ': ' + (se.detail ?? describeError(error))); }
       return 'storeError';
     }
   }, [draft, store, editing]);

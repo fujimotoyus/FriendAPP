@@ -114,10 +114,10 @@ export type Result<T, E> =
  * 参照: design.md「補助的な値型」「エラー変換」、要件3.2, 2.2, 8.4, 8.5
  */
 export type StoreError =
-  | { kind: 'quotaExceeded' }
-  | { kind: 'writeFailed' }
-  | { kind: 'loadFailed' }
-  | { kind: 'capacityReached' };
+  | { kind: 'quotaExceeded'; detail?: string }
+  | { kind: 'writeFailed'; detail?: string }
+  | { kind: 'loadFailed'; detail?: string }
+  | { kind: 'capacityReached'; detail?: string };
 
 /**
  * 写真の取り込み・検証に関するエラーの判別可能ユニオン。
