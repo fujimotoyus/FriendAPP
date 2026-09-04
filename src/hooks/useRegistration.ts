@@ -15,6 +15,7 @@ import type {
   Character,
   CharacterDraft,
   FieldError,
+  PhotoData,
   PhotoError,
   StoreError,
 } from '../domain/types';
@@ -174,7 +175,7 @@ export function useRegistration(
     }
     setFieldErrors([]);
 
-    const photo = draft.photo as Blob;
+    const photo = draft.photo as PhotoData;
     const isEditing = draft.editingId !== undefined;
 
     if (!isEditing) {

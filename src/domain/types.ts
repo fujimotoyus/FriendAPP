@@ -8,6 +8,24 @@
  */
 
 /**
+ * 写真データ（バイト列 + MIME）。
+ *
+ * 写真は `Blob` ではなく ArrayBuffer（バイト列）+ MIME 文字列として保持・保存する。
+ * IndexedDB に `Blob` / `File` を直接保存すると iOS WebKit の既知バグで
+ * `UnknownError: Error preparing Blob/File data to be stored in object store`
+ * が発生し保存に失敗する（一覧で写真が表示できない）ため、これを回避する。
+ * 表示時は `new Blob([data], { type })` で都度 Blob を生成して Object URL 化する。
+ *
+ * 参照: design.md「写真ストレージ戦略」、要件1.8, 3.3
+ */
+export interface PhotoData {
+  /** 画像のバイト列。IndexedDB には ArrayBuffer のまま構造化複製で保存される。 */
+  data: ArrayBuffer;
+  /** 画像の MIME タイプ（例: 'image/jpeg'）。表示時の Blob 生成に用いる。 */
+  type: string;
+}
+
+/**
  * 登録された 1 件のお気に入りキャラクター（ドメインの中心エンティティ）。
  * IndexedDB の `characters` オブジェクトストアに `keyPath: 'id'` で永続化される。
  *
@@ -24,8 +42,8 @@ export interface Character {
   memo: string;
   /** お気に入り度。1〜5 の整数。範囲外・非整数は保存拒否。要件1.7, 8.1 */
   favoriteLevel: number;
-  /** 写真バイナリ（必須）。IndexedDB に Blob として直接格納する。要件1.8, 3.3 */
-  photo: Blob;
+  /** 写真（必須）。ArrayBuffer(バイト列)+MIME として IndexedDB に格納する。要件1.8, 3.3 */
+  photo: PhotoData;
   /** 登録日時（epoch ミリ秒）。一覧の並び順（新しい順）・暦日固定選出の安定キー。要件2.1, 5.2 */
   createdAt: number;
 }
@@ -45,8 +63,8 @@ export interface CharacterDraft {
   memo: string;
   /** お気に入り度（整数 1〜5）。要件1.7, 8.1 */
   favoriteLevel: number;
-  /** 写真。未取得は null（写真は登録時に必須）。要件1.3, 1.8 */
-  photo: Blob | null;
+  /** 写真。ArrayBuffer(バイト列)+MIME。未取得は null（写真は登録時に必須）。要件1.3, 1.8 */
+  photo: PhotoData | null;
   /** 未指定なら新規登録、値ありなら当該 id の Character を編集。要件6.1 */
   editingId?: string;
 }

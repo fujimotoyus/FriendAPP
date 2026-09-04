@@ -18,7 +18,7 @@ import { InMemoryCharacterStore } from '../persistence/InMemoryCharacterStore';
 import { useDailyGacha } from './useDailyGacha';
 
 /**
- * テスト用の Character を生成する。写真 Blob はダミーの小さな Blob。
+ * テスト用の Character を生成する。写真はダミーの ArrayBuffer + MIME（PhotoData）。
  */
 function makeCharacter(id: string, name = `name-${id}`): Character {
   return {
@@ -27,7 +27,7 @@ function makeCharacter(id: string, name = `name-${id}`): Character {
     nickname: '',
     memo: '',
     favoriteLevel: 3,
-    photo: new Blob(['x'], { type: 'image/png' }),
+    photo: { data: new Uint8Array([120]).buffer, type: 'image/png' },
     createdAt: Number(id.replace(/\D/g, '')) || 1,
   };
 }

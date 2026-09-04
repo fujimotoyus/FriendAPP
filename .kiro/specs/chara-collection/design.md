@@ -17,7 +17,7 @@
 - **プラットフォーム**: Web（PWA）。iPhone Safari でホーム画面に追加し、スタンドアロン・ポートレートで起動する（要件7.1, 7.2）。オフラインファースト設計とする。
 - **フレームワーク / 言語 / ビルド**: React + TypeScript + Vite（要件7.1）。
 - **PWA 化**: `vite-plugin-pwa` により Web App Manifest と Service Worker を生成する。Service Worker がアプリシェルをプリキャッシュし、初回読み込み以降はオフラインで各機能を提供する（要件3.4, 3.5, 7.2, 7.3）。
-- **永続化**: 端末内の **IndexedDB**。写真は **Blob** として保存する。IndexedDB の薄いラッパとして `idb` ライブラリを用いる（実装詳細）。サーバー同期・外部送信は一切行わない（要件3.1, 3.3, 3.8）。
+- **永続化**: 端末内の **IndexedDB**。写真は **ArrayBuffer(バイト列)+MIME** として保存する（`PhotoData`）。IndexedDB に Blob/File を直接保存すると iOS WebKit の既知バグ（`UnknownError: Error preparing Blob/File data to be stored in object store`）で保存に失敗するため、ArrayBuffer として保存する。IndexedDB の薄いラッパとして `idb` ライブラリを用いる（実装詳細）。サーバー同期・外部送信は一切行わない（要件3.1, 3.3, 3.8）。
 - **写真取得**: HTML の `<input type="file" accept="image/*">` を用いる。モバイルでは `capture` 属性でカメラ起動を要求できる（要件1.2）。
 - **UI**: パステルカラー基調・角丸多用のかわいくポップなデザインを **CSS（CSS カスタムプロパティ／トークン）** で実現する。重量級 UI フレームワークは用いない（要件7.4, 7.5）。
 - **状態管理**: React の state + hooks を基本とし、小さなストア／コンテキスト層を許容する。ドメインロジックはフレームワーク非依存の**純粋 TypeScript モジュール**として切り出し、テスト容易性（property-based testing）を確保する。
@@ -117,10 +117,10 @@ React コンポーネント（View）と hooks（View-State）を分離し、意
 | --- | --- |
 | React + TypeScript + Vite | 要件7.1 で指定。型安全・高速な開発サーバー・軽量ビルド。Windows で完結。 |
 | PWA（vite-plugin-pwa） | 要件7.2, 7.3。Manifest + Service Worker をビルド時に生成し、ホーム画面追加とオフラインを実現。 |
-| IndexedDB + `idb`（写真は Blob） | 要件3.1, 3.3。大容量バイナリを扱える端末内ストア。`idb` は薄い Promise ラッパで実装を簡潔化。 |
+| IndexedDB + `idb`（写真は ArrayBuffer+MIME） | 要件3.1, 3.3。大容量バイナリを扱える端末内ストア。写真は Blob/File ではなく ArrayBuffer で保存（iOS WebKit の Blob 保存バグ回避）。`idb` は薄い Promise ラッパで実装を簡潔化。 |
 | `CharacterStore` インターフェース抽象 | 実装（IndexedDB）とテスト（インメモリ）を差し替え可能にするため。 |
 | ドメインロジックの純粋 TS 化 | property-based testing（決定的選出・トーナメント・バリデーション）を成立させるため。 |
-| Blob + Object URL 表示 | 写真表示は `URL.createObjectURL(blob)` で行い、不要時に `revokeObjectURL` で解放しメモリリークを防ぐ。 |
+| ArrayBuffer 保存 + Object URL 表示 | 保存は ArrayBuffer+MIME。表示時に `new Blob([data], { type })` で Blob を都度生成し `URL.createObjectURL` で表示、不要時に `revokeObjectURL` で解放しメモリリークを防ぐ。 |
 
 ## Components and Interfaces
 
@@ -161,7 +161,7 @@ function CollectionView(): JSX.Element {
 - `FavoriteLevelPicker`: 1〜5 のお気に入り度選択（ハート等のかわいい表現、44×44 CSS px 以上、要件1.7, 7.7）。
 - `PastelButton`: 主要アクション用ボタン（パステルアクセント・角丸中・最小 44×44 CSS px、要件7.5, 7.7）。
 - `EmptyStateView`: 空状態表示（要件2.7, 5.6, 8.6）。
-- `PhotoFrame`: 角丸の写真表示枠。Blob から生成した Object URL を受け取り、`onError` でプレースホルダー表示（要件2.4）。
+- `PhotoFrame`: 角丸の写真表示枠。`PhotoData`（ArrayBuffer+MIME）を受け取り、表示時に Blob を生成して Object URL 化する。`onError` でプレースホルダー表示（要件2.4）。
 - `PhotoInput`: `<input type="file" accept="image/*" capture="environment">` をラップし、選択・キャンセル・ブロックを扱う（要件1.2, 1.11）。
 
 ### Hooks / View-State（ViewModel 相当）
@@ -242,8 +242,8 @@ interface BattleCommentator {
 
 // 画像検証・正規化（要件1.10, 8.2, 8.3）
 interface PhotoProcessor {
-  // 対応 MIME(JPEG/PNG/WebP)判定、サイズ上限チェック、必要なら Blob を返す
-  validateAndProcess(file: File): Promise<Result<Blob, PhotoError>>;
+  // 対応 MIME(JPEG/PNG/WebP)判定、サイズ上限チェック、正常なら PhotoData(ArrayBuffer+MIME)を返す
+  validateAndProcess(file: File): Promise<Result<PhotoData, PhotoError>>;
 }
 ```
 
@@ -283,7 +283,7 @@ interface Character {
   nickname: string;      // 0〜50文字（要件1.5）。空文字は「未登録」扱い
   memo: string;          // 0〜500文字（要件1.6）
   favoriteLevel: number; // 1〜5 の整数（要件1.7, 8.1）
-  photo: Blob;           // 写真バイナリ（要件1.8, 3.3）
+  photo: PhotoData;      // 写真（ArrayBuffer+MIME）（要件1.8, 3.3）
   createdAt: number;     // 登録日時（epoch ミリ秒）。並び順・決定的選出のキー
 }
 ```
@@ -297,7 +297,7 @@ interface Character {
 | `nickname` | `string`、0〜50 | 要件1.5, 2.6。空文字は「未登録」として扱う。 |
 | `memo` | `string`、0〜500 | 要件1.6, 2.8。 |
 | `favoriteLevel` | `number`（整数 1〜5） | 要件1.7, 8.1。範囲外・非整数は保存拒否。 |
-| `photo` | `Blob` | 要件1.8, 3.3。写真は必須。IndexedDB に Blob として格納。 |
+| `photo` | `PhotoData`（`{ data: ArrayBuffer; type: string }`） | 要件1.8, 3.3。写真は必須。IndexedDB に ArrayBuffer(バイト列)+MIME として格納（iOS WebKit の Blob 保存バグ回避）。 |
 | `createdAt` | `number`（epoch ms） | 要件2.1（新しい順）、要件5.2（暦日固定選出の安定キー）。 |
 
 ### IndexedDB オブジェクトストアスキーマ
@@ -306,8 +306,8 @@ interface Character {
 - オブジェクトストア: `characters`。
   - `keyPath: 'id'`（UUID を主キー）。
   - インデックス: `by-createdAt`（`keyPath: 'createdAt'`）。降順取得と並び替えに使用（要件2.1）。
-- 写真は `Character.photo` フィールドに **Blob** として直接格納する。IndexedDB は Blob の保存に対応しており、別ファイル管理（孤児ファイル掃除）が不要なため、削除時の整合性が単純になる（要件1.8, 3.3, 6.7）。
-- 表示時は `URL.createObjectURL(photo)` で Object URL を生成し、コンポーネントのアンマウント時に `URL.revokeObjectURL` で解放する（メモリリーク防止）。
+- 写真は `Character.photo` フィールドに **ArrayBuffer(バイト列)+MIME**（`PhotoData`）として直接格納する。IndexedDB に Blob/File を直接保存すると iOS WebKit の既知バグ（UnknownError: Error preparing Blob/File data...）で失敗するため ArrayBuffer で保存する。別ファイル管理（孤児ファイル掃除）が不要なため、削除時の整合性が単純になる（要件1.8, 3.3, 6.7）。旧バージョンで Blob として保存された写真は `fetchAll` 読み出し時に `PhotoData` へ正規化して後方互換を保つ。
+- 表示時は `new Blob([photo.data], { type: photo.type })` で Blob を都度生成し `URL.createObjectURL` で Object URL を生成する。コンポーネントのアンマウント時に `URL.revokeObjectURL` で解放する（メモリリーク防止）。この表示用 Blob は保存しない（IndexedDB には ArrayBuffer のまま格納される）。
 
 ### 容量上限（1,000 件）
 
@@ -321,7 +321,7 @@ interface CharacterDraft {   // 入力保持用（要件1.3, 1.11, 1.12, 8.3〜8
   nickname: string;
   memo: string;
   favoriteLevel: number;
-  photo: Blob | null;        // 未取得は null
+  photo: PhotoData | null;   // ArrayBuffer+MIME。未取得は null
   editingId?: string;        // 未指定なら新規、値ありなら編集
 }
 
@@ -384,7 +384,7 @@ sequenceDiagram
             IMG-->>H: { ok:false, error: unsupportedFormat/tooLarge }
             H-->>RF: 形式/サイズ案内・入力保持（要件1.10, 8.2）
         else 正常
-            IMG-->>H: { ok:true, value: Blob }
+            IMG-->>H: { ok:true, value: PhotoData }
             H->>H: draft.photo に格納
         end
     end
@@ -527,10 +527,11 @@ sequenceDiagram
   - `delete(id)`: 当該 `id` を削除（要件6.7）。
   - `count()`: レコード数を返す。
 
-### 写真ストレージ戦略（Blob と Object URL）
+### 写真ストレージ戦略（ArrayBuffer 保存と Object URL 表示）
 
-- 写真は `Character.photo` に **Blob** として保存する。取得直後に `PhotoProcessor` で対応 MIME（JPEG/PNG/WebP）と上限サイズを検証し、必要に応じて処理した Blob を保存する（要件1.8, 1.10, 8.2）。
-- 表示時は `URL.createObjectURL(blob)` で Object URL を生成し、`PhotoFrame` / `CharacterCard` に渡す。コンポーネントのアンマウント時・画像差し替え時に `URL.revokeObjectURL` を必ず呼び、URL の蓄積によるメモリリークを防ぐ。
+- 写真は `Character.photo` に **ArrayBuffer(バイト列)+MIME**（`PhotoData`）として保存する。IndexedDB に Blob/File を直接保存すると iOS WebKit の既知バグ（`UnknownError: Error preparing Blob/File data to be stored in object store`）で保存に失敗するため、ArrayBuffer として保存する。取得直後に `PhotoProcessor` で対応 MIME（JPEG/PNG/WebP）と上限サイズを検証し、内容を ArrayBuffer に読み出して `{ data, type }` を保存する（要件1.8, 1.10, 8.2）。
+- 表示時は `PhotoFrame` 内で `new Blob([photo.data], { type: photo.type })` により Blob を都度生成し、`URL.createObjectURL(blob)` で Object URL を生成する。この Blob は表示専用であり保存しない。コンポーネントのアンマウント時・画像差し替え時に `URL.revokeObjectURL` を必ず呼び、URL の蓄積によるメモリリークを防ぐ。
+- 旧バージョンで Blob として保存された写真は `IndexedDbCharacterStore.fetchAll` 読み出し時に `PhotoData` へ正規化し、後方互換を保つ。
 - 画像読み込み失敗（`<img onError>`）時はプレースホルダーへフォールバックし、他カードの表示は継続する（要件2.4）。
 
 ### エラー変換
@@ -608,7 +609,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 ### Property 5: 保存・復元のラウンドトリップ
 
-*任意の* 有効な `Character` について、ストアへ保存した後に取得（再読み込みを含む）すると、写真 Blob のバイト内容を含む全属性が等価な `Character` が得られる。
+*任意の* 有効な `Character` について、ストアへ保存した後に取得（再読み込みを含む）すると、写真のバイト内容を含む全属性が等価な `Character` が得られる。
 
 **Validates: Requirements 1.8, 3.3, 3.6**
 
@@ -732,7 +733,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 2 | favoriteLevel 1〜5（整数） | `CharacterValidator` |
 | 3 | 写真必須 | `CharacterValidator` |
 | 4 | 非対応/過大画像の拒否 | `PhotoProcessor` |
-| 5 | 保存→取得ラウンドトリップ（Blob 含む） | `InMemoryCharacterStore` |
+| 5 | 保存→取得ラウンドトリップ（写真バイト内容含む） | `InMemoryCharacterStore` |
 | 6 | 更新ラウンドトリップ・件数不変 | `InMemoryCharacterStore` |
 | 7 | 保存失敗時の原子性・入力保持 | 失敗スタブ Store + `useRegistration`/save ロジック |
 | 8 | 削除は対象1件のみ | `InMemoryCharacterStore` |
@@ -823,7 +824,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | --- | --- |
 | 要件1（写真付き登録） | `RegistrationForm` / `useRegistration` / `CharacterValidator` / `PhotoProcessor` / `PhotoInput` / フロー1 / Property 1〜5, 7 |
 | 要件2（一覧表示・図鑑） | `CollectionView` / `useCollection` / `CharacterCard` / `EmptyStateView` / `fetchAll`（降順）/ 上限1,000件 / Property 8〜10 |
-| 要件3（オフライン保存） | `CharacterStore` / `IndexedDbCharacterStore`（idb）/ Blob 写真 / Service Worker / Persistence Design / PWA Design / Property 5, 7 |
+| 要件3（オフライン保存） | `CharacterStore` / `IndexedDbCharacterStore`（idb）/ ArrayBuffer+MIME 写真 / Service Worker / Persistence Design / PWA Design / Property 5, 7 |
 | 要件4（ランキング対戦） | `RankingBattleView` / `useRankingBattle`（`advance` 自動進行）/ `TournamentEngine`（rng 自動判定）/ `BattleCommentator`（実況生成）/ フロー3 / 自動判定トーナメントアルゴリズム / Property 11〜14 |
 | 要件5（今日の一枚ガチャ） | `DailyGachaView` / `useDailyGacha` / `DailyPickSelector` / localStorage salt / フロー2 / 決定的選出アルゴリズム / Property 15, 16 |
 | 要件6（編集・削除） | `RegistrationForm`（編集）/ `CharacterDetailView`（削除確認）/ `CharacterStore.update` / `delete` / Property 6, 8 |

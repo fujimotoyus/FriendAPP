@@ -1,11 +1,14 @@
 /**
  * PhotoFrame — 角丸の写真表示枠。
  *
- * Blob（または null）を受け取り、`URL.createObjectURL` で Object URL を生成して
- * 表示する。Blob が変わったときとアンマウント時に `URL.revokeObjectURL` で URL を
- * 解放し、Object URL の蓄積によるメモリリークを防ぐ（design.md「写真ストレージ戦略
- * / Blob と Object URL」）。写真が null の場合、または `<img onError>` でデコードに
- * 失敗した場合はプレースホルダー表示にフォールバックする（要件2.4）。
+ * {@link PhotoData}（ArrayBuffer + MIME）または null を受け取り、表示のたびに
+ * `new Blob([data], { type })` で Blob を生成し `URL.createObjectURL` で Object URL を
+ * 生成して表示する。ここで生成する Blob は表示（URL 生成）専用であり、IndexedDB には
+ * 保存しない（保存されるのは ArrayBuffer のまま。iOS WebKit の Blob/File 保存バグ回避）。
+ * `photo` が変わったときとアンマウント時に `URL.revokeObjectURL` で URL を解放し、
+ * Object URL の蓄積によるメモリリークを防ぐ（design.md「写真ストレージ戦略」）。
+ * 写真が null / data が空の場合、または `<img onError>` でデコードに失敗した場合は
+ * プレースホルダー表示にフォールバックする（要件2.4）。
  *
  * 角丸はデザインシステムの `.photo-frame`（`--radius-large`）で表現する
  * （design.md「Design Theme and Design System」、要件7.5）。
@@ -13,10 +16,11 @@
  * Requirements: 2.4, 7.5
  */
 import { useEffect, useState } from 'react';
+import type { PhotoData } from '../domain/types';
 
 export interface PhotoFrameProps {
-  /** 表示する写真の Blob。未取得・未設定は null（プレースホルダー表示）。 */
-  photo: Blob | null;
+  /** 表示する写真（ArrayBuffer + MIME）。未取得・未設定は null（プレースホルダー表示）。 */
+  photo: PhotoData | null;
   /** 画像の代替テキスト（アクセシビリティ）。省略時は空文字。 */
   alt?: string;
   /** ルート要素に付与する追加クラス名（レイアウト調整用）。 */
@@ -43,19 +47,21 @@ export function PhotoFrame({ photo, alt = '', className }: PhotoFrameProps): JSX
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    // 写真が無ければ Object URL を生成しない。
-    if (photo == null) {
+    // 写真が無い / バイト列が空なら Object URL を生成しない。
+    if (photo == null || photo.data == null || photo.data.byteLength === 0) {
       setObjectUrl(null);
       setHasError(false);
       return;
     }
 
-    // Blob から Object URL を生成し、新しい写真になるたびにエラー状態をリセットする。
-    const url = URL.createObjectURL(photo);
+    // 表示専用の Blob を ArrayBuffer から都度生成し、Object URL を作る。
+    // この Blob は保存しない（IndexedDB には ArrayBuffer のまま保存される）。
+    const blob = new Blob([photo.data], { type: photo.type });
+    const url = URL.createObjectURL(blob);
     setObjectUrl(url);
     setHasError(false);
 
-    // Blob 変更時・アンマウント時に URL を解放してメモリリークを防ぐ。
+    // photo 変更時・アンマウント時に URL を解放してメモリリークを防ぐ。
     return () => {
       URL.revokeObjectURL(url);
     };

@@ -2,15 +2,56 @@
  * IndexedDB による Character_Store の既定実装（idb 経由）
  *
  * `idb` の薄い Promise ラッパを用いて IndexedDB に Character を永続化する。
- * 写真は Blob として `Character.photo` フィールドに直接格納する（別ファイル管理不要）。
+ * 写真は ArrayBuffer(バイト列)+MIME（{@link PhotoData}）として `Character.photo` に格納する。
+ * IndexedDB に Blob/File を直接保存すると iOS WebKit の既知バグ
+ * （UnknownError: Error preparing Blob/File data...）で保存に失敗するため、ArrayBuffer で保存する。
+ * 旧バージョンで Blob として保存された写真は fetchAll 読み出し時に PhotoData へ正規化する。
  * IndexedDB / idb の例外はすべて {@link StoreError} に正規化して throw する。
  *
  * 参照: design.md「Persistence Design」「Data Models / IndexedDB オブジェクトストアスキーマ」、
  *       要件2.1, 2.2, 3.1, 3.2, 3.3, 3.6, 6.3, 6.7, 8.4, 8.5
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Character, StoreError } from '../domain/types';
+import type { Character, PhotoData, StoreError } from '../domain/types';
 import type { CharacterStore } from './CharacterStore';
+
+/**
+ * 読み出した Character の photo を {@link PhotoData} 形（ArrayBuffer + MIME）へ正規化する。
+ *
+ * 旧バージョンでは写真を `Blob` として保存していたため、IndexedDB に Blob が残っている
+ * 可能性がある。読み出し時に以下のように正規化して、旧データでも表示が壊れないようにする:
+ * - 既に PhotoData 形（data:ArrayBuffer, type:string）ならそのまま。
+ * - Blob なら `{ data: await blob.arrayBuffer(), type: blob.type }` へ変換する。
+ * - それ以外（想定外）は空の PhotoData として扱い、プレースホルダー表示に委ねる。
+ */
+async function normalizePhoto(photo: unknown): Promise<PhotoData> {
+  // 既に PhotoData 形（ArrayBuffer + type）ならそのまま返す。
+  if (
+    photo != null &&
+    typeof photo === 'object' &&
+    'data' in photo &&
+    (photo as { data?: unknown }).data instanceof ArrayBuffer
+  ) {
+    const p = photo as { data: ArrayBuffer; type?: unknown };
+    return { data: p.data, type: typeof p.type === 'string' ? p.type : '' };
+  }
+
+  // 旧データ: Blob として保存されていた写真を ArrayBuffer へ変換する。
+  if (typeof Blob !== 'undefined' && photo instanceof Blob) {
+    return { data: await photo.arrayBuffer(), type: photo.type };
+  }
+
+  // 想定外の値は空の PhotoData として扱う（PhotoFrame がプレースホルダー表示）。
+  return { data: new ArrayBuffer(0), type: '' };
+}
+
+/**
+ * 読み出した Character の photo を正規化した新しい Character を返す。
+ */
+async function normalizeCharacter(character: Character): Promise<Character> {
+  const photo = await normalizePhoto((character as { photo?: unknown }).photo);
+  return { ...character, photo };
+}
 
 /** データベース名（design.md「IndexedDB スキーマとバージョニング」）。 */
 const DB_NAME = 'chara-collection';
@@ -132,7 +173,9 @@ export class IndexedDbCharacterStore implements CharacterStore {
       const db = await this.getDb();
       const ascending = await db.getAllFromIndex(STORE_NAME, CREATED_AT_INDEX);
       // インデックスは createdAt 昇順で返すため、反転して降順にする。
-      return ascending.reverse();
+      const descending = ascending.reverse();
+      // 各 photo を PhotoData へ正規化（旧 Blob データの後方互換）。
+      return await Promise.all(descending.map((c) => normalizeCharacter(c)));
     } catch {
       throw new StoreErrorException({ kind: 'loadFailed' });
     }
