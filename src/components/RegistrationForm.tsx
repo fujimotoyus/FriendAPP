@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RegistrationForm — キャラクターの新規登録 / 編集フォーム。
  *
  * {@link useRegistration} を用いて入力保持用の {@link CharacterDraft} を編集し、
@@ -63,6 +63,7 @@ export function RegistrationForm({
     fieldErrors,
     photoError,
     storeError,
+    storeErrorDetail,
     setField,
     pickPhoto,
     save,
@@ -219,6 +220,17 @@ export function RegistrationForm({
         {storeError ? (
           <p className="registration-form__error" role="alert">
             {storeErrorMessage(storeError)}
+          </p>
+        ) : null}
+
+        {/* 【一時デバッグ】保存失敗の真因（元例外）を画面に表示する。原因確定後に削除する。 */}
+        {storeErrorDetail ? (
+          <p
+            className="registration-form__error"
+            role="alert"
+            style={{ fontSize: '0.75rem', opacity: 0.8, wordBreak: 'break-all' }}
+          >
+            [debug] {storeErrorDetail}
           </p>
         ) : null}
 
