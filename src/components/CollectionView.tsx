@@ -4,8 +4,10 @@
  * {@link useCollection} から一覧・読み込み状態・再試行（reload）を受け取り、
  * `createdAt` 降順で {@link CharacterCard} をグリッド表示する（要件2.1, 2.3, 2.5, 2.6）。
  * 読み込み失敗時は再試行導線（reload）を提示し（要件2.9）、0 件時は {@link EmptyStateView}
- * と「新規登録」の CTA を表示する（要件2.7, 8.6）。カード選択で詳細へ、ヘッダーの
- * 「新規登録」で登録フォームへ遷移する（遷移自体は App が担い、コールバックで受け取る）。
+ * と「新規登録」の CTA を表示する（要件2.7, 8.6）。カード選択で詳細へ遷移する
+ * （遷移自体は App が担い、コールバックで受け取る）。図鑑 / 今日の相棒 / トーナメント /
+ * 新規登録 への導線は共通の下部ナビゲーションバー（{@link NavigationBar}）が担うため、
+ * ヘッダーは見出し「お友達図鑑」のみとする（要件13）。
  *
  * 本コンポーネントはロジックを持たず、hook から受け取った状態を描画するのみとする
  * （design.md「UI 層」）。
@@ -24,10 +26,6 @@ export interface CollectionViewProps {
   onAdd: () => void;
   /** 一覧内の 1 件が選択されたときのハンドラ（詳細へ遷移）。要件2.8 */
   onSelect: (character: Character) => void;
-  /** 「今日の相棒（ガチャ）」導線が押されたときのハンドラ（ガチャ画面へ遷移）。要件5.4 */
-  onOpenGacha: () => void;
-  /** 「対戦（ランキング対戦）」導線が押されたときのハンドラ（対戦画面へ遷移）。要件4.1 */
-  onOpenBattle: () => void;
 }
 
 /** 並び順選択 UI に表示する 3 種のオプション（表示ラベルと値）。要件11.1〜11.4 */
@@ -40,8 +38,6 @@ const SORT_OPTIONS: ReadonlyArray<{ value: SortOrder; label: string }> = [
 export function CollectionView({
   onAdd,
   onSelect,
-  onOpenGacha,
-  onOpenBattle,
 }: CollectionViewProps): JSX.Element {
   const { characters, loadState, sortOrder, setSortOrder, reload } =
     useCollection();
@@ -50,15 +46,6 @@ export function CollectionView({
     <main className="collection-view">
       <header className="collection-view__header">
         <h1>お友達図鑑</h1>
-        <div className="collection-view__actions">
-          <PastelButton variant="secondary" onClick={onOpenGacha}>
-            今日の相棒 🎁
-          </PastelButton>
-          <PastelButton variant="secondary" onClick={onOpenBattle}>
-            対戦 ⚔️
-          </PastelButton>
-          <PastelButton onClick={onAdd}>新規登録 ✚</PastelButton>
-        </div>
       </header>
 
       {/* 並び順選択（セグメント風）。1 件以上あるときのみ表示し、空状態と干渉させない

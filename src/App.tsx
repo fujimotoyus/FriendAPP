@@ -39,8 +39,8 @@ type View = 'list' | 'add' | 'detail' | 'gacha' | 'battle';
  * の `delete` を呼び、一覧を再マウントして最新化したうえで一覧へ戻る（削除完了の反映。要件6.7）。
  * 一覧の {@link useCollection} は再マウント時の読み込みで削除結果を取り込む。
  *
- * 今日の一枚ガチャ画面（{@link DailyGachaView}）は一覧ヘッダーの「今日の相棒」導線から開き、
- * ランキング対戦画面（{@link RankingBattleView}）も一覧ヘッダーの「対戦」導線から開く。
+ * 今日の一枚ガチャ画面（{@link DailyGachaView}）とランキング対戦画面（{@link RankingBattleView}）
+ * へは、共通の下部ナビゲーションバー（{@link NavigationBar}）の導線から遷移する（要件13）。
  */
 export default function App(): JSX.Element {
   const [view, setView] = useState<View>('list');
@@ -129,8 +129,6 @@ export default function App(): JSX.Element {
           key={listKey}
           onAdd={goToAdd}
           onSelect={goToDetail}
-          onOpenGacha={goToGacha}
-          onOpenBattle={goToBattle}
         />
       ) : null}
 
