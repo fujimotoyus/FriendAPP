@@ -2,7 +2,8 @@
  * CollectionView（図鑑一覧）— 登録済み Character の一覧表示。
  *
  * {@link useCollection} から一覧・読み込み状態・再試行（reload）を受け取り、
- * `createdAt` 降順で {@link CharacterCard} をグリッド表示する（要件2.1, 2.3, 2.5, 2.6）。
+ * 選択中の並び順（初期は名前昇順）で {@link CharacterCard} をグリッド表示する
+ * （要件2.1, 2.3, 2.5, 2.6）。
  * 読み込み失敗時は再試行導線（reload）を提示し（要件2.9）、0 件時は {@link EmptyStateView}
  * と「新規登録」の CTA を表示する（要件2.7, 8.6）。カード選択で詳細へ遷移する
  * （遷移自体は App が担い、コールバックで受け取る）。図鑑 / 今日の相棒 / トーナメント /
@@ -28,11 +29,16 @@ export interface CollectionViewProps {
   onSelect: (character: Character) => void;
 }
 
-/** 並び順選択 UI に表示する 4 種のオプション（表示ラベルと値）。要件11.1〜11.4 */
+/**
+ * 並び順選択 UI に表示する 3 種のオプション（表示ラベルと値）。
+ * 配列の順序＝UI の表示順で、左から「名前順」→「お気に入り順」→「出会った日順」。
+ * `'newest'`（新しい順）は選択肢から除外する（初期並び順は名前昇順。要件2.1, 11.2）。
+ * ドメインの `sortCharacters` は `'newest'` ロジックを引き続き保持するが、UI では提示しない。
+ * 要件11.1〜11.4
+ */
 const SORT_OPTIONS: ReadonlyArray<{ value: SortOrder; label: string }> = [
-  { value: 'newest', label: '新しい順' },
-  { value: 'favorite', label: 'お気に入り順' },
   { value: 'name', label: '名前順' },
+  { value: 'favorite', label: 'お気に入り順' },
   { value: 'metOn', label: '出会った日順' },
 ];
 

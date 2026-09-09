@@ -411,6 +411,16 @@
 
 - [x] 35. Iteration 7 チェックポイント（出会った日順の追加）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+- [x] 36. 並び順選択 UI の選択肢構成と初期並び順の変更（要件2.1, 11.1, 11.2）
+  - CollectionView の SORT_OPTIONS から newest（新しい順）を除き、左から 名前(name)→お気に入り(favorite)→出会った日(metOn) の3種にする。各ボタンは最小 44x44 CSS px・横スクロールなし・大人かわいいテーマ整合を維持する（要件11.1）
+  - useCollection の sortOrder 初期値を newest から name に変更する（初期表示は名前の昇順=要件11.4 と同一の順序。要件2.1, 11.2）
+  - sortCharacters の newest case・SortOrder 型は変更しない（UI 選択肢と初期値のみ変更）
+  - _Requirements: 2.1, 11.1, 11.2_
+
+  - [x]* 36.1 並び順 UI 選択肢・初期並び順のユニットテスト
+    - CollectionView の並び順選択に 名前/お気に入り/出会った日 の3ボタンが左からこの順で存在し新しい順が無いこと、初期状態で名前が選択状態(aria-pressed=true)であること、useCollection の初期 sortOrder が name であることを検証する（要件11.1, 11.2）
+    - _Requirements: 2.1, 11.1, 11.2_
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。

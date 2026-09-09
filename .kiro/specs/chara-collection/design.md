@@ -170,14 +170,14 @@ React コンポーネント（View）と hooks（View-State）を分離し、意
 
 #### CollectionView（図鑑一覧）
 
-登録済み Character を、現在選択中の `Sort_Order` に従って一覧表示する。初期状態（未選択）は登録日時の新しい順（`createdAt` 降順、要件2.1, 11.2）。各カードは写真・主表示/副表示（ニックネーム優先、要件10）・お気に入り度の視覚表現（要件12）を表示する（要件2.3, 2.5, 2.6）。0 件時は空状態メッセージと新規登録導線を表示（要件2.7, 8.6）。写真読み込み失敗時は当該カードのみプレースホルダー表示にフォールバックし、他カードの表示は継続する（要件2.4）。ストア読み込み失敗時は再試行手段を提示（要件2.9）。
+登録済み Character を、現在選択中の `Sort_Order` に従って一覧表示する。初期状態（未選択）は名前の昇順（要件11.4 と同一の順序。要件2.1, 11.2）。各カードは写真・主表示/副表示（ニックネーム優先、要件10）・お気に入り度の視覚表現（要件12）を表示する（要件2.3, 2.5, 2.6）。0 件時は空状態メッセージと新規登録導線を表示（要件2.7, 8.6）。写真読み込み失敗時は当該カードのみプレースホルダー表示にフォールバックし、他カードの表示は継続する（要件2.4）。ストア読み込み失敗時は再試行手段を提示（要件2.9）。
 
-一覧の先頭に、大人かわいいテーマに沿った **並び順の選択 UI**（セグメント/ドロップダウン等。各操作要素は最小 44×44 CSS px、横スクロールなし）を配置し、「登録日時の新しい順」「Favorite_Level の高い順」「名前の昇順」「出会った日の新しい順」の4種を切り替える（要件11.1, 11.7, 9.6, 9.7, 13 と整合）。並び替えは表示順のみを変更し、Character_Store のデータおよび Character の内容は変更しない（要件11.5）。なお「出会った日の新しい順」は並び替えキーに Met_On を用いるのみで、一覧カードに Met_On を表示するわけではない（Met_On は詳細画面のみ表示、要件14.7）。
+一覧の先頭に、大人かわいいテーマに沿った **並び順の選択 UI**（セグメント/ドロップダウン等。各操作要素は最小 44×44 CSS px、横スクロールなし）を配置し、左から「名前の昇順」→「Favorite_Level の高い順」→「出会った日の新しい順」の3種を切り替える（「登録日時の新しい順」は UI の選択肢に含めない。要件11.1, 11.7, 9.6, 9.7, 13 と整合）。並び替えは表示順のみを変更し、Character_Store のデータおよび Character の内容は変更しない（要件11.5）。なお「出会った日の新しい順」は並び替えキーに Met_On を用いるのみで、一覧カードに Met_On を表示するわけではない（Met_On は詳細画面のみ表示、要件14.7）。
 
 ```tsx
 function CollectionView(): JSX.Element {
   const { characters, sortOrder, setSortOrder, loadState, reload } = useCollection();
-  // 並び順選択 UI（newest/favorite/name/metOn）、grid/list、empty-state、retry-on-error を分岐表示
+  // 並び順選択 UI（name/favorite/metOn の3種、初期 name）、grid/list、empty-state、retry-on-error を分岐表示
   // 各カードは deriveCardDisplay(character) の主表示/副表示と FavoriteLevelDisplay を描画
 }
 ```
@@ -246,7 +246,7 @@ type LoadState = 'idle' | 'loading' | 'loaded' | 'failed';
 // 一覧（要件2, 11）
 function useCollection(): {
   characters: Character[];      // 現在の sortOrder で並べ替えた表示順（sortCharacters の結果）
-  sortOrder: SortOrder;         // 現在の並び順。初期値 'newest'（要件11.2）
+  sortOrder: SortOrder;         // 現在の並び順。初期値 'name'（名前の昇順。要件11.2）
   setSortOrder: (order: SortOrder) => void; // 表示順のみ変更、ストア/データは不変（要件11.5）
   loadState: LoadState;
   reload: () => Promise<void>;

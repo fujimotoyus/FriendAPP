@@ -40,12 +40,12 @@ export interface UseCollectionResult {
   /**
    * 表示用の Character 一覧。現在の {@link sortOrder} に従って {@link sortCharacters}
    * で並べ替えた結果を返す（表示順のみ。ストア/データは不変。要件11.5, 11.6）。
-   * 初期の並び順は `'newest'`（`createdAt` 降順）。要件2.1, 11.2
+   * 初期の並び順は `'name'`（名前の昇順）。要件2.1, 11.2
    */
   characters: Character[];
   /** 現在の読み込み状態。要件2.9 */
   loadState: LoadState;
-  /** 現在の一覧の並び順（初期値 `'newest'`）。要件11.1, 11.2 */
+  /** 現在の一覧の並び順（初期値 `'name'`）。要件11.1, 11.2 */
   sortOrder: SortOrder;
   /**
    * 一覧の並び順を変更する。再フェッチはせず、保持済みデータを並べ替えるのみ
@@ -71,7 +71,7 @@ export function useCollection(
   // これに `sortCharacters` を適用した結果とし、並び順変更時は再フェッチせず再ソートのみ行う。
   const [source, setSource] = useState<Character[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('idle');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('name');
 
   /**
    * ストアから全 Character を読み込み、状態を更新する。
