@@ -2,9 +2,11 @@
  * useCollection — キャラクター一覧（図鑑）の View-State（ViewModel 相当）
  *
  * Collection_View / CharacterDetailView が用いる hook（design.md「Hooks / View-State」）。
- * {@link CharacterStore} から全 Character を読み込み、`createdAt` 降順の一覧・読み込み状態・
- * 再試行（reload）・削除（remove）を提供する。ドメインロジックは持たず、Persistence 層の
- * 調停とビュー状態の保持のみを担う。
+ * {@link CharacterStore} から全 Character を読み込み、並び順（sortOrder）に応じて
+ * 並べ替えた一覧・読み込み状態・並び順の変更（setSortOrder）・再試行（reload）・
+ * 削除（remove）を提供する。並べ替えはドメインの純粋関数 {@link sortCharacters} に委譲し、
+ * 本 hook は Persistence 層の調停とビュー状態の保持のみを担う。並び順の変更は再フェッチを
+ * 伴わず、保持済みデータの再ソートのみで行う（表示順のみ変更、ストア/データは不変。要件11.5, 11.6）。
  *
  * 設計方針:
  * - ストアは引数（DI）で受け取り、テスト時に {@link InMemoryCharacterStore} 等へ差し替え可能。
@@ -16,8 +18,9 @@
  *
  * 参照: design.md「Hooks / View-State」「Error Handling」、要件2.1, 2.9, 3.6, 6.7
  */
-import { useCallback, useEffect, useState } from 'react';
-import type { Character } from '../domain/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Character, SortOrder } from '../domain/types';
+import { sortCharacters } from '../domain/sortCharacters';
 import type { CharacterStore } from '../persistence/CharacterStore';
 import { defaultCharacterStore } from '../persistence/defaultStore';
 
@@ -34,10 +37,21 @@ export type LoadState = 'idle' | 'loading' | 'loaded' | 'failed';
  * {@link useCollection} の戻り値。
  */
 export interface UseCollectionResult {
-  /** 保存済み Character の一覧（`createdAt` 降順）。要件2.1 */
+  /**
+   * 表示用の Character 一覧。現在の {@link sortOrder} に従って {@link sortCharacters}
+   * で並べ替えた結果を返す（表示順のみ。ストア/データは不変。要件11.5, 11.6）。
+   * 初期の並び順は `'newest'`（`createdAt` 降順）。要件2.1, 11.2
+   */
   characters: Character[];
   /** 現在の読み込み状態。要件2.9 */
   loadState: LoadState;
+  /** 現在の一覧の並び順（初期値 `'newest'`）。要件11.1, 11.2 */
+  sortOrder: SortOrder;
+  /**
+   * 一覧の並び順を変更する。再フェッチはせず、保持済みデータを並べ替えるのみ
+   * （無駄な再読み込みを避ける。表示順のみ変更でストア/データは不変。要件11.5, 11.6）。
+   */
+  setSortOrder: (order: SortOrder) => void;
   /** 一覧を（再）読み込みする。読み込み失敗時の再試行手段。要件2.9, 3.6 */
   reload: () => Promise<void>;
   /** 指定 id の Character を削除し、一覧を再読み込みする。要件6.7 */
@@ -53,26 +67,36 @@ export interface UseCollectionResult {
 export function useCollection(
   store: CharacterStore = defaultCharacterStore,
 ): UseCollectionResult {
-  const [characters, setCharacters] = useState<Character[]>([]);
+  // fetchAll で取得した元データ（並べ替え前）を内部に保持する。返す `characters` は
+  // これに `sortCharacters` を適用した結果とし、並び順変更時は再フェッチせず再ソートのみ行う。
+  const [source, setSource] = useState<Character[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('idle');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
 
   /**
    * ストアから全 Character を読み込み、状態を更新する。
-   * 失敗時は `loadState` を `'failed'` にし、`characters`（保持済みデータ）は変更しない（要件2.9）。
-   * ストアは `createdAt` 降順で返す契約だが、View-State 側でも降順を保証しておく（要件2.1）。
+   * 失敗時は `loadState` を `'failed'` にし、保持済みデータは変更しない（要件2.9）。
    */
   const reload = useCallback(async (): Promise<void> => {
     setLoadState('loading');
     try {
       const all = await store.fetchAll();
-      const sorted = [...all].sort((a, b) => b.createdAt - a.createdAt);
-      setCharacters(sorted);
+      setSource(all);
       setLoadState('loaded');
     } catch {
       // 読み込み失敗。既に読み込めていたデータは破棄せず保持する（要件2.9）。
       setLoadState('failed');
     }
   }, [store]);
+
+  /**
+   * 表示用の並べ替え済み一覧。元データ（source）と sortOrder のいずれかが変わったときのみ
+   * 再計算する。表示順のみに作用し、ストア/元データは不変（要件11.5, 11.6）。
+   */
+  const characters = useMemo(
+    () => sortCharacters(source, sortOrder),
+    [source, sortOrder],
+  );
 
   /**
    * 指定 id の Character を削除し、削除後の一覧を反映する（要件6.7）。
@@ -92,5 +116,5 @@ export function useCollection(
     void reload();
   }, [reload]);
 
-  return { characters, loadState, reload, remove };
+  return { characters, loadState, sortOrder, setSortOrder, reload, remove };
 }

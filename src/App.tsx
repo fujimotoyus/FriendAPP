@@ -3,6 +3,7 @@ import type { Character } from './domain/types';
 import { CharacterDetailView } from './components/CharacterDetailView';
 import { CollectionView } from './components/CollectionView';
 import { DailyGachaView } from './components/DailyGachaView';
+import { NavigationBar, type NavigationTarget } from './components/NavigationBar';
 import { RankingBattleView } from './components/RankingBattleView';
 import { RegistrationForm } from './components/RegistrationForm';
 import { defaultCharacterStore } from './persistence/defaultStore';
@@ -71,6 +72,25 @@ export default function App(): JSX.Element {
     setView('battle');
   };
 
+  // Navigation_Bar のタブ選択に応じて主要画面へ遷移する（要件13.2〜13.5）。
+  // 'add' は編集状態を引き継がない新規登録（goToAdd が editingCharacter をクリアする。要件13.5）。
+  const handleNavigate = (target: NavigationTarget): void => {
+    switch (target) {
+      case 'list':
+        goToList();
+        break;
+      case 'gacha':
+        goToGacha();
+        break;
+      case 'battle':
+        goToBattle();
+        break;
+      case 'add':
+        goToAdd();
+        break;
+    }
+  };
+
   // 一覧から 1 件を選択して詳細へ。
   const goToDetail = (character: Character): void => {
     setSelected(character);
@@ -98,8 +118,12 @@ export default function App(): JSX.Element {
     setView('list');
   };
 
+  // Navigation_Bar は主要画面（list/gacha/battle）でのみ表示し、
+  // 詳細・登録/編集フォームでは表示しない（要件13.6, 13.7）。
+  const showNavigation = view === 'list' || view === 'gacha' || view === 'battle';
+
   return (
-    <div className="app">
+    <div className={showNavigation ? 'app app--with-nav' : 'app'}>
       {view === 'list' ? (
         <CollectionView
           key={listKey}
@@ -133,6 +157,10 @@ export default function App(): JSX.Element {
 
       {view === 'battle' ? (
         <RankingBattleView onBack={goToList} onRegister={goToAdd} />
+      ) : null}
+
+      {showNavigation ? (
+        <NavigationBar active={view} onNavigate={handleNavigate} />
       ) : null}
     </div>
   );

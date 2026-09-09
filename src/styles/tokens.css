@@ -1,31 +1,36 @@
 /*
  * Design tokens for chara-collection (キャラ図鑑).
- * パステルカラー基調・角丸多用・rem ベースのタイポグラフィをまとめた
- * デザインシステムのトークン定義（design.md「Design Theme and Design System」）。
- * カラー値は PWA manifest の theme_color / background_color とも一致させる。
+ * 大人かわいいテーマ（Adult_Cute_Theme）: 彩度を抑えた落ち着いたパステル基調・
+ * 角丸・上品なソフトシャドウ・統一された余白・200〜500ms のトランジションを
+ * まとめたデザインシステムのトークン定義（design.md「Design Theme and Design System
+ * （大人かわいい / Adult_Cute_Theme）」）。カラー値は PWA manifest の theme_color /
+ * background_color とも一致させる。
  *
- * Requirements: 7.4 (パステル配色), 7.5 (角丸), 7.8 (rem 文字サイズ追従)
+ * Requirements: 9.1 (テーマ配色/トークン), 9.2 (角丸/影/余白の一貫), 9.3 (rem),
+ *               9.4 (200〜500ms トランジション), 9.5 (prefers-reduced-motion),
+ *               7.4 (パステル配色), 7.5 (角丸), 7.8 (rem 文字サイズ追従)
  */
 :root {
   /* ---------------------------------------------------------------------
-   * Color tokens — パステル基調 (要件7.4)
+   * Color tokens — 大人かわいい・彩度を抑えたパステル基調 (要件9.1 / 7.4)
+   * 色は要素へハードコードせず、常に var(--color-...) 経由で参照する。
    * ------------------------------------------------------------------- */
-  --color-primary: #ffb6c8; /* パステルピンク（主要アクセント） */
-  --color-secondary: #b8ecd0; /* パステルミント（補助アクセント） */
-  --color-accent: #d9c8f5; /* パステルラベンダー（強調・お気に入り度） */
-  --color-background: #fff8f0; /* クリーム（画面背景 / manifest background_color） */
-  --color-surface: #ffffff; /* カード面 */
-  --color-text-primary: #4a4a4a; /* 本文 */
-  --color-text-secondary: #8a8a8a; /* 補足テキスト */
+  --color-primary: #e8a9b8; /* くすませたローズ（主要アクセント） */
+  --color-secondary: #a9cabb; /* スモーキーミント（補助アクセント） */
+  --color-accent: #c3b3dd; /* スモーキーラベンダー（強調・お気に入り度） */
+  --color-background: #faf6f1; /* オフホワイト/クリーム（画面背景 / manifest background_color） */
+  --color-surface: #fffdfb; /* カード面（ごくわずかに温かみのある白） */
+  --color-text-primary: #4a4550; /* 本文（やや紫みのあるダークグレー） */
+  --color-text-secondary: #938c99; /* 副表示テキスト */
 
-  /* Interaction / state helpers derived from the pastel palette. */
-  --color-primary-hover: #ff9fb6; /* ボタン等の押下・ホバー時 */
-  --color-border: #f0e4d8; /* 面と背景を柔らかく区切る境界線 */
-  --color-focus-ring: #d9c8f5; /* フォーカスリング（アクセントと同系） */
-  --color-on-primary: #ffffff; /* primary 面上のテキスト */
+  /* Interaction / state helpers derived from the palette. */
+  --color-primary-hover: #dd94a6; /* ボタン等の押下・ホバー時（primary を一段深く） */
+  --color-border: #ede2d8; /* 面と背景を柔らかく区切る境界線 */
+  --color-focus-ring: #c3b3dd; /* フォーカスリング（アクセントと同系） */
+  --color-on-primary: #ffffff; /* primary 面上のテキスト（コントラスト確保） */
 
   /* ---------------------------------------------------------------------
-   * Corner radius tokens — 角丸 (要件7.5)
+   * Corner radius tokens — 角丸 (要件9.2 / 7.5)
    * ------------------------------------------------------------------- */
   --radius-small: 0.5rem; /* 小要素（バッジ・タグ） */
   --radius-medium: 1rem; /* ボタン・入力欄 */
@@ -33,7 +38,7 @@
   --radius-pill: 999rem; /* 完全な丸み（ピル型ボタン等） */
 
   /* ---------------------------------------------------------------------
-   * Typography — rem ベースでブラウザ/OS の文字サイズ設定に追従 (要件7.8)
+   * Typography — rem ベースでブラウザ/OS の文字サイズ設定に追従 (要件9.3 / 7.8)
    * ------------------------------------------------------------------- */
   --font-family-base: system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN',
     'Yu Gothic', Meiryo, Roboto, sans-serif;
@@ -53,7 +58,7 @@
   --font-weight-bold: 700;
 
   /* ---------------------------------------------------------------------
-   * Spacing scale (rem ベース)
+   * Spacing scale (rem ベース) — 同一種別要素間で一貫させる (要件9.2)
    * ------------------------------------------------------------------- */
   --space-xs: 0.25rem;
   --space-sm: 0.5rem;
@@ -62,14 +67,34 @@
   --space-xl: 2rem;
 
   /* ---------------------------------------------------------------------
-   * Touch target & layout constants
+   * Touch target & layout constants (要件9.6, 9.7 / 7.6, 7.7)
    * ------------------------------------------------------------------- */
-  --touch-target-min: 44px; /* 最小タッチ領域 44×44 CSS px (要件7.7) */
-  --content-max-width: 40rem; /* モバイルポートレート基準の最大幅 (要件7.6) */
+  --touch-target-min: 44px; /* 最小タッチ領域 44×44 CSS px */
+  --content-max-width: 40rem; /* モバイルポートレート基準の最大幅 */
 
   /* ---------------------------------------------------------------------
-   * Elevation — 柔らかい影でポップな立体感を演出
+   * Elevation — 落ち着いた低コントラストのソフトシャドウ (要件9.2)
+   * 同一種別要素間で影を統一するためにトークン化する。
    * ------------------------------------------------------------------- */
-  --shadow-soft: 0 0.25rem 0.75rem rgba(74, 74, 74, 0.08);
-  --shadow-card: 0 0.375rem 1rem rgba(74, 74, 74, 0.1);
+  --shadow-soft: 0 2px 8px rgba(74, 69, 80, 0.08); /* カード・写真枠の標準影 */
+  --shadow-raised: 0 4px 14px rgba(74, 69, 80, 0.12); /* 押下可能要素の浮き上がり */
+  --shadow-card: var(--shadow-soft); /* 後方互換: カード面は soft に整合させる */
+
+  /* ---------------------------------------------------------------------
+   * Transition tokens — 200〜500ms の視覚的トランジション (要件9.4)
+   * ------------------------------------------------------------------- */
+  --transition-fast: 200ms; /* フィードバック（下限） */
+  --transition-base: 300ms; /* 標準の画面遷移 */
+  --transition-slow: 500ms; /* 上限。これを超えない */
+}
+
+/* ---------------------------------------------------------------------------
+ * Reduced motion — モーション低減環境ではトランジションを無効化する (要件9.5)
+ * ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+  }
 }

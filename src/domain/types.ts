@@ -159,3 +159,14 @@ export interface FieldError {
   /** ユーザー向けの説明メッセージ */
   message: string;
 }
+
+/**
+ * 一覧の並び順（要件11）。表示順のみに作用し、Character の内容やストアを変更しない。
+ *
+ * - `'newest'`  : 登録日時（createdAt）の新しい順
+ * - `'favorite'`: お気に入り度（favoriteLevel）の高い順
+ * - `'name'`    : 名前の Unicode コードポイント順（昇順、空名は後方）
+ *
+ * 参照: design.md「補助的な値型 / SortOrder」「sortCharacters」、要件11.2〜11.6
+ */
+export type SortOrder = 'newest' | 'favorite' | 'name';

@@ -20,6 +20,7 @@
 - **イテレーション2**: 今日の一枚ガチャ（要件5）
 - **イテレーション3**: ランキング対戦（要件4）
 - **イテレーション4**: 仕上げ（編集・削除、メモ・ニックネーム、UI調整）（要件6、要件8）
+- **イテレーション5**: 見た目と使い勝手の底上げ（「大人かわいい」UIテーマ、一覧でのニックネーム優先表示、一覧の並び替え、お気に入り度の視覚的強調、共通ナビゲーションバー）（要件9、要件10、要件11、要件12、要件13）
 
 ## Glossary
 
@@ -38,6 +39,9 @@
 - **不戦勝（Bye）**: ランキング対戦のあるラウンドで対象Characterが奇数の場合に、対戦せず次のラウンドへ進む1件の扱い
 - **Daily_Gacha**: 登録済みキャラクターから1件をランダムに選び「今日の相棒」として表示するモード。同一暦日（利用者の端末ローカルの日付）内は選択結果を固定する
 - **PWA**: Webアプリをネイティブアプリのように端末へインストール・オフライン利用できる仕組み（Web App Manifest + Service Worker）
+- **大人かわいいテーマ（Adult_Cute_Theme）**: 落ち着いたパステルを基調とし、上品なアクセント・洗練された余白/影/フォント/トランジションで構成する視覚テーマ。要件7で定めた制約（パステル基調、角丸、横スクロールなし、最小44×44 CSSピクセルのタッチ領域、rem追従）をすべて満たしたうえで美観を高める上位互換の位置づけとする
+- **Sort_Order**: Collection_Viewにおける一覧の並び順。「登録日時の新しい順」「Favorite_Levelの高い順」「名前の昇順」のいずれかを指す。並び順の変更は表示順のみに作用し、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
+- **Navigation_Bar**: 画面下部に固定表示されるタブ型の共通ナビゲーション。「図鑑」「今日の相棒」「トーナメント」「新規登録」の4つの遷移項目を持ち、それぞれCollection_View・Daily_Gacha・Ranking_Battle・Registration_Form（新規登録）への到達手段を提供する。現在表示中の画面に対応するタブを選択状態として視覚的に区別する
 
 ## Requirements
 
@@ -163,3 +167,69 @@
 4. IF Character_StoreへのIndexedDB保存がストレージ容量超過により失敗した場合, THEN THE Chara_App SHALL 入力内容を破棄せずに保持し、容量不足で保存できなかった旨と不要データの削除を促すメッセージを表示する
 5. IF Character_Storeへの保存が容量上限以外の理由で失敗した場合, THEN THE Chara_App SHALL 入力内容を破棄せずに保持し、保存できなかった旨と再試行を促すメッセージを表示する
 6. WHEN カップルがキャラクター一覧を表示した時にCharacter_Storeに登録が1件も存在しない場合, THE Chara_App SHALL 登録が無い旨と新規登録手順を案内するメッセージを表示する
+
+### 要件9: 大人かわいい UI テーマ
+
+**ユーザーストーリー:** カップルとして、もっと大人かわいい見た目で使いたい。そうすることで、毎日開くのが上品で楽しくなる。
+
+#### 受け入れ基準
+
+1. THE Chara_App SHALL 一覧・登録/編集フォーム・詳細・今日の一枚ガチャ・ランキング対戦の各画面で、大人かわいいテーマ（Adult_Cute_Theme）の配色をテーマトークン経由で解決して適用し、当該配色は要件7.4のパステル基調を満たす
+2. THE Chara_App SHALL ボタン・カード・写真枠・入力欄について、同一種別の要素間では角丸・影・余白の値が一致する一貫したスタイルを、要件7.5の角丸適用を満たす形でテーマトークン経由で適用する
+3. THE Chara_App SHALL テキストのフォントサイズを相対単位（rem）で定義し、ルート要素の文字サイズ設定の変更に比例して追従させることで、要件7.8を満たす
+4. WHEN 画面遷移または操作へのフィードバックを表示するとき, THE Chara_App SHALL 200ミリ秒以上500ミリ秒以下の視覚的トランジションを適用する
+5. IF 利用者の環境がモーション低減（prefers-reduced-motion: reduce）を要求している場合, THEN THE Chara_App SHALL トランジションを無効化または大幅に短縮して適用する
+6. THE Chara_App SHALL ボタン・カード上の操作要素・お気に入り度選択・写真取り込み操作・並び順選択などのインタラクティブ要素について、最小44×44 CSSピクセルのタッチ領域を、要件7.7を満たす形で維持する
+7. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面で表示されたとき, THE Chara_App SHALL 横スクロールを発生させないレイアウトを、要件7.6を満たす形で維持する
+
+### 要件10: 一覧でのニックネーム優先表示
+
+**ユーザーストーリー:** カップルとして、一覧ではニックネームを目立たせたい。そうすることで、二人だけの呼び方で見つけやすくなる。
+
+#### 受け入れ基準
+
+1. IF あるCharacterのニックネームが空でない（空文字でなく、かつ空白文字のみでもない）場合, THEN THE Collection_View SHALL 当該Characterのニックネームを主表示として表示し、名前が空でない場合は当該名前を副表示として表示する
+2. IF あるCharacterのニックネームが空（空文字、または空白文字のみ）であり、かつ名前が空でない場合, THEN THE Collection_View SHALL 当該Characterの名前を主表示として表示し、副表示を表示しない
+3. IF あるCharacterのニックネームおよび名前がいずれも空（それぞれ空文字、または空白文字のみ）である場合, THEN THE Collection_View SHALL 「名前未設定」を主表示として表示し、副表示を表示しない
+4. THE Collection_View SHALL 各Characterについて、主表示を当該Characterの表示テキストのうち先頭に配置し、かつ副表示より大きい文字サイズで表示し、副表示は主表示に続けて補助的に表示する
+
+### 要件11: 一覧の並び替え
+
+**ユーザーストーリー:** カップルとして、一覧の並び順を選びたい。そうすることで、お気に入り順や名前順でも眺められる。
+
+#### 受け入れ基準
+
+1. THE Collection_View SHALL Sort_Orderとして「登録日時の新しい順」「Favorite_Levelの高い順」「名前の昇順」を選択する手段を提供する
+2. WHEN 利用者がSort_Orderを選択していない初期状態でCollection_Viewを開く, THE Collection_View SHALL 全Characterを登録日時（createdAt）の新しい順で一覧表示する
+3. WHEN 利用者が「Favorite_Levelの高い順」を選択する, THE Collection_View SHALL 全CharacterをFavorite_Levelの降順に並べ替え、Favorite_Levelが同値のCharacterどうしは登録日時（createdAt）の新しい順で並べ、それも同値の場合はCharacterのidの昇順で並べて一覧表示する
+4. WHEN 利用者が「名前の昇順」を選択する, THE Collection_View SHALL 全Characterを名前のUnicodeコードポイント順（大文字小文字・ロケールに依存しない一貫した順序）で昇順に並べ替え、名前が空（空文字または空白のみ）のCharacterは名前を持つCharacterより後に配置し、比較が同値の場合はCharacterのidの昇順で並べて一覧表示する
+5. WHEN 利用者がSort_Orderを変更する, THE Collection_View SHALL 一覧の表示順のみを変更し、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
+6. THE Collection_View SHALL 同一のCharacter集合と同一のSort_Orderに対して、常に同一の並び順（決定的な順序）で一覧表示する
+
+### 要件12: お気に入り度の視覚的強調
+
+**ユーザーストーリー:** カップルとして、各キャラのお気に入り度をひと目で分かるようにしたい。そうすることで、どれだけ好きかが一覧でも伝わる。
+
+#### 受け入れ基準
+
+1. WHEN Collection_ViewがCharacterの一覧カードを表示するとき, THE Collection_View SHALL 各CharacterのFavorite_Levelを、塗り記号（ハート等）をFavorite_Levelと等しい個数だけ塗り、残りを合計5個までの未塗り記号で表示し、塗られた記号の個数がFavorite_Level（1〜5の整数）と一致するようにする
+2. WHEN Chara_AppがCharacter詳細を表示するとき, THE Chara_App SHALL Favorite_Levelを、要件2.8を満たす形で受け入れ基準1と同一の視覚表現（塗り記号の個数がFavorite_Levelと一致し、合計5個の記号を表示）で表示する
+3. THE Chara_App SHALL Favorite_Levelの各視覚表現に対し、色または記号の見た目のみに依存せず度合い（数量）を判別できるよう、「5段階中N（NはFavorite_Levelの整数値）」に相当するテキスト等価物（スクリーンリーダー向け）を提供する
+4. IF Favorite_Levelが1〜5の整数範囲外、未設定、または数値として解釈できない値である場合, THEN THE Chara_App SHALL 塗り記号を0個として5個すべてを未塗り記号で表示し、テキスト等価物として「5段階中0」に相当する内容を提供する
+
+### 要件13: 共通ナビゲーションバー
+
+**ユーザーストーリー:** カップルとして、主要な画面へメニューバーからすぐ移動したい。そうすることで、図鑑・今日の相棒・トーナメント・新規登録を迷わず行き来できる。
+
+#### 受け入れ基準
+
+1. THE Chara_App SHALL 画面下部に固定表示されるNavigation_Barを提供し、「図鑑」「今日の相棒」「トーナメント」「新規登録」の4つの遷移項目を表示する
+2. WHEN 利用者がNavigation_Barの「図鑑」を選択する, THE Chara_App SHALL Collection_Viewを表示する
+3. WHEN 利用者がNavigation_Barの「今日の相棒」を選択する, THE Chara_App SHALL Daily_Gachaの画面を表示する
+4. WHEN 利用者がNavigation_Barの「トーナメント」を選択する, THE Chara_App SHALL Ranking_Battleの画面を表示する
+5. WHEN 利用者がNavigation_Barの「新規登録」を選択する, THE Chara_App SHALL 既存の編集状態を引き継がない新規登録用のRegistration_Formを表示する
+6. WHILE Collection_View・Daily_Gacha・Ranking_Battleのいずれかの画面を表示している間, THE Chara_App SHALL Navigation_Barを表示し、現在表示中の画面に対応するタブを選択状態として視覚的に区別して示す
+7. WHILE キャラクター詳細画面またはRegistration_Form（新規登録・編集）を表示している間, THE Chara_App SHALL Navigation_Barを表示しない
+8. THE Navigation_Bar SHALL 各タブ項目を、要件7.7を満たす形で最小44×44 CSSピクセルのタッチ領域で提供する
+9. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面で表示されたとき, THE Navigation_Bar SHALL 横スクロールを発生させずに4つの遷移項目を、要件7.6を満たす形で表示する
+10. THE Navigation_Bar SHALL 大人かわいいテーマ（Adult_Cute_Theme）の配色・角丸・テーマトークンに整合した外観を、要件9と整合する形で適用して表示する

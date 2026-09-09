@@ -1,4 +1,4 @@
-﻿# Implementation Plan
+# Implementation Plan
 
 実装計画: chara-collection（キャラ図鑑 / PWA）
 
@@ -271,12 +271,69 @@
 - [x] 19. Iteration 4 / 最終チェックポイント（仕上げ）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build` と `vitest run` がグリーンであることを確認する。
 
+- [x] 20. デザインシステムを「大人かわいい（Adult_Cute_Theme）」に刷新（要件9）
+  - `src/styles/tokens.css` のカラートークンを彩度を抑えた大人かわいい配色へ更新（`--color-primary` くすませたローズ、`--color-secondary` スモーキーミント、`--color-accent` スモーキーラベンダー、`--color-background` オフホワイト/クリーム、`--color-surface`、`--color-text-primary`/`--color-text-secondary`）。既存トークン名は維持し値のみ調整する（要件9.1 / 7.4）
+  - 影トークン（`--shadow-soft` / `--shadow-raised`）、余白トークン（`--space-xs`/`sm`/`md`/`lg`）、トランジショントークン（`--transition-fast=200ms` / `--transition-base=300ms` / `--transition-slow=500ms`、いずれも 200〜500ms）を追加する。`@media (prefers-reduced-motion: reduce)` でトランジションを 0/短縮にする（要件9.2, 9.4, 9.5）
+  - 主要コンポーネント（`PastelButton`・カード・写真枠・入力欄・各画面）が色/角丸/影/余白/トランジションをトークン経由で参照するよう `global.css` と各コンポーネントのクラスを整える。同一種別要素で角丸/影/余白が一致することを担保する。rem タイポグラフィ・44×44 CSS px・320〜430 px 横スクロールなしを維持する（要件9.3, 9.6, 9.7 / 7.6, 7.7, 7.8）
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
+
+- [ ] 21. 一覧の並び替え（要件11）
+  - [x] 21.1 ドメイン純粋関数 `sortCharacters` を実装する
+    - `src/domain/types.ts` に `type SortOrder = 'newest' | 'favorite' | 'name'` を追加する
+    - `src/domain/sortCharacters.ts` に `sortCharacters(characters: readonly Character[], order: SortOrder): Character[]` を実装する。元配列を変更せず新配列を返す。タイブレーク: `newest` = `createdAt` 降順 → `id` 昇順 / `favorite` = `favoriteLevel` 降順 → `createdAt` 降順 → `id` 昇順 / `name` = 名前の Unicode コードポイント順昇順（空名は後方）→ `id` 昇順。決定的順序とする
+    - _Requirements: 11.2, 11.3, 11.4, 11.5, 11.6_
+
+  - [ ]* 21.2 並び替えの決定性・要素保存のプロパティテスト
+    - **Property 17: 並び替えは決定的で要素を保存する**（入力集合の並べ替え＝要素の過不足なし、元配列不変、各 SortOrder で決定的順序・タイブレーク）
+    - **Validates: Requirements 11.2, 11.3, 11.4, 11.5, 11.6**
+    - `// Feature: chara-collection, Property 17` タグ・`numRuns: 100`。対象 `sortCharacters`
+
+  - [x] 21.3 `useCollection` に並び順状態を追加し `CollectionView` に選択 UI を配線する
+    - `useCollection` に `sortOrder`（初期 `'newest'`）・`setSortOrder` を追加し、`characters` は `fetchAll` 結果に `sortCharacters` を適用して返す（表示順のみ、ストア/データ不変。要件11.5, 11.6）
+    - `CollectionView` に大人かわいいテーマ準拠の並び順選択 UI（3 種、各 44×44 CSS px、横スクロールなし）を追加する（要件11.1）
+    - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
+
+- [ ] 22. 一覧でのニックネーム優先表示（要件10）
+  - [x] 22.1 表示モデル導出 `deriveCardDisplay` を実装し `CharacterCard` に適用する
+    - `src/domain` に `deriveCardDisplay(character): { primary: string; secondary?: string }` を実装する。ニックネーム非空（空白のみ除く）→ `primary` = ニックネーム、（名前非空なら）`secondary` = 名前 / ニックネーム空かつ名前非空 → `primary` = 名前 / 両方空 → `primary` = 「名前未設定」
+    - `CharacterCard` を `deriveCardDisplay` ベースに更新し、主表示を先頭かつ副表示より大きい文字サイズ、副表示を補助表示にする（要件10.4）。詳細画面（`CharacterDetailView`）の表示順は変更しない
+    - _Requirements: 10.1, 10.2, 10.3, 10.4_
+
+  - [ ]* 22.2 一覧カード主表示/副表示のプロパティテスト
+    - **Property 18: 一覧カードの主表示/副表示の決定**
+    - **Validates: Requirements 10.1, 10.2, 10.3**
+    - `// Feature: chara-collection, Property 18` タグ・`numRuns: 100`。対象 `deriveCardDisplay`
+
+- [ ] 23. お気に入り度の視覚的強調（要件12）
+  - [x] 23.1 表示モデル導出 `deriveFavoriteLevelDisplay` と `FavoriteLevelDisplay` を実装する
+    - `src/domain` に `deriveFavoriteLevelDisplay(favoriteLevel: number): { filled: number; total: 5; textEquivalent: string }` を実装する。1〜5 整数 → `filled = level`、範囲外/未設定/非整数 → `filled = 0`、`total` 常に 5、`textEquivalent = `5段階中${filled}``
+    - `src/components/FavoriteLevelDisplay.tsx`（表示専用）を実装する。塗り記号 `filled` 個＋未塗りで合計 5 個、色/記号のみに依存しないよう `aria-label` 等で「5段階中N」を提供する。`CharacterCard` と `CharacterDetailView` に配置する（要件12.1, 12.2, 12.3, 12.4）
+    - _Requirements: 12.1, 12.2, 12.3, 12.4_
+
+  - [ ]* 23.2 お気に入り度表示のプロパティテスト
+    - **Property 19: お気に入り度表示は個数一致とテキスト等価物を持つ**
+    - **Validates: Requirements 12.1, 12.3, 12.4**
+    - `// Feature: chara-collection, Property 19` タグ・`numRuns: 100`。対象 `deriveFavoriteLevelDisplay`
+
+- [ ] 24. 共通ナビゲーションバー（要件13）
+  - [x] 24.1 `NavigationBar` を実装し App に配線する
+    - `src/components/NavigationBar.tsx`（下部固定タブ 4 項目「図鑑/今日の相棒/トーナメント/新規登録」、アクティブタブ表示、各 44×44 CSS px、320〜430 px 横スクロールなし、大人かわいいテーマ整合）を実装する
+    - `App.tsx` を更新する: `NavigationBar` を `view` が `'list'`/`'gacha'`/`'battle'` のときのみ表示し、`'detail'`/`'add'` では非表示にする（要件13.6, 13.7）。各タブは `goToList`/`goToGacha`/`goToBattle`/`goToAdd`（`goToAdd` は編集状態を引き継がない新規）に対応させる。アクティブタブは現在の `view` から導出する
+    - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10_
+
+  - [ ]* 24.2 NavigationBar 表示制御・遷移のユニットテスト
+    - 各タブ選択で `view` が期待どおり遷移すること（`goToList`/`goToGacha`/`goToBattle`/`goToAdd`）、主要画面（list/gacha/battle）で表示・詳細/フォームで非表示、アクティブタブ一致、`goToAdd` が新規（編集状態を持たない）であることを検証する（要件13.2〜13.7）
+    - _Requirements: 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
+
+- [x] 25. Iteration 5 チェックポイント（見た目と使い勝手の底上げ）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build`（＝ `tsc -b && vite build`）と `vitest run` がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜16）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜19）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -296,7 +353,11 @@
     { "id": 8, "tasks": ["14.2", "14.3", "16.1"] },
     { "id": 9, "tasks": ["16.2", "16.3", "16.4"] },
     { "id": 10, "tasks": ["17.1"] },
-    { "id": 11, "tasks": ["17.2", "18.1"] }
+    { "id": 11, "tasks": ["17.2", "18.1"] },
+    { "id": 12, "tasks": ["20", "21.1", "22.1", "23.1"] },
+    { "id": 13, "tasks": ["21.2", "21.3", "22.2", "23.2"] },
+    { "id": 14, "tasks": ["24.1"] },
+    { "id": 15, "tasks": ["24.2"] }
   ]
 }
 ```

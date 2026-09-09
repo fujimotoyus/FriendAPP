@@ -6,11 +6,15 @@
 
 概要
 
-本設計書は、カップルが二人だけで楽しむ、iPhone のホーム画面に追加して使える **PWA（Progressive Web App）**「chara-collection（キャラ図鑑）」の技術設計を定義する。要件定義書（requirements.md、要件1〜要件8）に基づき、以下の3つの機能領域に「編集・削除」を加えて実装する。
+本設計書は、カップルが二人だけで楽しむ、iPhone のホーム画面に追加して使える **PWA（Progressive Web App）**「chara-collection（キャラ図鑑）」の技術設計を定義する。要件定義書（requirements.md、要件1〜要件13）に基づき、以下の3つの機能領域に「編集・削除」および「見た目と使い勝手の底上げ（イテレーション5）」を加えて実装する。
 
 1. **キャラ図鑑（Character Collection）**: 写真付きキャラクターの登録・一覧表示・詳細表示・編集・削除（要件1, 2, 6）
 2. **今日の一枚ガチャ（Daily Gacha）**: 同一暦日内で固定される「今日の相棒」のランダム選出と引き直し（要件5）
 3. **ランキング対戦（Ranking Battle）**: 全キャラクターによる勝ち抜きトーナメント（不戦勝対応）で一番のお気に入りを自動判定して決定（要件4）。各対戦の勝者は利用者が選ぶのではなく、**Chara_App がランダム要素を含めてちょうど1件を自動判定**する。対戦の様子・勝敗は、実行のたびにランダムに変わる **Battle_Commentary（それっぽい実況テキスト）** として表示し、同一の組み合わせでも**実行ごとに勝者・実況が変動**しうる。
+
+### イテレーション5（見た目と使い勝手の底上げ、要件9〜13）
+
+イテレーション5では、既存機能のデータモデル（`Character` 型）を変更せずに、UI の質と使い勝手を底上げする。具体的には、(a) 落ち着いたパステルを基調に上品なアクセント・洗練された余白/影/フォント/トランジションを備えた **大人かわいいテーマ（Adult_Cute_Theme）** を全画面へテーマトークン経由で適用し（要件9）、(b) 一覧では **ニックネームを主表示** として優先し名前を副表示に回すニックネーム優先表示を行い（要件10）、(c) 一覧を「登録日時の新しい順」「Favorite_Level の高い順」「名前の昇順」で **並び替え** できるようにし（要件11）、(d) お気に入り度を塗り記号 5 個中 N 個＋テキスト等価物「5段階中N」で **視覚的に強調** し（要件12）、(e) 「図鑑／今日の相棒／トーナメント／新規登録」へ素早く行き来できる画面下部固定の **共通ナビゲーションバー（Navigation_Bar）** を追加する（要件13）。これらはいずれも既存の `Character` データで成立し、並び替え・表示・ナビは既存データを読むだけで実現する。
 
 ### 技術方針
 
@@ -37,16 +41,18 @@
 ```mermaid
 graph TD
     subgraph UI["UI 層 (React Components)"]
+        APP[App ルート: view-state / NavigationBar 表示制御]
+        NB[NavigationBar 下部固定タブ 図鑑/今日の相棒/トーナメント/新規登録]
         CV[CollectionView 図鑑一覧]
         DV[CharacterDetailView 詳細]
         RF[RegistrationForm 登録/編集]
         GV[DailyGachaView ガチャ]
         BV[RankingBattleView 対戦]
-        RC[Reusable: CharacterCard / FavoriteLevelPicker / PastelButton / EmptyStateView / PhotoFrame / PhotoInput]
+        RC[Reusable: CharacterCard / FavoriteLevelPicker / FavoriteLevelDisplay / PastelButton / EmptyStateView / PhotoFrame / PhotoInput]
     end
 
     subgraph Hooks["Hooks + View-State 層"]
-        UC[useCollection]
+        UC[useCollection sortOrder]
         UR[useRegistration]
         UG[useDailyGacha]
         UB[useRankingBattle]
@@ -54,6 +60,8 @@ graph TD
 
     subgraph Domain["Domain 層 (純粋 TypeScript)"]
         VAL[CharacterValidator 入力検証]
+        SORT[sortCharacters 決定的並び替え]
+        DISP[deriveCardDisplay 表示モデル導出]
         GACHA[DailyPickSelector 決定的選出]
         TOUR[TournamentEngine トーナメント 自動判定]
         COMM[BattleCommentator 実況生成]
@@ -74,13 +82,24 @@ graph TD
         LS[(localStorage ガチャ salt)]
     end
 
+    APP --> NB
+    APP --> CV
+    APP --> DV
+    APP --> RF
+    APP --> GV
+    APP --> BV
+    NB -.タブ選択でビュー切替.-> APP
     CV --> UC
     DV --> UC
     RF --> UR
     GV --> UG
     BV --> UB
     RC -.再利用.-> CV
+    RC -.再利用.-> DV
     RC -.再利用.-> RF
+    UC --> SORT
+    CV --> DISP
+    DV --> DISP
 
     UC --> STORE
     UR --> STORE
@@ -101,9 +120,9 @@ graph TD
 
 ### レイヤーごとの責務
 
-- **UI 層（React コンポーネント）**: 画面描画とユーザー操作の受け取りのみ。状態は hooks から受け取り、ロジックを持たない。パステルテーマ・角丸・rem による文字サイズ追従・44×44 CSS px のタッチ領域・横スクロールなしのレスポンシブはここで担保する（要件7.4〜7.8）。
+- **UI 層（React コンポーネント）**: 画面描画とユーザー操作の受け取りのみ。状態は hooks から受け取り、ロジックを持たない。大人かわいいテーマ（Adult_Cute_Theme）の配色・角丸・影・余白・トランジション（`prefers-reduced-motion` 尊重）・rem による文字サイズ追従・44×44 CSS px のタッチ領域・横スクロールなしのレスポンシブはここで担保する（要件7.4〜7.8, 要件9）。ルートの `App` が現在のビュー状態（`'list' | 'add' | 'detail' | 'gacha' | 'battle'`）を保持し、共通の `NavigationBar`（下部固定タブ）を管理する。`NavigationBar` は主要画面（`list`/`gacha`/`battle`）でのみ表示し、詳細（`detail`）と登録/編集フォーム（`add`）では表示しない（要件13.6, 13.7）。一覧カードの主表示/副表示やお気に入り度の記号表示は Domain 層の純粋関数（`deriveCardDisplay` 等）が返す表示モデルに基づき描画する（要件10, 12）。
 - **Hooks + View-State 層**: 画面状態（ローディング／エラー／入力値）の保持と、ユースケースの調停。React hooks（`useState` / `useEffect` / `useReducer`）で実装し、Domain 層と Persistence 層を呼び出す。MVVM の ViewModel に相当する責務を担う（本設計では「MV 的分離」と呼ぶ）。
-- **Domain 層（純粋 TypeScript）**: 副作用を持たないフレームワーク非依存のモジュール。`CharacterValidator`（バリデーション）、`DailyPickSelector`（決定的選出）、`TournamentEngine`（トーナメントの勝者自動判定）、`BattleCommentator`（実況テキスト生成）、`PhotoProcessor`（画像形式・サイズ検証と正規化）。React にも IndexedDB にも依存しないため、単体テストと property-based testing の主対象となる。乱数を用いる `TournamentEngine`・`BattleCommentator` も、乱数生成器（rng）を外部注入することで純粋性・決定的テスト容易性を保つ。
+- **Domain 層（純粋 TypeScript）**: 副作用を持たないフレームワーク非依存のモジュール。`CharacterValidator`（バリデーション）、`sortCharacters`（Sort_Order に基づく決定的な並び替え、要件11）、`deriveCardDisplay`（一覧カードの主表示/副表示の導出、要件10）、お気に入り度表示モデル導出（塗り記号個数＋テキスト等価物、要件12）、`DailyPickSelector`（決定的選出）、`TournamentEngine`（トーナメントの勝者自動判定）、`BattleCommentator`（実況テキスト生成）、`PhotoProcessor`（画像形式・サイズ検証と正規化）。React にも IndexedDB にも依存しないため、単体テストと property-based testing の主対象となる。乱数を用いる `TournamentEngine`・`BattleCommentator` も、乱数生成器（rng）を外部注入することで純粋性・決定的テスト容易性を保つ。`sortCharacters` は入力配列を変更せず新しい配列を返す純粋関数として、`deriveCardDisplay`・お気に入り度表示モデル導出も入力から表示値を導く純粋関数として実装する（要件11.5）。
 - **Persistence 層**: `CharacterStore` インターフェースで永続化を抽象化し、既定実装は `IndexedDbCharacterStore`（`idb` 経由）。テスト時は `InMemoryCharacterStore` に差し替える。すべての操作は非同期（`Promise`）。
 - **PWA 基盤**: `vite-plugin-pwa` が生成する Service Worker（アプリシェルのプリキャッシュ／オフライン提供）と Web App Manifest（ホーム画面追加）。写真取得の `<input type="file">`、およびガチャの salt を保持する `localStorage` もこの層に属する。
 
@@ -119,7 +138,9 @@ React コンポーネント（View）と hooks（View-State）を分離し、意
 | PWA（vite-plugin-pwa） | 要件7.2, 7.3。Manifest + Service Worker をビルド時に生成し、ホーム画面追加とオフラインを実現。 |
 | IndexedDB + `idb`（写真は ArrayBuffer+MIME） | 要件3.1, 3.3。大容量バイナリを扱える端末内ストア。写真は Blob/File ではなく ArrayBuffer で保存（iOS WebKit の Blob 保存バグ回避）。`idb` は薄い Promise ラッパで実装を簡潔化。 |
 | `CharacterStore` インターフェース抽象 | 実装（IndexedDB）とテスト（インメモリ）を差し替え可能にするため。 |
-| ドメインロジックの純粋 TS 化 | property-based testing（決定的選出・トーナメント・バリデーション）を成立させるため。 |
+| ドメインロジックの純粋 TS 化 | property-based testing（決定的選出・トーナメント・バリデーション・並び替え・表示モデル導出）を成立させるため。 |
+| `App` ルートで view-state を集中管理し `NavigationBar` を制御 | 要件13.6, 13.7。主要画面（list/gacha/battle）のみ下部タブを表示し、詳細・登録/編集では非表示にする表示制御を単一箇所に集約するため。 |
+| 並び替え・表示テキストを純粋関数へ分離（`sortCharacters` / `deriveCardDisplay` / お気に入り度表示モデル） | 要件10, 11, 12。表示順・表示テキスト・記号個数を決定的な純粋関数として切り出し、property-based testing 可能にするため。並び替えは表示順のみでストア/データ不変（要件11.5）。 |
 | ArrayBuffer 保存 + Object URL 表示 | 保存は ArrayBuffer+MIME。表示時に `new Blob([data], { type })` で Blob を都度生成し `URL.createObjectURL` で表示、不要時に `revokeObjectURL` で解放しメモリリークを防ぐ。 |
 
 ## Components and Interfaces
@@ -130,18 +151,21 @@ React コンポーネント（View）と hooks（View-State）を分離し、意
 
 #### CollectionView（図鑑一覧）
 
-登録済み Character を登録日時の新しい順（`createdAt` 降順）で一覧表示する（要件2.1）。各カードは写真・名前・（あれば）ニックネームを表示（要件2.3, 2.5, 2.6）。0 件時は空状態メッセージと新規登録導線を表示（要件2.7, 8.6）。写真読み込み失敗時は当該カードのみプレースホルダー表示にフォールバックし、他カードの表示は継続する（要件2.4）。ストア読み込み失敗時は再試行手段を提示（要件2.9）。
+登録済み Character を、現在選択中の `Sort_Order` に従って一覧表示する。初期状態（未選択）は登録日時の新しい順（`createdAt` 降順、要件2.1, 11.2）。各カードは写真・主表示/副表示（ニックネーム優先、要件10）・お気に入り度の視覚表現（要件12）を表示する（要件2.3, 2.5, 2.6）。0 件時は空状態メッセージと新規登録導線を表示（要件2.7, 8.6）。写真読み込み失敗時は当該カードのみプレースホルダー表示にフォールバックし、他カードの表示は継続する（要件2.4）。ストア読み込み失敗時は再試行手段を提示（要件2.9）。
+
+一覧の先頭に、大人かわいいテーマに沿った **並び順の選択 UI**（セグメント/ドロップダウン等。各操作要素は最小 44×44 CSS px、横スクロールなし）を配置し、「登録日時の新しい順」「Favorite_Level の高い順」「名前の昇順」を切り替える（要件11.1, 9.6, 9.7, 13 と整合）。並び替えは表示順のみを変更し、Character_Store のデータおよび Character の内容は変更しない（要件11.5）。
 
 ```tsx
 function CollectionView(): JSX.Element {
-  const { characters, loadState, reload } = useCollection();
-  // grid/list, empty-state, retry-on-error を分岐表示
+  const { characters, sortOrder, setSortOrder, loadState, reload } = useCollection();
+  // 並び順選択 UI（newest/favorite/name）、grid/list、empty-state、retry-on-error を分岐表示
+  // 各カードは deriveCardDisplay(character) の主表示/副表示と FavoriteLevelDisplay を描画
 }
 ```
 
 #### CharacterDetailView（詳細）
 
-選択された Character の写真・名前・ニックネーム・メモ・お気に入り度を表示する（要件2.8）。編集・削除の導線を提供（要件6）。削除時は確認ダイアログを表示し、キャンセル時は元表示に戻す（要件6.5, 6.6, 6.7）。
+選択された Character の写真・名前・ニックネーム・メモ・お気に入り度を表示する（要件2.8）。詳細画面の表示順は従来どおり（名前・ニックネームの順序を一覧のニックネーム優先とは独立に維持）とし、要件10 のニックネーム優先は一覧カードにのみ適用する（要件10.1〜10.4 は Collection_View 対象）。お気に入り度は一覧カードと同一の視覚表現（塗り記号 5 個中 N 個＋テキスト等価物「5段階中N」）を `FavoriteLevelDisplay` で表示する（要件12.2）。編集・削除の導線を提供（要件6）。削除時は確認ダイアログを表示し、キャンセル時は元表示に戻す（要件6.5, 6.6, 6.7）。
 
 #### RegistrationForm（登録 / 編集）
 
@@ -155,27 +179,52 @@ function CollectionView(): JSX.Element {
 
 現在の `BattlePair` 2 件を並べて表示する（要件4.1）。勝敗は利用者が選ぶのではなく、**Chara_App が自動的に勝者を判定**し、ランダムに変わる実況（`Battle_Commentary`）と勝敗結果を表示して自動進行する（要件4.2, 4.3）。利用者の操作は対戦を進めるための「開始」「次へ／自動再生」のみで、**勝敗の選択は行わない**。各対戦の実況表示後、勝者を次ラウンドへ進め、勝ち残りが 2 件以上ある間は次の `BattlePair` を提示する（要件4.4）。同一の組み合わせでも実行ごとに勝者・実況が変動しうる（要件4.5）。最終的に勝者 1 件を「最も好きなキャラ」として表示（要件4.7）。2 件未満なら開始せずメッセージ表示（要件4.8）。ページ再読み込み時は進行状態を破棄して初期化する（要件4.9）。
 
+#### App（ルート・ビュー状態と NavigationBar 制御）
+
+アプリのルートコンポーネント。現在のビュー状態 `view: 'list' | 'add' | 'detail' | 'gacha' | 'battle'`（および `detail`/`add` の対象 Character・編集フラグ）を保持し、対応する画面コンポーネントを描画する。共通の `NavigationBar` の表示可否と遷移を制御する。
+
+- `NavigationBar` は主要画面（`view` が `'list'` / `'gacha'` / `'battle'`）でのみ表示し、`'detail'`（詳細）と `'add'`（新規登録・編集フォーム）では表示しない（要件13.6, 13.7）。
+- 遷移ハンドラ: `goToList()`→`'list'`（要件13.2）、`goToGacha()`→`'gacha'`（要件13.3）、`goToBattle()`→`'battle'`（要件13.4）、`goToAdd()`→編集状態を持たない新規登録フォーム（`'add'`、`editing` をクリア、要件13.5）。
+- アクティブタブは現在の `view`（`list`/`gacha`/`battle`）から導出して `NavigationBar` に渡す（要件13.6）。
+
+```tsx
+type View = 'list' | 'add' | 'detail' | 'gacha' | 'battle';
+
+function App(): JSX.Element {
+  const [view, setView] = useState<View>('list');
+  const showNav = view === 'list' || view === 'gacha' || view === 'battle'; // 要件13.6, 13.7
+  // goToList/goToGacha/goToBattle/goToAdd を NavigationBar に渡す
+  // showNav が true のときのみ NavigationBar を描画し、現在の view をアクティブタブとして渡す
+}
+```
+
 #### 再利用可能コンポーネント
 
-- `CharacterCard`: 一覧カード。写真枠（角丸大）・名前・ニックネームを表示（要件2.3, 2.5, 2.6）。写真デコード失敗時はプレースホルダー（要件2.4）。
-- `FavoriteLevelPicker`: 1〜5 のお気に入り度選択（ハート等のかわいい表現、44×44 CSS px 以上、要件1.7, 7.7）。
-- `PastelButton`: 主要アクション用ボタン（パステルアクセント・角丸中・最小 44×44 CSS px、要件7.5, 7.7）。
+- `CharacterCard`: 一覧カード。写真枠（角丸大）・主表示/副表示・お気に入り度を表示する。表示テキストは `deriveCardDisplay(character)` が返す `{ primary, secondary? }` に基づき、主表示を先頭かつ副表示より大きい文字サイズで表示し、副表示は主表示に続けて補助的に表示する（要件10.1〜10.4, 2.3, 2.5, 2.6）。お気に入り度は `FavoriteLevelDisplay` で表示（要件12.1）。写真デコード失敗時はプレースホルダー（要件2.4）。
+- `FavoriteLevelPicker`: 1〜5 のお気に入り度**選択**（入力用。ハート等のかわいい表現、44×44 CSS px 以上、要件1.7, 7.7, 9.6）。
+- `FavoriteLevelDisplay`: お気に入り度の**表示専用**コンポーネント（`FavoriteLevelPicker` の readOnly 表示に相当）。合計 5 個の記号のうち Favorite_Level と等しい個数を塗り記号、残りを未塗り記号で表示し、色/記号のみに依存せず度合いを判別できるテキスト等価物「5段階中N」を `aria-label` 等で提供する。範囲外/未設定/数値解釈不能は塗り 0 個・「5段階中0」で表示する（要件12.1〜12.4）。表示個数・テキスト等価物は純粋な表示モデル導出関数の結果を描画する。`CharacterCard` と `CharacterDetailView` の双方で用いる。
+- `PastelButton`: 主要アクション用ボタン（大人かわいいテーマのアクセント・角丸中・最小 44×44 CSS px、要件7.5, 7.7, 9.2）。
 - `EmptyStateView`: 空状態表示（要件2.7, 5.6, 8.6）。
 - `PhotoFrame`: 角丸の写真表示枠。`PhotoData`（ArrayBuffer+MIME）を受け取り、表示時に Blob を生成して Object URL 化する。`onError` でプレースホルダー表示（要件2.4）。
 - `PhotoInput`: `<input type="file" accept="image/*" capture="environment">` をラップし、選択・キャンセル・ブロックを扱う（要件1.2, 1.11）。
+- `NavigationBar`: 画面下部に固定表示するタブ型の共通ナビゲーション。「図鑑」「今日の相棒」「トーナメント」「新規登録」の 4 項目を表示し、現在のビューに対応するタブをアクティブ表示する（要件13.1, 13.6）。各タブ項目は最小 44×44 CSS px のタッチ領域を持ち（要件13.8）、ビューポート幅 320〜430 CSS px の縦向きでも横スクロールを発生させずに 4 項目を配置する（要件13.9）。配色・角丸・トークンは大人かわいいテーマに整合させる（要件13.10, 要件9）。各タブは `App` が提供する遷移ハンドラ（`goToList` / `goToGacha` / `goToBattle` / `goToAdd`）を呼び出す（要件13.2〜13.5）。`goToAdd` は既存の編集状態を引き継がない新規登録用フォームを開く（要件13.5）。
 
 ### Hooks / View-State（ViewModel 相当）
 
 ```ts
 type LoadState = 'idle' | 'loading' | 'loaded' | 'failed';
 
-// 一覧（要件2）
+// 一覧（要件2, 11）
 function useCollection(): {
-  characters: Character[];      // createdAt 降順
+  characters: Character[];      // 現在の sortOrder で並べ替えた表示順（sortCharacters の結果）
+  sortOrder: SortOrder;         // 現在の並び順。初期値 'newest'（要件11.2）
+  setSortOrder: (order: SortOrder) => void; // 表示順のみ変更、ストア/データは不変（要件11.5）
   loadState: LoadState;
   reload: () => Promise<void>;
   remove: (id: string) => Promise<void>;   // 要件6.7
 };
+// characters は fetchAll() の結果に sortCharacters(chars, sortOrder) を適用して返す。
+// 並び替えは純粋関数 sortCharacters で行い、元データを変更しない（要件11.5, 11.6）。
 
 // 登録/編集（要件1, 6）
 function useRegistration(editing?: Character): {
@@ -214,6 +263,27 @@ interface CharacterValidator {
   // name: 0..50, nickname: 0..50, memo: 0..500, favoriteLevel: 1..5(整数), photo: 必須
   validate(draft: CharacterDraft): FieldError[];
 }
+
+// 一覧の決定的並び替え（要件11）— 純粋関数。元配列を変更せず新しい配列を返す。
+// order 別のタイブレーク:
+//   'newest'   : createdAt 降順 → id 昇順
+//   'favorite' : favoriteLevel 降順 → createdAt 降順 → id 昇順
+//   'name'     : name の Unicode コードポイント順で昇順（ロケール非依存の一貫比較）。
+//                名前が空（空文字/空白のみ）は名前を持つ要素より後方。比較同値は id 昇順。
+function sortCharacters(characters: readonly Character[], order: SortOrder): Character[];
+
+// 一覧カードの表示モデル導出（要件10）— 純粋関数。
+//   ニックネームが空でない（空白のみでない）なら primary=ニックネーム、name が空でなければ secondary=name
+//   ニックネーム空かつ name 非空なら primary=name（secondary なし）
+//   両方空なら primary='名前未設定'（secondary なし）
+function deriveCardDisplay(character: Character): { primary: string; secondary?: string };
+
+// お気に入り度表示モデル導出（要件12）— 純粋関数。
+//   favoriteLevel が 1..5 の整数なら filled=level、そうでなければ（範囲外/未設定/非整数）filled=0。
+//   total は常に 5、textEquivalent は `5段階中${filled}`。
+function deriveFavoriteLevelDisplay(favoriteLevel: number): {
+  filled: number; total: 5; textEquivalent: string;
+};
 
 // 決定的な今日の一枚選出（要件5.1, 5.2, 5.3）
 interface DailyPickSelector {
@@ -330,6 +400,9 @@ interface CalendarDay {      // 端末ローカル暦日（要件5.2）
   month: number;             // 1〜12
   day: number;               // 1〜31
 }
+
+// 一覧の並び順（要件11）。表示順のみに作用し、Character の内容やストアを変更しない。
+type SortOrder = 'newest' | 'favorite' | 'name';
 
 interface BattlePair { left: string; right: string; }   // 不戦勝は Pair を生成しない
 // 対戦結果（勝敗はアプリが自動判定するため BattleSide は廃止。実況テキストを含む）
@@ -476,6 +549,38 @@ sequenceDiagram
     Note over H,TE: 進行状態は永続化しない。ページ再読み込み/再起動時は reset() で初期化（要件4.9）
 ```
 
+### フロー4: 共通ナビゲーションバーによる画面切替（要件13）
+
+`App` がビュー状態 `view` を単一の真実として保持し、`NavigationBar` のタブ選択に応じて `view` を更新する。`NavigationBar` は主要画面でのみ表示し、詳細・フォームでは非表示にする。
+
+```mermaid
+stateDiagram-v2
+    [*] --> list
+    list --> gacha : NavigationBar「今日の相棒」(13.3)
+    list --> battle : NavigationBar「トーナメント」(13.4)
+    list --> add : NavigationBar「新規登録」(13.5, 編集状態を引き継がない)
+    list --> detail : 一覧カード選択(2.8)
+    gacha --> list : NavigationBar「図鑑」(13.2)
+    gacha --> battle : NavigationBar「トーナメント」(13.4)
+    gacha --> add : NavigationBar「新規登録」(13.5)
+    battle --> list : NavigationBar「図鑑」(13.2)
+    battle --> gacha : NavigationBar「今日の相棒」(13.3)
+    battle --> add : NavigationBar「新規登録」(13.5)
+    detail --> add : 編集(6.1)
+    detail --> list : 戻る/削除完了
+    add --> list : 保存/キャンセル
+
+    note right of list : NavigationBar 表示（アクティブ=図鑑）(13.6)
+    note right of gacha : NavigationBar 表示（アクティブ=今日の相棒）(13.6)
+    note right of battle : NavigationBar 表示（アクティブ=トーナメント）(13.6)
+    note right of detail : NavigationBar 非表示 (13.7)
+    note right of add : NavigationBar 非表示 (13.7)
+```
+
+- `NavigationBar` は `view` が `'list'` / `'gacha'` / `'battle'` のときだけ描画し、`'detail'` / `'add'` では描画しない（要件13.6, 13.7）。
+- 「新規登録」タブ（`goToAdd`）は編集対象を持たない新規フォームを開く（要件13.5）。
+- 現在の `view` からアクティブタブを導出して視覚的に区別する（要件13.6）。
+
 ## Algorithms
 
 アルゴリズム
@@ -581,7 +686,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 *プロパティとは、システムのすべての正当な実行にわたって成り立つべき特性や振る舞いのことであり、システムが何をすべきかについての形式的な言明である。プロパティは、人間が読める仕様と機械が検証可能な正当性保証との橋渡しとなる。*
 
-以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出）に対する property-based testing の対象である。UI 見た目・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を PWA 要件（要件1〜8）へ対応付けている。
+以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜13へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19 として末尾に追加している（既存 Property 1〜16 は保持）。
 
 ### Property 1: フィールド文字数バリデーション
 
@@ -679,6 +784,24 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 **Validates: Requirements 5.5**
 
+### Property 17: 並び替えは決定的で要素を保存する
+
+*任意の* Character 集合と *任意の* `SortOrder` について、`sortCharacters(characters, order)` は入力集合の並べ替え（要素の過不足がない同一の多重集合）を返し、入力配列を変更しない。さらに各 `SortOrder` について決定的な順序を返す（同一入力・同一 order に対して何度呼んでも同一の順序）。順序は order ごとに、`'newest'` は `createdAt` 降順 → `id` 昇順、`'favorite'` は `favoriteLevel` 降順 → `createdAt` 降順 → `id` 昇順、`'name'` は名前の Unicode コードポイント順で昇順（名前が空のものは名前を持つものより後方）→ `id` 昇順のタイブレークに従う。
+
+**Validates: Requirements 11.2, 11.3, 11.4, 11.5, 11.6**
+
+### Property 18: 一覧カードの主表示/副表示の決定
+
+*任意の* `Character` について、`deriveCardDisplay(character)` は、ニックネームが空でない（空文字でなく空白のみでもない）場合は主表示（`primary`）にニックネームを返し、名前が空でなければ副表示（`secondary`）に名前を返す。ニックネームが空かつ名前が空でない場合は主表示に名前を返し副表示を持たない。ニックネームと名前がともに空の場合は主表示に「名前未設定」を返し副表示を持たない。
+
+**Validates: Requirements 10.1, 10.2, 10.3**
+
+### Property 19: お気に入り度表示は個数一致とテキスト等価物を持つ
+
+*任意の* `favoriteLevel` 値について、お気に入り度表示モデル導出関数は、値が 1〜5 の整数のとき塗り記号を当該値と等しい個数（`filled = level`）・合計 5 個（`total = 5`）で返し、範囲外・未設定・数値として解釈できない値のときは塗り記号 0 個（`filled = 0`）を返す。いずれの場合もテキスト等価物は「5段階中N」（N は `filled`）と一致する。
+
+**Validates: Requirements 12.1, 12.3, 12.4**
+
 ## Error Handling
 
 エラーハンドリング
@@ -709,7 +832,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 ### 方針: ユニットテスト + プロパティテストの併用
 
 - **ユニットテスト（Vitest + React Testing Library）**: 具体例・エッジケース・エラー分岐・UI 分岐（空状態、ファイル選択キャンセル/ブロック、削除確認、写真読込失敗のプレースホルダー、対戦2件未満、対戦中リセット等）を検証する。
-- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜16）を、広い入力空間にわたって検証する。
+- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜19）を、広い入力空間にわたって検証する。
 
 ### 実行環境の注記
 
@@ -722,7 +845,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 各プロパティテストには、対応する設計プロパティを参照するコメントを付与する。タグ形式:
   `// Feature: chara-collection, Property {number}: {property_text}`
 - 各 Correctness Property は **単一の** プロパティテストで実装する。
-- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）。
+- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**。
 - 乱数を用いる `TournamentEngine` と `BattleCommentator` は rng（`() => number`）を外部注入するため、テストでは固定/シード rng（例: 値の系列を返すスタブ）を渡して決定的に検証する。本番は `Math.random` を注入する。
 
 ### プロパティ ↔ テスト対応
@@ -738,13 +861,16 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 7 | 保存失敗時の原子性・入力保持 | 失敗スタブ Store + `useRegistration`/save ロジック |
 | 8 | 削除は対象1件のみ | `InMemoryCharacterStore` |
 | 9 | createdAt 降順整列 | `CharacterStore.fetchAll` |
-| 10 | 表示ビューの必須情報 | カード/詳細の表示モデル導出関数 |
+| 10 | 表示ビューの必須情報 | カード/詳細の表示モデル導出関数（`deriveCardDisplay` 等） |
 | 11 | 唯一の勝者で自動終了（rng シード列） | `TournamentEngine`（rng 注入） |
 | 12 | 自動判定の敗者除外・単調減少（rng シード列） | `TournamentEngine`（rng 注入） |
 | 13 | 奇数ラウンドの不戦勝 | `TournamentEngine`（rng 注入） |
 | 14 | 実況の妥当性・実行ごとの変動（複数テンプレート＋rng） | `BattleCommentator`（rng 注入） |
 | 15 | 暦日内決定的・要素性 | `DailyPickSelector` |
 | 16 | メッセージ50文字以下 | メッセージ生成関数 |
+| 17 | 並び替えの決定性・要素保存・タイブレーク（Character 集合＋各 SortOrder） | `sortCharacters`（domain） |
+| 18 | 一覧カードの主表示/副表示の決定（ニックネーム/名前の空・非空の組） | `deriveCardDisplay`（domain） |
+| 19 | お気に入り度表示の個数一致・テキスト等価物（範囲内外） | お気に入り度表示モデル導出関数（`deriveFavoriteLevelDisplay`） |
 
 ### ユニットテスト（例示・エッジ・エラー分岐）
 
@@ -761,33 +887,38 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 ### PWA / UI / 非機能テストの考慮（スモーク・計測）
 
 - **PWA スモーク**: Lighthouse の PWA チェックで Web App Manifest の妥当性（`display: standalone`、アイコン、theme/background color）とオフライン起動（Service Worker によるアプリシェル提供）を確認する（要件7.2, 7.3, 3.4, 3.5）。
-- **UI 見た目**: パステル配色・角丸・44×44 CSS px タッチ領域・rem による文字サイズ追従・横スクロールなしのポートレートレイアウト（要件7.4〜7.8）は、スナップショットテストと目視・複数フォントサイズでの確認で扱う。
+- **UI 見た目**: パステル配色・角丸・44×44 CSS px タッチ領域・rem による文字サイズ追従・横スクロールなしのポートレートレイアウト（要件7.4〜7.8）、および大人かわいいテーマの配色/角丸/影/余白/トランジションのトークン適用・`prefers-reduced-motion` での短縮（要件9.1〜9.7）は、スナップショットテストと目視・複数フォントサイズでの確認、および CSS/トークン検査（トランジション値が 200〜500ms、`prefers-reduced-motion` で 0/短縮、主表示 rem > 副表示 rem）で扱う。
+- **一覧カードの表示/お気に入り度表示（見た目側）**: 主表示を先頭・副表示より大きく表示する配置（要件10.4）、詳細でも一覧と同一の視覚表現を用いること（要件12.2）はスナップショット/例示テストで確認する（表示テキスト・記号個数・テキスト等価物の導出ロジック自体は Property 18/19 で検証）。
+- **並び順選択 UI / NavigationBar 表示制御**: 並び順の選択手段が存在すること（要件11.1）、各タブ選択で `App` の `view` が期待どおり遷移すること（`goToList`/`goToGacha`/`goToBattle`/`goToAdd`、要件13.2〜13.5）、`NavigationBar` が主要画面（list/gacha/battle）で表示され詳細・登録/編集フォームで非表示になること（要件13.6, 13.7）、アクティブタブが現在ビューに一致すること（要件13.6）、各タブが 44×44 px・320〜430 px 幅で横スクロールなし（要件13.8, 13.9）を、例示テスト（React Testing Library）とスナップショットで確認する。
 - **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する（要件3.8）。
 - **タイミング計測**: IndexedDB 永続化3秒以内（要件3.1）、ガチャ表示2秒以内（要件5.4）を計測（統合テスト）で確認する。
 
-## Design Theme and Design System
+## Design Theme and Design System（大人かわいい / Adult_Cute_Theme）
 
-デザインテーマとデザインシステム
+デザインテーマとデザインシステム（大人かわいい）
 
-要件7（かわいくポップな PWA UI）を満たすため、CSS カスタムプロパティによる再利用可能なデザイントークンとコンポーネントを定義する。重量級 UI フレームワークは使用しない。
+要件7（かわいくポップな PWA UI）および要件9（大人かわいい UI テーマ）を満たすため、CSS カスタムプロパティによる再利用可能なデザイントークンとコンポーネントを定義する。重量級 UI フレームワークは使用しない。**大人かわいいテーマ（Adult_Cute_Theme）** は、要件7 の制約（パステル基調・角丸・横スクロールなし・最小 44×44 CSS px・rem 追従）をすべて満たしたうえで、彩度を抑えた洗練配色・上品なアクセント・統一された余白/影/フォント/トランジションで美観を高める**上位互換**の位置づけとする。全画面（一覧・登録/編集フォーム・詳細・今日の一枚ガチャ・ランキング対戦）および `NavigationBar` は、色・角丸・影・余白・トランジションをすべて**テーマトークン経由**で解決して適用する（要件9.1, 9.2, 13.10）。同一種別の要素（ボタン・カード・写真枠・入力欄）は角丸・影・余白の値がトークンにより一致する（要件9.2）。
 
-### カラートークン（パステル基調・要件7.4）
+### カラートークン（大人かわいい・彩度を抑えたパステル基調・要件9.1 / 7.4）
 
-`:root` に CSS カスタムプロパティとして定義する（Manifest の theme/background color とも一致させる）。
+`:root` に CSS カスタムプロパティとして定義する（Manifest の theme/background color とも一致させる）。従来のトークン名（`--color-primary` 等）は維持しつつ、彩度を落とした落ち着いた配色へ調整する（少しくすませたローズ系プライマリ、スモーキーなラベンダー/ミントのアクセント、オフホワイト/クリームの背景）。これによりパステル基調（要件7.4）を満たしたまま「大人かわいい」印象へ更新する。
 
 ```css
 :root {
-  --color-primary: #ffb6c8;      /* パステルピンク（主要アクセント） */
-  --color-secondary: #b8ecd0;    /* パステルミント（補助アクセント） */
-  --color-accent: #d9c8f5;       /* パステルラベンダー（強調・お気に入り度） */
-  --color-background: #fff8f0;   /* クリーム（画面背景 / manifest background_color） */
-  --color-surface: #ffffff;      /* カード面 */
-  --color-text-primary: #4a4a4a; /* 本文 */
-  --color-text-secondary: #8a8a8a;
+  --color-primary: #e8a9b8;        /* くすませたローズ（主要アクセント。従来のパステルピンクを彩度控えめに） */
+  --color-secondary: #a9cabb;      /* スモーキーミント（補助アクセント） */
+  --color-accent: #c3b3dd;         /* スモーキーラベンダー（強調・お気に入り度） */
+  --color-background: #faf6f1;      /* オフホワイト/クリーム（画面背景 / manifest background_color） */
+  --color-surface: #fffdfb;         /* カード面（ごくわずかに温かみのある白） */
+  --color-text-primary: #4a4550;    /* 本文（やや紫みのあるダークグレーで上品に） */
+  --color-text-secondary: #938c99;  /* 副表示テキスト */
 }
 ```
 
-### コーナー半径トークン（角丸・要件7.5）
+- 色は要素へ直接ハードコードせず、常にトークン参照（`var(--color-...)`）で適用する（要件9.1）。
+- 本文と背景・アクセント上テキストのコントラストは可読性を確保する値とする（要件7.8 と整合）。
+
+### コーナー半径トークン（角丸・要件9.2 / 7.5）
 
 ```css
 :root {
@@ -797,24 +928,74 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 }
 ```
 
-### タイポグラフィ（文字サイズ追従・要件7.8）
+### 影トークン（要件9.2）
 
-- フォントサイズは固定 px を避け、**rem** で定義してブラウザ/OS の文字サイズ設定に追従させる。
-- 見出しは丸みのある書体でポップな印象を与える。本文は可読性を優先したコントラストを確保する。
+同一種別の要素間で影を統一するためのトークン。落ち着いた低コントラストのソフトシャドウを基本とする。
 
-### レイアウトとタッチ領域（要件7.6, 7.7）
+```css
+:root {
+  --shadow-soft: 0 2px 8px rgba(74, 69, 80, 0.08);   /* カード・写真枠の標準影 */
+  --shadow-raised: 0 4px 14px rgba(74, 69, 80, 0.12); /* 押下可能要素の浮き上がり */
+}
+```
 
-- モバイルポートレートを基準に、`max-width` とパーセンテージ/フレックスで**横スクロールを発生させない**レスポンシブレイアウトとする（要件7.6）。
-- すべてのインタラクティブ要素（ボタン、お気に入り度選択、カード等）は **最小 44×44 CSS px** のタッチ領域を持たせる（`min-width: 44px; min-height: 44px;`）（要件7.7）。
+### 余白トークン（要件9.2）
+
+余白は 4 段階のスケールをトークン化し、同一種別要素間で一貫させる。
+
+```css
+:root {
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+}
+```
+
+### トランジショントークン（要件9.4, 9.5）
+
+画面遷移・操作フィードバックには 200〜500ms の視覚的トランジションを適用する（要件9.4）。`prefers-reduced-motion: reduce` の環境ではトランジションを無効化または大幅に短縮する（要件9.5）。
+
+```css
+:root {
+  --transition-fast: 200ms;   /* フィードバック */
+  --transition-base: 300ms;   /* 標準の画面遷移 */
+  --transition-slow: 500ms;   /* 上限。これを超えない */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    /* トランジションを無効化/大幅短縮（要件9.5） */
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+  }
+}
+```
+
+- トランジション時間はトークン（`var(--transition-*)`）で参照し、200ms 未満・500ms 超を用いない（要件9.4）。
+
+### タイポグラフィ（文字サイズ追従・要件9.3 / 7.8）
+
+- フォントサイズは固定 px を避け、**rem** で定義してルート要素（ブラウザ/OS）の文字サイズ設定に比例して追従させる（要件9.3, 7.8）。
+- 見出しは丸みのある上品な書体で大人かわいい印象を与える。本文は可読性を優先したコントラストを確保する。
+- 一覧カードの主表示は副表示より大きい rem 値で表示する（要件10.4）。
+
+### レイアウトとタッチ領域（要件9.6, 9.7 / 7.6, 7.7）
+
+- モバイルポートレートを基準に、`max-width` とパーセンテージ/フレックスで**横スクロールを発生させない**レスポンシブレイアウトとする。ビューポート幅 320〜430 CSS px の縦向きでも横スクロールを発生させない（要件9.7, 7.6）。
+- すべてのインタラクティブ要素（ボタン、お気に入り度選択、写真取り込み操作、並び順選択、`NavigationBar` の各タブ、カード等）は **最小 44×44 CSS px** のタッチ領域を持たせる（`min-width: 44px; min-height: 44px;`）（要件9.6, 7.7, 13.8）。
 
 ### 再利用可能コンポーネントのスタイル
 
-- `CharacterCard`: 写真枠（`--radius-large`）・名前・ニックネーム。写真デコード失敗時プレースホルダー（要件2.3〜2.6, 2.4）。
-- `FavoriteLevelPicker`: 1〜5 のかわいい選択（ハート等、44px 以上、要件1.7, 7.7）。
-- `PastelButton`: `--color-primary` / `--radius-medium` / 最小 44×44 px（要件7.5, 7.7）。
+- `CharacterCard`: 写真枠（`--radius-large`）・主表示/副表示（ニックネーム優先、要件10）・お気に入り度表示（要件12）。影は `--shadow-soft`、余白は `--space-*` トークン。写真デコード失敗時プレースホルダー（要件2.3〜2.6, 2.4）。
+- `FavoriteLevelPicker`: 1〜5 のかわいい選択（ハート等、44px 以上、要件1.7, 7.7, 9.6）。
+- `FavoriteLevelDisplay`: 表示専用の度合い表示（塗り記号 5 個中 N 個＋テキスト等価物「5段階中N」を `aria-label` 等で提供、要件12.1〜12.4）。
+- `PastelButton`: `--color-primary` / `--radius-medium` / `--shadow-raised` / `--transition-fast` / 最小 44×44 px（要件7.5, 7.7, 9.2, 9.4）。
 - `EmptyStateView`: 空状態（要件2.7, 5.6, 8.6）。
 - `PhotoFrame`: 角丸写真枠（`--radius-large`）、Object URL 表示・`onError` フォールバック。
 - `PhotoInput`: `<input type="file" accept="image/*" capture="environment">`（要件1.2）。
+- `NavigationBar`: 下部固定タブ 4 項目。配色・角丸・影・余白・トランジションを大人かわいいテーマのトークンで統一し、各タブは最小 44×44 px、320〜430 px 幅でも横スクロールなしで 4 項目を配置する（要件13.8, 13.9, 13.10, 要件9）。
 
 ## Requirements Traceability
 
@@ -830,3 +1011,8 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件6（編集・削除） | `RegistrationForm`（編集）/ `CharacterDetailView`（削除確認）/ `CharacterStore.update` / `delete` / Property 6, 8 |
 | 要件7（PWA・かわいいデザイン） | PWA Design（Manifest/Service Worker）/ Design Theme and Design System（CSS トークン/角丸/rem/44px/レスポンシブ） |
 | 要件8（空状態・入力エラー） | `CharacterValidator` / `EmptyStateView` / Error Handling マッピング表 / Property 1〜4, 7 |
+| 要件9（大人かわいい UI テーマ） | Design Theme and Design System（Adult_Cute_Theme のカラー/角丸/影/余白/トランジショントークン、`prefers-reduced-motion` 短縮）/ 全 UI コンポーネント（トークン経由適用）/ UI スモーク・CSS 検査 |
+| 要件10（一覧でのニックネーム優先表示） | `CharacterCard` / `deriveCardDisplay`（domain）/ `CollectionView` / Property 18（表示配置 10.4 は UI スナップショット） |
+| 要件11（一覧の並び替え） | `sortCharacters`（domain）/ `useCollection`（`sortOrder`/`setSortOrder`）/ `CollectionView`（並び順選択 UI）/ `SortOrder` 型 / Property 17 |
+| 要件12（お気に入り度の視覚的強調） | `FavoriteLevelDisplay`（表示専用）/ `deriveFavoriteLevelDisplay`（domain）/ `CharacterCard` / `CharacterDetailView` / Property 19 |
+| 要件13（共通ナビゲーションバー） | `NavigationBar` / `App`（`view` 状態と表示制御・遷移ハンドラ）/ フロー4（画面切替）/ UI 例示・スナップショット |

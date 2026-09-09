@@ -128,11 +128,13 @@ button {
   cursor: pointer;
   padding: var(--space-sm) var(--space-lg);
   border: none;
-  border-radius: var(--radius-medium); /* 角丸 (要件7.5) */
+  border-radius: var(--radius-medium); /* 角丸 (要件7.5, 9.2) */
   background-color: var(--color-primary);
   color: var(--color-on-primary);
   font-weight: var(--font-weight-medium);
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  box-shadow: var(--shadow-raised); /* 押下可能要素の浮き上がり (要件9.2) */
+  transition: background-color var(--transition-fast) ease,
+    transform var(--transition-fast) ease, filter var(--transition-fast) ease; /* 200〜500ms (要件9.4) */
 }
 
 button:hover {
@@ -169,9 +171,9 @@ select {
  * ------------------------------------------------------------------------- */
 .card {
   background-color: var(--color-surface);
-  border-radius: var(--radius-large); /* 角丸大 (要件7.5) */
+  border-radius: var(--radius-large); /* 角丸大 (要件7.5, 9.2) */
   padding: var(--space-md);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft); /* カード標準影を soft に統一 (要件9.2) */
 }
 
 /* 写真枠は角丸大でクリップする */
@@ -219,7 +221,8 @@ select {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: transform 0.1s ease, filter 0.15s ease;
+  box-shadow: var(--shadow-raised); /* 押下可能要素の浮き上がり (要件9.2) */
+  transition: transform var(--transition-fast) ease, filter var(--transition-fast) ease; /* 要件9.4 */
 }
 
 .photo-input__label:hover {
@@ -258,9 +261,11 @@ select {
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-lg);
   border: none;
-  border-radius: var(--radius-medium); /* 角丸中 (要件7.5) */
+  border-radius: var(--radius-medium); /* 角丸中 (要件7.5, 9.2) */
   font-weight: var(--font-weight-bold);
-  transition: background-color 0.15s ease, filter 0.15s ease, transform 0.1s ease;
+  box-shadow: var(--shadow-raised); /* 押下可能要素の浮き上がり (要件9.2) */
+  transition: background-color var(--transition-fast) ease,
+    filter var(--transition-fast) ease, transform var(--transition-fast) ease; /* 要件9.4 */
 }
 
 .pastel-button--primary {
@@ -308,7 +313,7 @@ select {
   background-color: transparent;
   font-size: var(--font-size-xl);
   line-height: 1;
-  transition: transform 0.1s ease;
+  transition: transform var(--transition-fast) ease; /* 要件9.4 */
 }
 
 .favorite-level-picker__item:hover {
@@ -317,6 +322,16 @@ select {
 
 .favorite-level-picker__item:active {
   transform: scale(0.95);
+}
+
+/* ---------------------------------------------------------------------------
+ * FavoriteLevelDisplay — お気に入り度の表示専用（要件12）
+ * 塗り記号 5 個中 N 個で度合いを可視化する。クリック不可（入力は Picker）。
+ * ------------------------------------------------------------------------- */
+.favorite-level-display {
+  display: inline-flex;
+  gap: var(--space-xs);
+  line-height: 1;
 }
 
 /* ---------------------------------------------------------------------------
@@ -360,12 +375,12 @@ select {
   text-align: left;
   align-items: stretch;
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  transition: transform var(--transition-fast) ease, box-shadow var(--transition-fast) ease; /* 要件9.4 */
 }
 
 .character-card--interactive:hover {
   background-color: var(--color-surface);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-raised);
 }
 
 .character-card--interactive:active {
@@ -416,6 +431,50 @@ select {
   display: flex;
   gap: var(--space-sm);
   flex-wrap: wrap;
+}
+
+/* 並び順選択（セグメント風）。3 種を横並びにし、狭幅でも折り返して横スクロールを
+ * 出さない (要件11.1, 9.6, 9.7)。各ボタンは .touch-target で最小 44×44 CSS px を担保。 */
+.collection-view__sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  border-radius: var(--radius-large);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.collection-view__sort-option {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-medium);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast) ease,
+    color var(--transition-fast) ease;
+}
+
+.collection-view__sort-option:hover {
+  color: var(--color-text-primary);
+}
+
+/* 選択中は塗り＋濃色で明確に区別する (要件11.1)。 */
+.collection-view__sort-option--selected {
+  background-color: var(--color-primary);
+  color: var(--color-surface);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.collection-view__sort-option:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 /* 読み込み失敗時の再試行導線 (要件2.9) */
@@ -745,4 +804,106 @@ select {
 .ranking-battle__champion-name {
   color: var(--color-text-primary);
   overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+ * NavigationBar — 画面下部に固定表示する共通タブナビゲーション (要件13)
+ * 4 項目（図鑑 / 今日の相棒 / トーナメント / 新規登録）を横並びにし、各タブは
+ * flex:1 で等分・折り返さず、320〜430px でも横スクロールを出さない (要件13.9 / 7.6)。
+ * 各タブは最小 44×44 CSS px のタッチ領域を持つ (要件13.8 / 7.7)。大人かわいいテーマの
+ * トークン（色/角丸/影/余白/トランジション）に整合させる (要件13.10 / 要件9)。
+ * ------------------------------------------------------------------------- */
+.navigation-bar {
+  /* 画面下部に固定。content-max-width で中央寄せ、左右いっぱいから margin auto で寄せる。 */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  /* iOS のホームインジケータぶんのセーフエリアを確保しつつ本体と分離する。 */
+  padding: var(--space-xs) var(--space-sm)
+    calc(var(--space-xs) + env(safe-area-inset-bottom, 0px));
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -2px 8px rgba(74, 69, 80, 0.08); /* 上端に軽い影で本体と分離 (要件13.10) */
+}
+
+.navigation-bar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-xs);
+}
+
+/* 各タブを等分し、狭幅でも折り返さず横スクロールを出さない (要件13.9)。 */
+.navigation-bar__list-item {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+}
+
+.navigation-bar__item {
+  /* ボタン既定のパステル塗り/影を打ち消し、面色に馴染む透明タブにする。 */
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-xs);
+  border: none;
+  border-radius: var(--radius-medium);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  box-shadow: none;
+  transition:
+    background-color var(--transition-fast) ease,
+    color var(--transition-fast) ease; /* 200〜500ms (要件9.4) */
+}
+
+.navigation-bar__item:hover {
+  background-color: transparent;
+  color: var(--color-text-primary);
+}
+
+.navigation-bar__item:active {
+  transform: scale(0.97);
+}
+
+/* 現在表示中の画面に対応するタブを選択状態で区別する (要件13.6)。 */
+.navigation-bar__item--active {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.navigation-bar__item--active:hover {
+  background-color: var(--color-primary-hover);
+  color: var(--color-on-primary);
+}
+
+.navigation-bar__icon {
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+/* ラベルは小さめにして 4 項目が横スクロールなしで収まるようにする (要件13.9)。 */
+.navigation-bar__label {
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* 固定 Navigation_Bar に主要画面のコンテンツが隠れないよう下部余白を確保する
+ * （バー高さ＋セーフエリアぶん。要件13.6, 13.7 の表示と両立）。 */
+.app--with-nav {
+  padding-bottom: calc(var(--space-xl) * 2 + env(safe-area-inset-bottom, 0px));
 }

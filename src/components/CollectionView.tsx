@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CollectionView（図鑑一覧）— 登録済み Character の一覧表示。
  *
  * {@link useCollection} から一覧・読み込み状態・再試行（reload）を受け取り、
@@ -12,7 +12,7 @@
  *
  * Requirements: 2.1, 2.3, 2.5, 2.6, 2.7, 2.9, 8.6
  */
-import type { Character } from '../domain/types';
+import type { Character, SortOrder } from '../domain/types';
 import { useCollection } from '../hooks/useCollection';
 import { storeErrorMessage } from '../hooks/errorMessages';
 import { CharacterCard } from './CharacterCard';
@@ -30,13 +30,21 @@ export interface CollectionViewProps {
   onOpenBattle: () => void;
 }
 
+/** 並び順選択 UI に表示する 3 種のオプション（表示ラベルと値）。要件11.1〜11.4 */
+const SORT_OPTIONS: ReadonlyArray<{ value: SortOrder; label: string }> = [
+  { value: 'newest', label: '新しい順' },
+  { value: 'favorite', label: 'お気に入り順' },
+  { value: 'name', label: '名前順' },
+];
+
 export function CollectionView({
   onAdd,
   onSelect,
   onOpenGacha,
   onOpenBattle,
 }: CollectionViewProps): JSX.Element {
-  const { characters, loadState, reload } = useCollection();
+  const { characters, loadState, sortOrder, setSortOrder, reload } =
+    useCollection();
 
   return (
     <main className="collection-view">
@@ -52,6 +60,35 @@ export function CollectionView({
           <PastelButton onClick={onAdd}>新規登録 ✚</PastelButton>
         </div>
       </header>
+
+      {/* 並び順選択（セグメント風）。1 件以上あるときのみ表示し、空状態と干渉させない
+          （要件11.1）。各ボタンは最小 44×44 CSS px（.touch-target）で、選択中は
+          aria-pressed と選択スタイルで視覚的に区別する（要件9.6, 9.7, 11.1）。
+          選択で setSortOrder を呼び、並べ替えは hook（sortCharacters）が担う。 */}
+      {characters.length > 0 ? (
+        <div
+          className="collection-view__sort"
+          role="group"
+          aria-label="並び順"
+        >
+          {SORT_OPTIONS.map((option) => {
+            const selected = option.value === sortOrder;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`collection-view__sort-option touch-target${
+                  selected ? ' collection-view__sort-option--selected' : ''
+                }`}
+                aria-pressed={selected}
+                onClick={() => setSortOrder(option.value)}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* 読み込み失敗: 保存済みデータは保持しつつ再試行手段を提示する（要件2.9）。 */}
       {loadState === 'failed' ? (
@@ -73,7 +110,8 @@ export function CollectionView({
         />
       ) : null}
 
-      {/* 一覧: createdAt 降順（hook が保証）。写真・名前・ニックネームを表示（要件2.1, 2.3, 2.5, 2.6）。 */}
+      {/* 一覧: 選択中の並び順（hook が sortCharacters で保証）。CollectionView 側では
+          再ソートしない。写真・名前・ニックネームを表示（要件2.1, 2.3, 2.5, 2.6, 11.2〜11.4）。 */}
       {characters.length > 0 ? (
         <ul className="collection-view__grid">
           {characters.map((character) => (

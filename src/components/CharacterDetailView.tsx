@@ -18,11 +18,14 @@
  * 名前が未入力（空文字）の場合は「名前未設定」を、ニックネームが未登録の場合は
  * 「未登録」を代替表示する（要件1.9, 2.6）。
  *
- * Requirements: 2.8, 6.1, 6.5, 6.6, 6.7
+ * お気に入り度は一覧カードと同一の視覚表現（表示専用 {@link FavoriteLevelDisplay}）で
+ * 表示する（要件12.2）。
+ *
+ * Requirements: 2.8, 6.1, 6.5, 6.6, 6.7, 12.2
  */
 import { useState } from 'react';
 import type { Character } from '../domain/types';
-import { FavoriteLevelPicker } from './FavoriteLevelPicker';
+import { FavoriteLevelDisplay } from './FavoriteLevelDisplay';
 import { PastelButton } from './PastelButton';
 import { PhotoFrame } from './PhotoFrame';
 
@@ -84,11 +87,8 @@ export function CharacterDetailView({
 
         <div className="character-detail__field">
           <span className="character-detail__label">お気に入り度</span>
-          {/* 表示専用: 変更は編集フォームで行うため onChange は空にする。 */}
-          <FavoriteLevelPicker
-            value={character.favoriteLevel}
-            onChange={() => undefined}
-          />
+          {/* 表示専用（要件12.2）。変更は編集フォームで行う。 */}
+          <FavoriteLevelDisplay level={character.favoriteLevel} />
         </div>
       </div>
 
