@@ -24,7 +24,7 @@
 import type { FormEvent } from 'react';
 import { useRegistration } from '../hooks/useRegistration';
 import { photoErrorMessage, storeErrorMessage } from '../hooks/errorMessages';
-import type { Character, FieldError } from '../domain/types';
+import type { Character, FieldError, ImageColor } from '../domain/types';
 import {
   MEMO_MAX_LENGTH,
   NAME_MAX_LENGTH,
@@ -43,6 +43,21 @@ export interface RegistrationFormProps {
   /** 編集対象の Character（省略時は新規登録）。hook へそのまま渡す。要件6.1 */
   editing?: Character;
 }
+
+/**
+ * イメージカラー選択肢（「なし」＋プリセット5色の6択。要件15.1）。
+ * `label` は日本語表示名で、スウォッチの aria-label（例「イメージカラー: ローズ」）に用いる。
+ * プリセット5色は tokens.css の `--image-color-{color}` を CSS 変数経由で表示し、色は
+ * ハードコードしない（要件15.10 / 9.1）。'none' は縁取りなしを表す（既定選択）。
+ */
+const IMAGE_COLOR_OPTIONS: ReadonlyArray<{ value: ImageColor; label: string }> = [
+  { value: 'none', label: 'なし' },
+  { value: 'rose', label: 'ローズ' },
+  { value: 'mint', label: 'ミント' },
+  { value: 'lavender', label: 'ラベンダー' },
+  { value: 'butter', label: 'バター' },
+  { value: 'sky', label: 'スカイ' },
+];
 
 /** 指定フィールドの検証エラーメッセージを返す（無ければ null）。 */
 function fieldErrorMessage(
@@ -102,6 +117,17 @@ export function RegistrationForm({
   const memoError = fieldErrorMessage(fieldErrors, 'memo');
   const favoriteLevelError = fieldErrorMessage(fieldErrors, 'favoriteLevel');
   const photoFieldError = fieldErrorMessage(fieldErrors, 'photo');
+  const metOnError = fieldErrorMessage(fieldErrors, 'metOn');
+
+  // 出会った日の入力（要件14.1, 14.9, 14.10）。空文字は「未設定」を表すため
+  // draft の型（string | undefined）に沿って undefined を格納する。編集時に既存値を
+  // クリアして確定すると undefined となり、save 時に未設定へ更新される（要件14.10）。
+  const handleMetOnChange = (value: string): void => {
+    setField('metOn', value === '' ? undefined : value);
+  };
+
+  // 現在選択中のイメージカラー（新規時は 'none'、編集時は既存値）。要件15.1, 15.3
+  const selectedImageColor: ImageColor = draft.imageColor;
 
   return (
     <main className="registration-form">
@@ -213,6 +239,74 @@ export function RegistrationForm({
               {favoriteLevelError}
             </p>
           ) : null}
+        </div>
+
+        {/* 出会った日（任意）。詳細でのみ表示する。空にして確定すると未設定へ（要件14.1, 14.9, 14.10） */}
+        <div className="registration-form__field">
+          <label className="registration-form__label" htmlFor="registration-met-on">
+            出会った日（任意）
+          </label>
+          <input
+            id="registration-met-on"
+            className="registration-form__met-on"
+            type="date"
+            value={draft.metOn ?? ''}
+            onChange={(event) => handleMetOnChange(event.target.value)}
+          />
+          {metOnError ? (
+            <p className="registration-form__error" role="alert">
+              {metOnError}
+            </p>
+          ) : null}
+        </div>
+
+        {/* イメージカラー（「なし」＋プリセット5色の6択スウォッチ）。既定は 'none'（要件15.1, 15.2, 15.3, 15.10） */}
+        <div className="registration-form__field">
+          <span className="registration-form__label" id="registration-image-color-label">
+            イメージカラー（任意）
+          </span>
+          <div
+            className="image-color-picker"
+            role="group"
+            aria-labelledby="registration-image-color-label"
+          >
+            {IMAGE_COLOR_OPTIONS.map((option) => {
+              const isSelected = selectedImageColor === option.value;
+              const isNone = option.value === 'none';
+              const swatchClassName = [
+                'image-color-picker__swatch',
+                isNone ? 'image-color-picker__swatch--none' : '',
+                isSelected ? 'image-color-picker__swatch--selected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+              // プリセット色はトークン（--image-color-{color}）経由で表示し、色をハードコードしない（要件15.10）。
+              const swatchStyle = isNone
+                ? undefined
+                : { backgroundColor: `var(--image-color-${option.value})` };
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={swatchClassName}
+                  style={swatchStyle}
+                  aria-label={`イメージカラー: ${option.label}`}
+                  aria-pressed={isSelected}
+                  onClick={() => setField('imageColor', option.value)}
+                >
+                  {/* 「なし」は色を持たないため斜線で表現。選択中はチェックを重ねる。 */}
+                  {isNone ? (
+                    <span className="image-color-picker__none-mark" aria-hidden="true" />
+                  ) : null}
+                  {isSelected ? (
+                    <span className="image-color-picker__check" aria-hidden="true">
+                      ✓
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* 保存失敗メッセージ（入力は保持される。要件1.12, 8.4, 8.5） */}

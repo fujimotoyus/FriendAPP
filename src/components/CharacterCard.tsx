@@ -14,10 +14,21 @@
  *
  * お気に入り度は表示専用の {@link FavoriteLevelDisplay} で可視化する（要件12.1）。
  *
- * Requirements: 2.3, 2.5, 2.6, 10.1, 10.2, 10.3, 10.4, 12.1
+ * イメージカラーが設定されている場合、Domain 層の純粋関数 {@link deriveImageColorStyle} が
+ * 返す `{ hasBorder, borderVarName }` に基づき、`hasBorder === true` のときのみカード枠へ
+ * 縁取りを適用する。縁取り色は `tokens.css` のイメージカラートークン
+ * （`--image-color-*`）を `var(...)` 経由で `border-color` に参照し、ハードコードしない
+ * （要件15.9）。`'none'`・許容値以外（旧データ・不正値）は `hasBorder === false` となり、
+ * 縁取りクラス・style を一切付けない（要件15.6, 15.8）。角丸大（`--radius-large`）・
+ * 横スクロールなし・44×44 CSS px タッチ領域は縁取り有無にかかわらず維持する（要件14.7,
+ * 15.10）。`metOn`（出会った日）は一覧カードには表示しない（詳細のみ、要件15.6）。
+ *
+ * Requirements: 2.3, 2.5, 2.6, 10.1, 10.2, 10.3, 10.4, 12.1, 14.7, 15.6, 15.8, 15.9, 15.10
  */
+import type { CSSProperties } from 'react';
 import type { Character } from '../domain/types';
 import { deriveCardDisplay } from '../domain/deriveCardDisplay';
+import { deriveImageColorStyle } from '../domain/imageColor';
 import { FavoriteLevelDisplay } from './FavoriteLevelDisplay';
 import { PhotoFrame } from './PhotoFrame';
 
@@ -61,12 +72,22 @@ function CharacterCardContent({ character }: { character: Character }): JSX.Elem
 }
 
 export function CharacterCard({ character, onClick }: CharacterCardProps): JSX.Element {
+  // イメージカラーから縁取りの有無・参照トークンを導出する（要件15.6, 15.8）。
+  // hasBorder が true のときのみ縁取りクラスとトークン参照の border-color を付与し、
+  // 'none'・不正値では一切付けない（縁取りなし）。色は var(--image-color-*) 経由（要件15.9）。
+  const imageColorStyle = deriveImageColorStyle(character.imageColor);
+  const borderedClass = imageColorStyle.hasBorder ? ' character-card--bordered' : '';
+  const borderStyle: CSSProperties | undefined = imageColorStyle.hasBorder
+    ? { borderColor: `var(${imageColorStyle.borderVarName})` }
+    : undefined;
+
   // タップ可能な場合はカード全体をボタン化し、44px 以上のタッチ領域を確保する（要件7.7）。
   if (onClick != null) {
     return (
       <button
         type="button"
-        className="card character-card character-card--interactive touch-target"
+        className={`card character-card character-card--interactive touch-target${borderedClass}`}
+        style={borderStyle}
         onClick={() => onClick(character)}
       >
         <CharacterCardContent character={character} />
@@ -75,7 +96,7 @@ export function CharacterCard({ character, onClick }: CharacterCardProps): JSX.E
   }
 
   return (
-    <div className="card character-card">
+    <div className={`card character-card${borderedClass}`} style={borderStyle}>
       <CharacterCardContent character={character} />
     </div>
   );

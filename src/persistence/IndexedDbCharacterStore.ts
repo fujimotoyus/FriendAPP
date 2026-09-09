@@ -14,6 +14,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Character, PhotoData, StoreError } from '../domain/types';
 import type { CharacterStore } from './CharacterStore';
+import { normalizeNewFields } from './normalizeCharacterFields';
 
 /**
  * 読み出した Character の photo を {@link PhotoData} 形（ArrayBuffer + MIME）へ正規化する。
@@ -46,11 +47,16 @@ async function normalizePhoto(photo: unknown): Promise<PhotoData> {
 }
 
 /**
- * 読み出した Character の photo を正規化した新しい Character を返す。
+ * 読み出した Character を後方互換のため正規化した新しい Character を返す。
+ *
+ * - `photo`: {@link PhotoData}（ArrayBuffer + MIME）へ正規化（旧 Blob データ対応）。
+ * - `metOn` / `imageColor`: イテレーション6 で追加した属性を持たない旧データを
+ *   既定値へ補完する（`metOn` 欠落/不正 → `undefined`、`imageColor` 欠落/不正 → `'none'`。
+ *   {@link normalizeNewFields}、要件14.11, 15.5）。DB バージョン・スキーマは据え置き。
  */
 async function normalizeCharacter(character: Character): Promise<Character> {
   const photo = await normalizePhoto((character as { photo?: unknown }).photo);
-  return { ...character, photo };
+  return normalizeNewFields({ ...character, photo });
 }
 
 /** データベース名（design.md「IndexedDB スキーマとバージョニング」）。 */

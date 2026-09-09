@@ -21,13 +21,31 @@
  * お気に入り度は一覧カードと同一の視覚表現（表示専用 {@link FavoriteLevelDisplay}）で
  * 表示する（要件12.2）。
  *
- * Requirements: 2.8, 6.1, 6.5, 6.6, 6.7, 12.2
+ * イメージカラーが設定されている場合、Domain 層の純粋関数 {@link deriveImageColorStyle} が
+ * 返す `{ hasBorder, borderVarName }` に基づき、`hasBorder === true` のときのみ写真枠へ
+ * 縁取りを適用する。縁取り色は `tokens.css` のイメージカラートークン（`--image-color-*`）を
+ * `var(...)` 経由で `border-color` に参照し、ハードコードしない（要件15.9）。`'none'`・
+ * 許容値以外（旧データ・不正値）は縁取りを一切付けない（要件15.7, 15.8）。角丸大
+ * （`--radius-large`）は縁取り有無にかかわらず維持する。
+ *
+ * 「出会った日」（{@link Character.metOn}）は、妥当な `YYYY-MM-DD`（`normalizeMetOn` 通過値）
+ * が設定されているときのみ {@link formatMetOn} で「YYYY年M月D日」として表示し、未設定
+ * （`undefined`・不正値）のときは当該行を描画しない（要件14.5, 14.6）。この「出会った日」は
+ * 詳細のみに表示し、Daily_Gacha / Ranking_Battle には表示しない（要件14.8）。
+ *
+ * Requirements: 2.8, 6.1, 6.5, 6.6, 6.7, 12.2, 14.5, 14.6, 14.8, 15.7, 15.9
  */
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { Character } from '../domain/types';
+import { deriveImageColorStyle } from '../domain/imageColor';
+import { formatMetOn } from '../domain/metOn';
 import { FavoriteLevelDisplay } from './FavoriteLevelDisplay';
 import { PastelButton } from './PastelButton';
 import { PhotoFrame } from './PhotoFrame';
+
+/** `metOn` が妥当な `YYYY-MM-DD` 形式かの簡易判定（表示時点の防御的チェック）。 */
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface CharacterDetailViewProps {
   /** 表示対象の Character。 */
@@ -51,6 +69,21 @@ export function CharacterDetailView({
   const hasNickname = character.nickname.trim().length > 0;
   const hasMemo = character.memo.trim().length > 0;
 
+  // イメージカラーから写真枠の縁取り有無・参照トークンを導出する（要件15.7, 15.8）。
+  // hasBorder が true のときのみ縁取りクラスとトークン参照の border-color を付与し、
+  // 'none'・不正値では一切付けない。色は var(--image-color-*) 経由でハードコードしない（要件15.9）。
+  const imageColorStyle = deriveImageColorStyle(character.imageColor);
+  const photoBorderClass = imageColorStyle.hasBorder
+    ? 'character-detail__photo character-detail__photo--bordered'
+    : 'character-detail__photo';
+  const photoBorderStyle: CSSProperties | undefined = imageColorStyle.hasBorder
+    ? { borderColor: `var(${imageColorStyle.borderVarName})` }
+    : undefined;
+
+  // 出会った日（要件14.5, 14.6）。妥当な YYYY-MM-DD のときのみ表示、未設定・不正値は非表示。
+  const metOn = character.metOn;
+  const hasMetOn = metOn !== undefined && ISO_DATE_PATTERN.test(metOn);
+
   // 削除確認の表示状態。true で確認 UI を表示する（要件6.5）。
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -65,7 +98,8 @@ export function CharacterDetailView({
       <PhotoFrame
         photo={character.photo}
         alt={displayName}
-        className="character-detail__photo"
+        className={photoBorderClass}
+        style={photoBorderStyle}
       />
 
       <div className="character-detail__body">
@@ -77,6 +111,14 @@ export function CharacterDetailView({
             {hasNickname ? character.nickname : '未登録'}
           </span>
         </div>
+
+        {/* 出会った日は妥当値のときのみ行ごと表示する。未設定・不正値は非表示（要件14.6）。 */}
+        {hasMetOn && metOn !== undefined ? (
+          <div className="character-detail__field">
+            <span className="character-detail__label">出会った日</span>
+            <span className="character-detail__value">{formatMetOn(metOn)}</span>
+          </div>
+        ) : null}
 
         <div className="character-detail__field">
           <span className="character-detail__label">メモ</span>

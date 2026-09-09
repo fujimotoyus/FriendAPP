@@ -1,5 +1,10 @@
 {
-  "pbtResults": {},
+  "pbtResults": {
+    "29.1 新フィールドを含む保存・復元ラウンドトリップのプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1788932669911
+    }
+  },
   "executionHistory": {
     "1. Vite + React + TS プロジェクト scaffold と PWA / フォルダ基盤のセットアップ": [
       {
@@ -588,6 +593,188 @@
         "executionId": "3717ab9d-32e3-462f-a523-8d8a4377ca3a",
         "chatSessionId": "sess_e309b8af-ef70-4d2d-98f1-a77a86a971dc",
         "timestamp": 1788442326262
+      }
+    ],
+    "26. ドメイン型・テーマトークンの拡張（イメージカラー / 出会った日）": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931471434
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931690904
+      }
+    ],
+    "27.1 `normalizeMetOn` と `formatMetOn` を実装する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931695815
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931817001
+      }
+    ],
+    "27.2 `deriveImageColorStyle` を実装する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931696886
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931817965
+      }
+    ],
+    "27. ドメイン純粋関数: 出会った日の正規化・整形とイメージカラー縁取り導出": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931818064
+      }
+    ],
+    "28. CharacterValidator を新フィールドへ拡張する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931825809
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932036241
+      }
+    ],
+    "29. Persistence の後方互換正規化（読み出し時）": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931827194
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932037511
+      }
+    ],
+    "32.1 CharacterCard・PhotoFrame に縁取りを適用する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788931828234
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932036787
+      }
+    ],
+    "30. useRegistration を新フィールドへ拡張する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932044549
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932288860
+      }
+    ],
+    "32.2 CharacterDetailView に写真枠の縁取りと Met_On 表示を追加する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932045502
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932289922
+      }
+    ],
+    "32. CharacterCard / CharacterDetailView / PhotoFrame に縁取りと詳細の Met_On 表示を反映する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932290037
+      }
+    ],
+    "31. RegistrationForm に「出会った日」「イメージカラー」入力 UI を追加する": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932296287
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932492644
+      }
+    ],
+    "27.3 出会った日の正規化の妥当性のプロパティテスト": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932498677
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932810985
+      }
+    ],
+    "27.4 イメージカラーの正規化と縁取り導出のプロパティテスト": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932500095
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932812456
+      }
+    ],
+    "29.1 新フィールドを含む保存・復元ラウンドトリップのプロパティテスト": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932501500
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932813751
+      }
+    ],
+    "32.3 UI 追加・表示分岐のユニットテスト": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932502235
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932814824
+      }
+    ],
+    "33. Iteration 6 チェックポイント（登録項目の拡張）": [
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788932821382
+      },
+      {
+        "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
+        "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
+        "timestamp": 1788933292838
       }
     ]
   }

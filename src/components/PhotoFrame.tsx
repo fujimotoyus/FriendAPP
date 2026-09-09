@@ -16,6 +16,7 @@
  * Requirements: 2.4, 7.5
  */
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { PhotoData } from '../domain/types';
 
 export interface PhotoFrameProps {
@@ -25,6 +26,13 @@ export interface PhotoFrameProps {
   alt?: string;
   /** ルート要素に付与する追加クラス名（レイアウト調整用）。 */
   className?: string;
+  /**
+   * ルート要素 `.photo-frame` に付与する追加インラインスタイル。
+   * イメージカラーの縁取り色（`border-color: var(--image-color-*)`）を
+   * トークン経由で渡すために用いる（要件15.9）。角丸・onError フォールバック・
+   * Object URL 解放などの既存挙動には影響しない。
+   */
+  style?: CSSProperties;
 }
 
 /**
@@ -41,7 +49,7 @@ function PhotoPlaceholder(): JSX.Element {
   );
 }
 
-export function PhotoFrame({ photo, alt = '', className }: PhotoFrameProps): JSX.Element {
+export function PhotoFrame({ photo, alt = '', className, style }: PhotoFrameProps): JSX.Element {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   // 画像デコード失敗（onError）時にプレースホルダーへフォールバックする（要件2.4）。
   const [hasError, setHasError] = useState(false);
@@ -70,7 +78,7 @@ export function PhotoFrame({ photo, alt = '', className }: PhotoFrameProps): JSX
   const showPlaceholder = photo == null || hasError || objectUrl == null;
 
   return (
-    <div className={className ? `photo-frame ${className}` : 'photo-frame'}>
+    <div className={className ? `photo-frame ${className}` : 'photo-frame'} style={style}>
       {showPlaceholder ? (
         <PhotoPlaceholder />
       ) : (

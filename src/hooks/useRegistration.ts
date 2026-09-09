@@ -9,9 +9,11 @@
  *       要件1.3, 1.8, 1.10, 1.11, 1.12, 2.2, 3.1, 3.2, 8.1, 8.2, 8.3, 8.4, 8.5
  */
 import { useCallback, useState } from 'react';
-import { validate } from '../domain/CharacterValidator';
+import { normalizeImageColor, validate } from '../domain/CharacterValidator';
+import { normalizeMetOn } from '../domain/metOn';
 import { validateAndProcess } from '../domain/PhotoProcessor';
 import type {
+  CalendarDay,
   Character,
   CharacterDraft,
   FieldError,
@@ -28,6 +30,20 @@ const CAPACITY_LIMIT = 1000;
 
 /** 新規登録時の初期お気に入り度（1〜5 の中間値）。要件1.7 */
 const DEFAULT_FAVORITE_LEVEL = 3;
+
+/**
+ * 端末ローカルの現在日から今日の暦日（CalendarDay）を作る。
+ * normalizeMetOn の上限（未来日クリア）判定に用いる（要件14.10）。純粋関数ではないが、
+ * ドメイン関数 normalizeMetOn へ渡す値を作るだけで副作用は持たない。
+ */
+function localToday(): CalendarDay {
+  const now = new Date();
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    day: now.getDate(),
+  };
+}
 
 /**
  * 一意な id を生成する。crypto.randomUUID() はセキュアコンテキスト（HTTPS）かつ
@@ -81,6 +97,8 @@ function createInitialDraft(editing?: Character): CharacterDraft {
       memo: editing.memo,
       favoriteLevel: editing.favoriteLevel,
       photo: editing.photo,
+      metOn: editing.metOn,
+      imageColor: editing.imageColor,
       editingId: editing.id,
     };
   }
@@ -90,6 +108,7 @@ function createInitialDraft(editing?: Character): CharacterDraft {
     memo: '',
     favoriteLevel: DEFAULT_FAVORITE_LEVEL,
     photo: null,
+    imageColor: 'none',
   };
 }
 
@@ -155,6 +174,11 @@ export function useRegistration(
     const photo = draft.photo as PhotoData;
     const isEditing = draft.editingId !== undefined;
 
+    // 出会った日を確定する（要件14.10）。空/形式不正/実在しない日/範囲外/未来日は
+    // undefined（未設定）へ正規化される。イメージカラーは許容外を 'none' に落とす（要件15.2, 15.3）。
+    const metOn = normalizeMetOn(draft.metOn, localToday());
+    const imageColor = normalizeImageColor(draft.imageColor);
+
     if (!isEditing) {
       try {
         const current = await store.count();
@@ -178,6 +202,8 @@ export function useRegistration(
           favoriteLevel: draft.favoriteLevel,
           photo,
           createdAt: editing?.createdAt ?? Date.now(),
+          metOn,
+          imageColor,
         };
         await store.update(character);
       } else {
@@ -189,6 +215,8 @@ export function useRegistration(
           favoriteLevel: draft.favoriteLevel,
           photo,
           createdAt: Date.now(),
+          metOn,
+          imageColor,
         };
         await store.insert(character);
       }

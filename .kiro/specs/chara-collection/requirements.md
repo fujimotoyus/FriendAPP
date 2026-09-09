@@ -21,6 +21,7 @@
 - **イテレーション3**: ランキング対戦（要件4）
 - **イテレーション4**: 仕上げ（編集・削除、メモ・ニックネーム、UI調整）（要件6、要件8）
 - **イテレーション5**: 見た目と使い勝手の底上げ（「大人かわいい」UIテーマ、一覧でのニックネーム優先表示、一覧の並び替え、お気に入り度の視覚的強調、共通ナビゲーションバー）（要件9、要件10、要件11、要件12、要件13）
+- **イテレーション6**: 登録項目の拡張（任意の「出会った日」を登録し詳細でのみ表示、パステルプリセットから選ぶ「イメージカラー」を登録しカードと詳細の写真枠の縁取りへ反映。旧データは既定値で補完し後方互換を維持）（要件14、要件15）
 
 ## Glossary
 
@@ -42,6 +43,9 @@
 - **大人かわいいテーマ（Adult_Cute_Theme）**: 落ち着いたパステルを基調とし、上品なアクセント・洗練された余白/影/フォント/トランジションで構成する視覚テーマ。要件7で定めた制約（パステル基調、角丸、横スクロールなし、最小44×44 CSSピクセルのタッチ領域、rem追従）をすべて満たしたうえで美観を高める上位互換の位置づけとする
 - **Sort_Order**: Collection_Viewにおける一覧の並び順。「登録日時の新しい順」「Favorite_Levelの高い順」「名前の昇順」のいずれかを指す。並び順の変更は表示順のみに作用し、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
 - **Navigation_Bar**: 画面下部に固定表示されるタブ型の共通ナビゲーション。「図鑑」「今日の相棒」「トーナメント」「新規登録」の4つの遷移項目を持ち、それぞれCollection_View・Daily_Gacha・Ranking_Battle・Registration_Form（新規登録）への到達手段を提供する。現在表示中の画面に対応するタブを選択状態として視覚的に区別する
+- **Met_On（出会った日）**: Characterに紐づく任意（未設定可）の日付属性。当該Characterと「出会った日」を暦日（年月日）で表す。妥当な暦日のみを保持し、未入力または不正な日付文字列は未設定として扱う。CharacterDetailView（詳細画面）でのみ表示し、Collection_View・Daily_Gacha・Ranking_Battleには表示しない。この属性を持たない既存Characterは未設定として扱う（後方互換）
+- **Image_Color（イメージカラー）**: Characterに紐づく属性で、大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン由来のパステルのプリセット色から選ぶ縁取り色。選択肢はプリセット5色と「なし（Image_Color_None）」で構成し、既定値は「なし」とする。CharacterCard（一覧カード）の枠および詳細画面の写真枠の縁取りへ反映する。プリセットの許容値以外・未設定・この属性を持たない既存Characterはいずれも「なし」として扱う（後方互換）
+- **Image_Color_None（イメージカラーなし）**: Image_Colorの既定値。縁取りを一切適用しない状態を表す
 
 ## Requirements
 
@@ -233,3 +237,40 @@
 8. THE Navigation_Bar SHALL 各タブ項目を、要件7.7を満たす形で最小44×44 CSSピクセルのタッチ領域で提供する
 9. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面で表示されたとき, THE Navigation_Bar SHALL 横スクロールを発生させずに4つの遷移項目を、要件7.6を満たす形で表示する
 10. THE Navigation_Bar SHALL 大人かわいいテーマ（Adult_Cute_Theme）の配色・角丸・テーマトークンに整合した外観を、要件9と整合する形で適用して表示する
+
+### 要件14: 出会った日（Met_On）の登録と詳細表示
+
+**ユーザーストーリー:** カップルとして、そのキャラと出会った日を残したい。そうすることで、二人の思い出の日付を詳細画面で振り返れる。
+
+#### 受け入れ基準
+
+1. THE Registration_Form SHALL Met_Onの入力欄を`<input type="date">`により任意項目（未入力可）として提供する
+2. WHEN 利用者がMet_Onに妥当な暦日を入力してCharacterの登録または編集を確定する, THE Chara_App SHALL 当該暦日をMet_OnとしてCharacterに保持しCharacter_Storeへ保存する
+3. WHEN 利用者がMet_Onを未入力のままCharacterの登録または編集を確定する, THE Chara_App SHALL 当該CharacterのMet_Onを未設定としてCharacter_Storeへ保存する
+4. IF Met_Onとして入力された値が妥当な暦日として解釈できない場合, THEN THE Chara_App SHALL 当該値をMet_Onとして保存せず、Met_Onを未設定として扱う
+5. WHERE あるCharacterのMet_Onが設定されている場合, THE CharacterDetailView SHALL 当該CharacterのMet_Onを詳細画面に表示する
+6. IF あるCharacterのMet_Onが未設定である場合, THEN THE CharacterDetailView SHALL 当該CharacterのMet_Onを未設定である旨として示す、またはMet_Onの表示を行わない
+7. THE Collection_View SHALL Met_Onを一覧に表示しない
+8. THE Chara_App SHALL Daily_GachaおよびRanking_Battleの画面にMet_Onを表示しない
+9. WHEN 利用者が既存のCharacterの編集操作を行う, THE Registration_Form SHALL 当該CharacterのMet_Onが設定されている場合は当該日付を初期値として表示し、未設定の場合は空欄で表示する
+10. WHEN 利用者が編集時にMet_Onの入力欄をクリア（空）にして確定する, THE Chara_App SHALL 当該CharacterのMet_Onを未設定へ更新してCharacter_Storeへ保存する
+11. WHERE Met_Onの属性を持たない既存のCharacterが読み出される場合, THE Chara_App SHALL 当該CharacterのMet_Onを未設定として扱う
+12. THE Chara_App SHALL Met_Onをいかなる外部サーバーへも送信せず、Character_Storeによる端末内保存のみに保持する
+
+### 要件15: イメージカラー（Image_Color）の登録と縁取り反映
+
+**ユーザーストーリー:** カップルとして、キャラごとにイメージカラーを付けたい。そうすることで、一覧や詳細でそのキャラらしい色の縁取りが映えて見分けやすくなる。
+
+#### 受け入れ基準
+
+1. THE Registration_Form SHALL Image_Colorを、大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン由来のパステルのプリセット5色と「なし（Image_Color_None）」の合計6つの選択肢から1つ選択する手段を提供する
+2. WHEN 利用者がImage_Colorを選択せずにCharacterの登録を確定する, THE Chara_App SHALL 当該CharacterのImage_ColorをImage_Color_None（既定値）としてCharacter_Storeへ保存する
+3. WHEN 利用者がプリセットの許容値のImage_Colorを選択してCharacterの登録または編集を確定する, THE Chara_App SHALL 当該Image_ColorをCharacterに保持しCharacter_Storeへ保存する
+4. IF あるCharacterのImage_Colorがプリセットの許容値以外の値、または未設定である場合, THEN THE Chara_App SHALL 当該CharacterのImage_ColorをImage_Color_Noneとして扱う
+5. WHERE Image_Colorの属性を持たない既存のCharacterが読み出される場合, THE Chara_App SHALL 当該CharacterのImage_ColorをImage_Color_Noneとして扱う
+6. WHERE あるCharacterのImage_ColorがImage_Color_None以外のプリセット色である場合, THE CharacterCard SHALL 当該Characterの一覧カードの枠に当該Image_Colorの縁取りを、テーマトークン経由で適用して表示する
+7. WHERE あるCharacterのImage_ColorがImage_Color_None以外のプリセット色である場合, THE CharacterDetailView SHALL 当該Characterの詳細画面の写真枠に当該Image_Colorの縁取りを、テーマトークン経由で適用して表示する
+8. IF あるCharacterのImage_ColorがImage_Color_Noneである場合, THEN THE Chara_App SHALL 当該CharacterのCharacterCardおよびCharacterDetailViewの写真枠に縁取りを適用しない
+9. THE Chara_App SHALL Image_Colorの縁取りを、要件7.5の角丸適用および要件9.2のテーマトークン経由の一貫スタイルを満たす形で適用する
+10. THE Chara_App SHALL Image_Colorの縁取りを反映しても、要件7.6・要件9.7を満たす横スクロールを発生させないレイアウト、および要件7.7・要件9.6を満たす最小44×44 CSSピクセルのタッチ領域を維持する
+11. THE Chara_App SHALL Image_Colorをいかなる外部サーバーへも送信せず、Character_Storeによる端末内保存のみに保持する

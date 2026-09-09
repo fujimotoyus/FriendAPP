@@ -6,7 +6,7 @@
 
 概要
 
-本設計書は、カップルが二人だけで楽しむ、iPhone のホーム画面に追加して使える **PWA（Progressive Web App）**「chara-collection（キャラ図鑑）」の技術設計を定義する。要件定義書（requirements.md、要件1〜要件13）に基づき、以下の3つの機能領域に「編集・削除」および「見た目と使い勝手の底上げ（イテレーション5）」を加えて実装する。
+本設計書は、カップルが二人だけで楽しむ、iPhone のホーム画面に追加して使える **PWA（Progressive Web App）**「chara-collection（キャラ図鑑）」の技術設計を定義する。要件定義書（requirements.md、要件1〜要件15）に基づき、以下の3つの機能領域に「編集・削除」「見た目と使い勝手の底上げ（イテレーション5）」および「登録項目の拡張（イテレーション6）」を加えて実装する。
 
 1. **キャラ図鑑（Character Collection）**: 写真付きキャラクターの登録・一覧表示・詳細表示・編集・削除（要件1, 2, 6）
 2. **今日の一枚ガチャ（Daily Gacha）**: 同一暦日内で固定される「今日の相棒」のランダム選出と引き直し（要件5）
@@ -15,6 +15,17 @@
 ### イテレーション5（見た目と使い勝手の底上げ、要件9〜13）
 
 イテレーション5では、既存機能のデータモデル（`Character` 型）を変更せずに、UI の質と使い勝手を底上げする。具体的には、(a) 落ち着いたパステルを基調に上品なアクセント・洗練された余白/影/フォント/トランジションを備えた **大人かわいいテーマ（Adult_Cute_Theme）** を全画面へテーマトークン経由で適用し（要件9）、(b) 一覧では **ニックネームを主表示** として優先し名前を副表示に回すニックネーム優先表示を行い（要件10）、(c) 一覧を「登録日時の新しい順」「Favorite_Level の高い順」「名前の昇順」で **並び替え** できるようにし（要件11）、(d) お気に入り度を塗り記号 5 個中 N 個＋テキスト等価物「5段階中N」で **視覚的に強調** し（要件12）、(e) 「図鑑／今日の相棒／トーナメント／新規登録」へ素早く行き来できる画面下部固定の **共通ナビゲーションバー（Navigation_Bar）** を追加する（要件13）。これらはいずれも既存の `Character` データで成立し、並び替え・表示・ナビは既存データを読むだけで実現する。
+
+### イテレーション6（登録項目の拡張、要件14〜15）
+
+イテレーション6では、`Character` に**任意の2フィールドを追加**して登録項目を拡張する。具体的には、(a) そのキャラと「出会った日」を任意（未設定可）で登録し、詳細画面でのみ表示する **Met_On（出会った日）**（要件14）と、(b) 大人かわいいテーマのトークン由来のパステルのプリセットから選ぶ **Image_Color（イメージカラー）** を登録し、一覧カードの枠および詳細の写真枠の縁取りへ反映する機能（要件15）を追加する。
+
+このイテレーションは既存機能への**破壊的でない拡張**として設計する。要点は次のとおり。
+
+- **データモデル拡張（後方互換が最重要）**: `Character` に `metOn?: string`（ISO 8601 の `YYYY-MM-DD`。未設定は `undefined`）と `imageColor: ImageColor`（プリセット列挙。既定は `'none'`）を追加する。これらの属性を持たない旧データは、`IndexedDbCharacterStore.fetchAll` の読み出し時に既存の `PhotoData` 正規化と同じ場所で正規化して吸収する（`metOn` 無し → `undefined`、`imageColor` 無し/不正値 → `'none'`）。**DB バージョンやスキーマ変更は不要**（新規プロパティの追加のみで、既存レコードは読み出し時正規化で後方互換を保つ、要件14.11, 15.5）。
+- **ドメイン純粋関数の追加（PBT 対象）**: 出会った日の入力/旧データを妥当な `metOn` か `undefined` へ正規化する `normalizeMetOn`、イメージカラーから縁取り適用有無と参照トークン名を導く `deriveImageColorStyle`、詳細表示用の整形 `formatMetOn` を追加する。意思決定ロジックは従来どおり Domain 層の純粋関数へ寄せ、property-based testing で検証する。
+- **UI 反映**: `RegistrationForm` に「出会った日」（`<input type="date">`・任意）と「イメージカラー」（なし＋5色の6択）の入力 UI を追加し、`CharacterCard`・`CharacterDetailView` は `imageColor` に応じた縁取りをトークン経由で適用する。`CharacterDetailView` は `metOn` 設定時のみ「YYYY年M月D日」で表示する。`Collection_View`・`Daily_Gacha`・`Ranking_Battle` には `metOn` を表示しない（要件14.7, 14.8）。
+- **不変の制約の維持**: `metOn`・`imageColor` を含む一切のデータを外部サーバーへ送信しない（要件3.8, 14.12, 15.11）。縁取りは大人かわいいテーマのトークン経由で適用し、角丸・横スクロールなし・44×44 CSS px タッチ領域を維持する（要件15.9, 15.10）。
 
 ### 技術方針
 
@@ -62,6 +73,8 @@ graph TD
         VAL[CharacterValidator 入力検証]
         SORT[sortCharacters 決定的並び替え]
         DISP[deriveCardDisplay 表示モデル導出]
+        METON[normalizeMetOn/formatMetOn 出会った日 正規化/整形]
+        ICOL[deriveImageColorStyle イメージカラー縁取り導出]
         GACHA[DailyPickSelector 決定的選出]
         TOUR[TournamentEngine トーナメント 自動判定]
         COMM[BattleCommentator 実況生成]
@@ -100,6 +113,11 @@ graph TD
     UC --> SORT
     CV --> DISP
     DV --> DISP
+    CV --> ICOL
+    DV --> ICOL
+    DV --> METON
+    UR --> METON
+    UR --> ICOL
 
     UC --> STORE
     UR --> STORE
@@ -122,7 +140,7 @@ graph TD
 
 - **UI 層（React コンポーネント）**: 画面描画とユーザー操作の受け取りのみ。状態は hooks から受け取り、ロジックを持たない。大人かわいいテーマ（Adult_Cute_Theme）の配色・角丸・影・余白・トランジション（`prefers-reduced-motion` 尊重）・rem による文字サイズ追従・44×44 CSS px のタッチ領域・横スクロールなしのレスポンシブはここで担保する（要件7.4〜7.8, 要件9）。ルートの `App` が現在のビュー状態（`'list' | 'add' | 'detail' | 'gacha' | 'battle'`）を保持し、共通の `NavigationBar`（下部固定タブ）を管理する。`NavigationBar` は主要画面（`list`/`gacha`/`battle`）でのみ表示し、詳細（`detail`）と登録/編集フォーム（`add`）では表示しない（要件13.6, 13.7）。一覧カードの主表示/副表示やお気に入り度の記号表示は Domain 層の純粋関数（`deriveCardDisplay` 等）が返す表示モデルに基づき描画する（要件10, 12）。
 - **Hooks + View-State 層**: 画面状態（ローディング／エラー／入力値）の保持と、ユースケースの調停。React hooks（`useState` / `useEffect` / `useReducer`）で実装し、Domain 層と Persistence 層を呼び出す。MVVM の ViewModel に相当する責務を担う（本設計では「MV 的分離」と呼ぶ）。
-- **Domain 層（純粋 TypeScript）**: 副作用を持たないフレームワーク非依存のモジュール。`CharacterValidator`（バリデーション）、`sortCharacters`（Sort_Order に基づく決定的な並び替え、要件11）、`deriveCardDisplay`（一覧カードの主表示/副表示の導出、要件10）、お気に入り度表示モデル導出（塗り記号個数＋テキスト等価物、要件12）、`DailyPickSelector`（決定的選出）、`TournamentEngine`（トーナメントの勝者自動判定）、`BattleCommentator`（実況テキスト生成）、`PhotoProcessor`（画像形式・サイズ検証と正規化）。React にも IndexedDB にも依存しないため、単体テストと property-based testing の主対象となる。乱数を用いる `TournamentEngine`・`BattleCommentator` も、乱数生成器（rng）を外部注入することで純粋性・決定的テスト容易性を保つ。`sortCharacters` は入力配列を変更せず新しい配列を返す純粋関数として、`deriveCardDisplay`・お気に入り度表示モデル導出も入力から表示値を導く純粋関数として実装する（要件11.5）。
+- **Domain 層（純粋 TypeScript）**: 副作用を持たないフレームワーク非依存のモジュール。`CharacterValidator`（バリデーション）、`sortCharacters`（Sort_Order に基づく決定的な並び替え、要件11）、`deriveCardDisplay`（一覧カードの主表示/副表示の導出、要件10）、お気に入り度表示モデル導出（塗り記号個数＋テキスト等価物、要件12）、`normalizeMetOn`（出会った日の正規化、要件14）、`formatMetOn`（出会った日の表示整形、要件14）、`deriveImageColorStyle`（イメージカラーからの縁取り導出、要件15）、`DailyPickSelector`（決定的選出）、`TournamentEngine`（トーナメントの勝者自動判定）、`BattleCommentator`（実況テキスト生成）、`PhotoProcessor`（画像形式・サイズ検証と正規化）。React にも IndexedDB にも依存しないため、単体テストと property-based testing の主対象となる。乱数を用いる `TournamentEngine`・`BattleCommentator` も、乱数生成器（rng）を外部注入することで純粋性・決定的テスト容易性を保つ。`sortCharacters` は入力配列を変更せず新しい配列を返す純粋関数として、`deriveCardDisplay`・お気に入り度表示モデル導出も入力から表示値を導く純粋関数として実装する（要件11.5）。
 - **Persistence 層**: `CharacterStore` インターフェースで永続化を抽象化し、既定実装は `IndexedDbCharacterStore`（`idb` 経由）。テスト時は `InMemoryCharacterStore` に差し替える。すべての操作は非同期（`Promise`）。
 - **PWA 基盤**: `vite-plugin-pwa` が生成する Service Worker（アプリシェルのプリキャッシュ／オフライン提供）と Web App Manifest（ホーム画面追加）。写真取得の `<input type="file">`、およびガチャの salt を保持する `localStorage` もこの層に属する。
 
@@ -142,6 +160,7 @@ React コンポーネント（View）と hooks（View-State）を分離し、意
 | `App` ルートで view-state を集中管理し `NavigationBar` を制御 | 要件13.6, 13.7。主要画面（list/gacha/battle）のみ下部タブを表示し、詳細・登録/編集では非表示にする表示制御を単一箇所に集約するため。 |
 | 並び替え・表示テキストを純粋関数へ分離（`sortCharacters` / `deriveCardDisplay` / お気に入り度表示モデル） | 要件10, 11, 12。表示順・表示テキスト・記号個数を決定的な純粋関数として切り出し、property-based testing 可能にするため。並び替えは表示順のみでストア/データ不変（要件11.5）。 |
 | ArrayBuffer 保存 + Object URL 表示 | 保存は ArrayBuffer+MIME。表示時に `new Blob([data], { type })` で Blob を都度生成し `URL.createObjectURL` で表示、不要時に `revokeObjectURL` で解放しメモリリークを防ぐ。 |
+| `metOn` / `imageColor` を任意追加し読み出し時正規化で後方互換（DB バージョン据え置き） | 要件14, 15。新規プロパティ追加のみでスキーマ変更を伴わないため、`fetchAll` 読み出し時に欠落/不正を既定値（`undefined` / `'none'`）へ正規化すれば旧データを破壊せず拡張できる（要件14.11, 15.5, 3.8）。意思決定は純粋関数（`normalizeMetOn` / `deriveImageColorStyle`）へ寄せ PBT 対象とする。 |
 
 ## Components and Interfaces
 
@@ -167,9 +186,19 @@ function CollectionView(): JSX.Element {
 
 選択された Character の写真・名前・ニックネーム・メモ・お気に入り度を表示する（要件2.8）。詳細画面の表示順は従来どおり（名前・ニックネームの順序を一覧のニックネーム優先とは独立に維持）とし、要件10 のニックネーム優先は一覧カードにのみ適用する（要件10.1〜10.4 は Collection_View 対象）。お気に入り度は一覧カードと同一の視覚表現（塗り記号 5 個中 N 個＋テキスト等価物「5段階中N」）を `FavoriteLevelDisplay` で表示する（要件12.2）。編集・削除の導線を提供（要件6）。削除時は確認ダイアログを表示し、キャンセル時は元表示に戻す（要件6.5, 6.6, 6.7）。
 
+**イテレーション6の追加表示（要件14, 15）**:
+
+- **出会った日（Met_On）**: `metOn` が設定済み（`normalizeMetOn` を通過した妥当な `YYYY-MM-DD`）の場合のみ、`formatMetOn(metOn)` の結果「YYYY年M月D日」を詳細画面に表示する（要件14.5）。未設定の場合は当該行自体を表示しない（要件14.6）。この表示は詳細画面（`CharacterDetailView`）に限り、一覧・ガチャ・対戦には出さない（要件14.7, 14.8）。
+- **イメージカラー（Image_Color）の縁取り**: `deriveImageColorStyle(character.imageColor)` の結果に基づき、写真枠に縁取りをトークン経由で軽く反映する。`hasBorder === true` のときのみ `borderVarName`（例 `--image-color-rose`）を `border-color` に用い、`'none'`（`hasBorder === false`）のときは縁取りを一切適用しない（要件15.7, 15.8）。角丸（`--radius-large`）は維持する（要件15.9）。
+
 #### RegistrationForm（登録 / 編集）
 
 新規登録と編集の双方に用いる（要件1, 要件6.1）。入力欄: 名前（0〜50 文字・任意、要件1.4, 1.9）、ニックネーム（0〜50 文字、要件1.5）、メモ（0〜500 文字、要件1.6）、お気に入り度（1〜5、要件1.7）、写真取得（`PhotoInput`、要件1.2）。編集時は既存属性を初期表示（要件6.1）し、写真を差し替え可能（要件6.4）。写真未指定確定時・不正画像時・保存失敗時・ファイル選択キャンセル/ブロック時は入力内容を保持したままメッセージを表示（要件1.3, 1.10, 1.11, 1.12, 8.2〜8.5）。
+
+**イテレーション6の追加入力欄（要件14, 15）**:
+
+- **出会った日（Met_On）**: `<input type="date">` による任意項目（未入力可、要件14.1）。編集時は既存 `metOn` が設定済みなら当該日付を初期値に表示し、未設定なら空欄で表示する（要件14.9）。入力欄をクリア（空）にして確定すると `metOn` を未設定へ更新する（要件14.10）。妥当な暦日として解釈できない値は `normalizeMetOn` により未設定へ落とす（要件14.4）。各操作要素は最小 44×44 CSS px・横スクロールなし・大人かわいいテーマ整合を維持する（要件15.10, 要件9）。
+- **イメージカラー（Image_Color）**: 「なし」＋プリセット5色の**6択**選択 UI（各色をパステルのスウォッチ等で提示、要件15.1）。既定選択は `'none'`（要件15.2）。編集時は既存 `imageColor` を初期選択にする。各選択肢は最小 44×44 CSS px のタッチ領域を持たせる（要件15.10）。選択値は `ImageColor` として `draft.imageColor` に保持する。
 
 #### DailyGachaView（今日の一枚ガチャ）
 
@@ -200,7 +229,7 @@ function App(): JSX.Element {
 
 #### 再利用可能コンポーネント
 
-- `CharacterCard`: 一覧カード。写真枠（角丸大）・主表示/副表示・お気に入り度を表示する。表示テキストは `deriveCardDisplay(character)` が返す `{ primary, secondary? }` に基づき、主表示を先頭かつ副表示より大きい文字サイズで表示し、副表示は主表示に続けて補助的に表示する（要件10.1〜10.4, 2.3, 2.5, 2.6）。お気に入り度は `FavoriteLevelDisplay` で表示（要件12.1）。写真デコード失敗時はプレースホルダー（要件2.4）。
+- `CharacterCard`: 一覧カード。写真枠（角丸大）・主表示/副表示・お気に入り度を表示する。表示テキストは `deriveCardDisplay(character)` が返す `{ primary, secondary? }` に基づき、主表示を先頭かつ副表示より大きい文字サイズで表示し、副表示は主表示に続けて補助的に表示する（要件10.1〜10.4, 2.3, 2.5, 2.6）。お気に入り度は `FavoriteLevelDisplay` で表示（要件12.1）。写真デコード失敗時はプレースホルダー（要件2.4）。**イメージカラーの縁取り**は `deriveImageColorStyle(character.imageColor)` の結果に従い、`'none'` 以外のプリセット色のときのみカードの枠に `borderVarName`（`--image-color-*`）をトークン経由で適用し、`'none'` のときは縁取りなし（要件15.6, 15.8）。縁取りは角丸（`--radius-large`）を維持し、横スクロールなし・44×44 CSS px タッチ領域を崩さない（要件15.9, 15.10）。`metOn` は一覧カードには表示しない（要件14.7）。
 - `FavoriteLevelPicker`: 1〜5 のお気に入り度**選択**（入力用。ハート等のかわいい表現、44×44 CSS px 以上、要件1.7, 7.7, 9.6）。
 - `FavoriteLevelDisplay`: お気に入り度の**表示専用**コンポーネント（`FavoriteLevelPicker` の readOnly 表示に相当）。合計 5 個の記号のうち Favorite_Level と等しい個数を塗り記号、残りを未塗り記号で表示し、色/記号のみに依存せず度合いを判別できるテキスト等価物「5段階中N」を `aria-label` 等で提供する。範囲外/未設定/数値解釈不能は塗り 0 個・「5段階中0」で表示する（要件12.1〜12.4）。表示個数・テキスト等価物は純粋な表示モデル導出関数の結果を描画する。`CharacterCard` と `CharacterDetailView` の双方で用いる。
 - `PastelButton`: 主要アクション用ボタン（大人かわいいテーマのアクセント・角丸中・最小 44×44 CSS px、要件7.5, 7.7, 9.2）。
@@ -258,9 +287,14 @@ function useRankingBattle(): {
 ### Domain モジュール（純粋 TypeScript）
 
 ```ts
-// 入力検証（要件1, 6.2, 8.1）
+// 入力検証（要件1, 6.2, 8.1, 14.4, 15.4）
 interface CharacterValidator {
   // name: 0..50, nickname: 0..50, memo: 0..500, favoriteLevel: 1..5(整数), photo: 必須
+  // metOn: 空/未入力は許可（未設定）。値がある場合は YYYY-MM-DD かつ 1900-01-01〜当日の実在日のみ許可。
+  //        範囲外・不正形式・未来日は FieldError（field: 'metOn'）または未設定として扱う（要件14.4）。
+  //        検証は normalizeMetOn を用い、正規化不能なら未設定へ落とす方針とする。
+  // imageColor: プリセット許容値（'none' | 'rose' | 'mint' | 'lavender' | 'butter' | 'sky'）のみ受理。
+  //             許容値以外・未設定は 'none' に正規化する（要件15.4）。
   validate(draft: CharacterDraft): FieldError[];
 }
 
@@ -283,6 +317,24 @@ function deriveCardDisplay(character: Character): { primary: string; secondary?:
 //   total は常に 5、textEquivalent は `5段階中${filled}`。
 function deriveFavoriteLevelDisplay(favoriteLevel: number): {
   filled: number; total: 5; textEquivalent: string;
+};
+
+// 出会った日の正規化（要件14.2, 14.3, 14.4, 14.10, 14.11）— 純粋関数。
+//   入力（フォーム値 or 旧データ）が YYYY-MM-DD 形式かつ 1900-01-01 〜 today の範囲の
+//   実在する暦日ならそのまま（正規化された YYYY-MM-DD 文字列）を返す。
+//   空文字/undefined/形式不正/実在しない日付/範囲外（1900 以前）/未来日は undefined を返す。
+function normalizeMetOn(value: string | undefined, today: CalendarDay): string | undefined;
+
+// 出会った日の表示整形（要件14.5）— 純粋関数。妥当な YYYY-MM-DD を「YYYY年M月D日」へ整形する。
+//   月/日はゼロ埋めしない（例: '2024-03-05' → '2024年3月5日'）。
+function formatMetOn(metOn: string): string;
+
+// イメージカラーからの縁取り導出（要件15.4, 15.6, 15.7, 15.8）— 純粋関数。
+//   imageColor が 'none'（または許容値以外）なら { hasBorder: false }。
+//   プリセット5色なら { hasBorder: true, borderVarName: `--image-color-${color}` } を返す。
+//   CharacterCard / CharacterDetailView はこの結果に基づき縁取りをトークン経由で描画する。
+function deriveImageColorStyle(imageColor: ImageColor): {
+  hasBorder: boolean; borderVarName?: string;
 };
 
 // 決定的な今日の一枚選出（要件5.1, 5.2, 5.3）
@@ -355,8 +407,12 @@ interface Character {
   favoriteLevel: number; // 1〜5 の整数（要件1.7, 8.1）
   photo: PhotoData;      // 写真（ArrayBuffer+MIME）（要件1.8, 3.3）
   createdAt: number;     // 登録日時（epoch ミリ秒）。並び順・決定的選出のキー
+  metOn?: string;        // 出会った日（ISO 8601 の YYYY-MM-DD、任意）。未設定は undefined（要件14）
+  imageColor: ImageColor;// イメージカラー（プリセット列挙）。既定は 'none'（要件15）
 }
 ```
+
+`metOn` と `imageColor` は **イテレーション6で追加**した属性である。いずれも**破壊的でない拡張**として設計し、これらを持たない旧データは読み出し時正規化で吸収する（`metOn` 無し → `undefined`、`imageColor` 無し/不正値 → `'none'`、要件14.11, 15.5）。`metOn` は任意（`undefined` 可）だが `imageColor` は必ず値を持つ（既定 `'none'`）ため、正規化後の `Character` では `imageColor` は非 `undefined` を保証する。
 
 ### 属性の設計意図
 
@@ -369,6 +425,8 @@ interface Character {
 | `favoriteLevel` | `number`（整数 1〜5） | 要件1.7, 8.1。範囲外・非整数は保存拒否。 |
 | `photo` | `PhotoData`（`{ data: ArrayBuffer; type: string }`） | 要件1.8, 3.3。写真は必須。IndexedDB に ArrayBuffer(バイト列)+MIME として格納（iOS WebKit の Blob 保存バグ回避）。 |
 | `createdAt` | `number`（epoch ms） | 要件2.1（新しい順）、要件5.2（暦日固定選出の安定キー）。 |
+| `metOn` | `string \| undefined`（`YYYY-MM-DD`、任意） | 要件14。妥当な暦日（1900-01-01〜当日）のみ保持。未入力・不正・未来日・範囲外は `undefined`（未設定）。詳細画面でのみ表示。属性を持たない旧データは読み出し時 `undefined` へ正規化（後方互換）。 |
+| `imageColor` | `ImageColor`（列挙、既定 `'none'`） | 要件15。プリセット5色＋なし。許容値以外・未設定・属性なし旧データは読み出し時 `'none'` へ正規化（後方互換）。一覧カード枠・詳細写真枠の縁取りへ反映。 |
 
 ### IndexedDB オブジェクトストアスキーマ
 
@@ -377,6 +435,7 @@ interface Character {
   - `keyPath: 'id'`（UUID を主キー）。
   - インデックス: `by-createdAt`（`keyPath: 'createdAt'`）。降順取得と並び替えに使用（要件2.1）。
 - 写真は `Character.photo` フィールドに **ArrayBuffer(バイト列)+MIME**（`PhotoData`）として直接格納する。IndexedDB に Blob/File を直接保存すると iOS WebKit の既知バグ（UnknownError: Error preparing Blob/File data...）で失敗するため ArrayBuffer で保存する。別ファイル管理（孤児ファイル掃除）が不要なため、削除時の整合性が単純になる（要件1.8, 3.3, 6.7）。旧バージョンで Blob として保存された写真は `fetchAll` 読み出し時に `PhotoData` へ正規化して後方互換を保つ。
+- **イテレーション6の後方互換（要件14.11, 15.5）**: `metOn` と `imageColor` は既存レコードに存在しない可能性があるため、`fetchAll` の読み出し時に**既存の `PhotoData` 正規化と同じ場所**で併せて正規化する。`metOn` を持たない旧データは `metOn: undefined`、`imageColor` を持たない/プリセット許容値以外の旧データは `imageColor: 'none'` に補完する。この正規化は新規プロパティの追加のみで実現でき、**DB バージョンやスキーマ（オブジェクトストア／インデックス）の変更は不要**である。既存の `by-createdAt` インデックスもそのまま使用する。書き込み（`insert`/`update`）時は正規化済みの `Character`（`imageColor` は非 `undefined`、`metOn` は妥当日 or `undefined`）をそのまま `put` する。
 - 表示時は `new Blob([photo.data], { type: photo.type })` で Blob を都度生成し `URL.createObjectURL` で Object URL を生成する。コンポーネントのアンマウント時に `URL.revokeObjectURL` で解放する（メモリリーク防止）。この表示用 Blob は保存しない（IndexedDB には ArrayBuffer のまま格納される）。
 
 ### 容量上限（1,000 件）
@@ -392,8 +451,15 @@ interface CharacterDraft {   // 入力保持用（要件1.3, 1.11, 1.12, 8.3〜8
   memo: string;
   favoriteLevel: number;
   photo: PhotoData | null;   // ArrayBuffer+MIME。未取得は null
+  metOn?: string;            // 出会った日の入力（<input type="date"> の値 YYYY-MM-DD）。空/未入力は undefined（要件14）
+  imageColor: ImageColor;    // イメージカラーの選択。既定は 'none'（要件15）
   editingId?: string;        // 未指定なら新規、値ありなら編集
 }
+
+// イメージカラーのプリセット列挙（要件15）。'none' は縁取りなし（既定値）。
+// 5 色は大人かわいいテーマのトークン由来のパステル。各色は tokens.css の
+// --image-color-{color}（例 --image-color-rose）に対応する。
+type ImageColor = 'none' | 'rose' | 'mint' | 'lavender' | 'butter' | 'sky';
 
 interface CalendarDay {      // 端末ローカル暦日（要件5.2）
   year: number;
@@ -426,7 +492,10 @@ type PhotoError =
   | { kind: 'acquisitionFailed' }   // キャンセル/ブロック等（要件1.11, 8.3）
   | { kind: 'cancelled' };
 
-interface FieldError { field: 'name' | 'nickname' | 'memo' | 'favoriteLevel' | 'photo'; message: string; }
+interface FieldError {
+  field: 'name' | 'nickname' | 'memo' | 'favoriteLevel' | 'photo' | 'metOn' | 'imageColor';
+  message: string;
+}
 ```
 
 ## Key Flows and Sequences
@@ -626,7 +695,7 @@ stateDiagram-v2
 - `idb` の `openDB('chara-collection', 1, { upgrade })` でデータベースを開く。
 - `upgrade` コールバックでオブジェクトストア `characters`（`keyPath: 'id'`）を作成し、`by-createdAt` インデックスを張る。
 - `IndexedDbCharacterStore` が以下を提供する。
-  - `fetchAll()`: `by-createdAt` インデックスで全件取得し、`createdAt` **降順**に整列して返す（要件2.1）。
+  - `fetchAll()`: `by-createdAt` インデックスで全件取得し、`createdAt` **降順**に整列して返す（要件2.1）。読み出し時に写真の `PhotoData` 正規化に加え、イテレーション6の後方互換正規化（`metOn` 欠落 → `undefined`、`imageColor` 欠落/不正値 → `'none'`）を同じ場所で行う（要件14.11, 15.5）。
   - `insert(character)`: 事前に `count()` を確認し、1,000 件到達時は `capacityReached` を throw（要件2.2）。
   - `update(character)`: 同一 `id` のレコードを `put` で上書き（写真差し替え含む）。件数は不変（要件6.3, 6.4）。
   - `delete(id)`: 当該 `id` を削除（要件6.7）。
@@ -646,6 +715,8 @@ IndexedDB の例外（`QuotaExceededError` など）や書き込み失敗は `St
 ### マイグレーション / バージョニング方針
 
 初版は DB バージョン `1`・単一ストア。将来のスキーマ変更は `openDB` のバージョン番号を上げ、`upgrade(db, oldVersion, newVersion)` 内で `oldVersion` を判定してストア追加・インデックス変更・データ移行を段階的に行う。破壊的変更時も既存 Character データを消失させないマイグレーションを原則とする（要件3.7）。
+
+**イテレーション6での方針（DB バージョンを上げない）**: `metOn`・`imageColor` の追加は新規プロパティの追加のみであり、オブジェクトストア／インデックスの構造は変わらないため、**DB バージョンは `1` のまま据え置く**。既存レコードへの一括マイグレーションは行わず、`fetchAll` 読み出し時の正規化（`metOn` 欠落 → `undefined`、`imageColor` 欠落/不正 → `'none'`）で後方互換を吸収する。これにより旧データを破壊せず、書き込み（`insert`/`update`）時に正規化済みの新フィールドを含む `Character` が保存され、以後は新フィールドを持つレコードとして扱われる（要件14.11, 15.5）。
 
 ## PWA Design
 
@@ -686,7 +757,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 *プロパティとは、システムのすべての正当な実行にわたって成り立つべき特性や振る舞いのことであり、システムが何をすべきかについての形式的な言明である。プロパティは、人間が読める仕様と機械が検証可能な正当性保証との橋渡しとなる。*
 
-以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜13へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19 として末尾に追加している（既存 Property 1〜16 は保持）。
+以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜15へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19、イテレーション6（要件14〜15）で追加した出会った日の正規化・イメージカラー正規化/縁取り導出・新フィールドを含む保存往復のプロパティは Property 20〜22 として末尾に追加している（既存 Property 1〜19 は保持）。
 
 ### Property 1: フィールド文字数バリデーション
 
@@ -802,6 +873,24 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 **Validates: Requirements 12.1, 12.3, 12.4**
 
+### Property 20: 出会った日・イメージカラーを含む保存・復元ラウンドトリップ
+
+*任意の* 妥当な `metOn`（`YYYY-MM-DD` または `undefined`）と *任意の* `ImageColor` 値を持つ有効な `Character` について、ストアへ保存した後に取得（再読み込みを含む）すると、写真のバイト内容を含む全属性に加えて `metOn` と `imageColor` が等価に復元される。また、`metOn` を持たない旧データを読み出すと `metOn` は `undefined`、`imageColor` を持たない/不正値の旧データを読み出すと `imageColor` は `'none'` に正規化されて復元される（後方互換）。
+
+**Validates: Requirements 14.2, 14.3, 14.11, 15.2, 15.3, 15.5**
+
+### Property 21: 出会った日の正規化の妥当性
+
+*任意の* 文字列または `undefined` の入力値と *任意の* 固定した基準日 `today`（`CalendarDay`）について、`normalizeMetOn(value, today)` は、入力が `YYYY-MM-DD` 形式かつ 1900-01-01 以上 `today` 以下の実在する暦日である場合に限り、その正規化された `YYYY-MM-DD` 文字列をそのまま返す。空文字・`undefined`・形式不正・実在しない日付・1900 以前・未来日（`today` より後）はいずれも `undefined` を返す。
+
+**Validates: Requirements 14.2, 14.3, 14.4, 14.10, 14.11**
+
+### Property 22: イメージカラーの正規化と縁取り導出
+
+*任意の* `ImageColor` 値（およびプリセット許容値以外の任意の値）について、`deriveImageColorStyle` は、値が `'none'` またはプリセット許容値以外のときは縁取りなし（`hasBorder === false`、`borderVarName` を持たない）を返し、プリセット5色（`'rose'` / `'mint'` / `'lavender'` / `'butter'` / `'sky'`）のときはちょうど対応するトークン名（`--image-color-{color}`）を伴う縁取りあり（`hasBorder === true`）を返す。すなわち縁取りの有無と参照トークンは入力のイメージカラーによって一意に決まり、許容値以外・未設定は `'none'` と同一の（縁取りなしの）結果になる。
+
+**Validates: Requirements 15.4, 15.6, 15.7, 15.8**
+
 ## Error Handling
 
 エラーハンドリング
@@ -824,6 +913,8 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | コレクション0件（一覧/ガチャ） | hooks | 空状態メッセージ・登録手順/登録要求 | 2.7, 5.6, 8.6 |
 | 対戦が2件未満 | hooks | 開始せず「2件以上必要」表示 | 4.8 |
 | 対戦中の再読み込み/再起動 | hooks | 進行状態を破棄し初期化（非永続） | 4.9 |
+| Met_On に不正形式/範囲外/未来日を入力 | Validator / normalizeMetOn（domain） | 当該値を保存せず metOn を未設定として扱う（要件14.4）。FieldError を返すか、サイレントに undefined へ正規化する方針のいずれかを取る（設計では正規化方針とし、FieldError は任意）| 14.4 |
+| ImageColor にプリセット許容値以外を指定 | Validator / 読み出し正規化（domain / persistence） | imageColor を 'none' に正規化して扱う | 15.4, 15.5 |
 
 ## Testing Strategy
 
@@ -832,7 +923,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 ### 方針: ユニットテスト + プロパティテストの併用
 
 - **ユニットテスト（Vitest + React Testing Library）**: 具体例・エッジケース・エラー分岐・UI 分岐（空状態、ファイル選択キャンセル/ブロック、削除確認、写真読込失敗のプレースホルダー、対戦2件未満、対戦中リセット等）を検証する。
-- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜19）を、広い入力空間にわたって検証する。
+- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜22）を、広い入力空間にわたって検証する。
 
 ### 実行環境の注記
 
@@ -845,7 +936,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 各プロパティテストには、対応する設計プロパティを参照するコメントを付与する。タグ形式:
   `// Feature: chara-collection, Property {number}: {property_text}`
 - 各 Correctness Property は **単一の** プロパティテストで実装する。
-- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**。
+- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**、**`metOn` 入力（`YYYY-MM-DD` 妥当日・1900-01-01/当日/未来日/範囲外・不正形式・実在しない日付（例 2 月 30 日）・うるう年 2/29・空/undefined）と固定基準日 `today` の組（出会った日の正規化）**、**`ImageColor` の6プリセット値および許容値以外の任意文字列（イメージカラー正規化/縁取り導出）**、**`metOn`（妥当/undefined）・`imageColor`（6値）を含む `Character`（新フィールドを含む保存往復）**。
 - 乱数を用いる `TournamentEngine` と `BattleCommentator` は rng（`() => number`）を外部注入するため、テストでは固定/シード rng（例: 値の系列を返すスタブ）を渡して決定的に検証する。本番は `Math.random` を注入する。
 
 ### プロパティ ↔ テスト対応
@@ -871,6 +962,9 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 17 | 並び替えの決定性・要素保存・タイブレーク（Character 集合＋各 SortOrder） | `sortCharacters`（domain） |
 | 18 | 一覧カードの主表示/副表示の決定（ニックネーム/名前の空・非空の組） | `deriveCardDisplay`（domain） |
 | 19 | お気に入り度表示の個数一致・テキスト等価物（範囲内外） | お気に入り度表示モデル導出関数（`deriveFavoriteLevelDisplay`） |
+| 20 | metOn/imageColor を含む保存→取得ラウンドトリップ・欠落正規化 | `InMemoryCharacterStore` + 読み出し正規化 |
+| 21 | 出会った日の正規化（妥当日保持・範囲外/不正/未来日/空は undefined） | `normalizeMetOn`（domain） |
+| 22 | イメージカラー正規化/縁取り導出（none/許容外は縁取りなし・各色は対応トークン） | `deriveImageColorStyle`（domain） |
 
 ### ユニットテスト（例示・エッジ・エラー分岐）
 
@@ -883,6 +977,11 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 一覧写真1件の読込失敗時のプレースホルダー（要件2.4）
 - ストア読込/復元失敗時の非破壊挙動（要件2.9, 3.7）
 - `PhotoInput` が `accept="image/*"` / `capture` 属性を持つこと（要件1.2）
+- `RegistrationForm` に「出会った日」の `<input type="date">`（任意）と「イメージカラー」の6択が存在すること（要件14.1, 15.1）
+- 編集時に `metOn` が設定済みなら初期値表示・未設定なら空欄、クリアして確定すると `metOn` が未設定へ更新されること（要件14.9, 14.10）
+- 詳細画面で `metOn` 設定済みは「YYYY年M月D日」を表示し、未設定は当該行を表示しないこと（要件14.5, 14.6）
+- 一覧・ガチャ・対戦の各画面に `metOn` が表示されないこと（要件14.7, 14.8）
+- `imageColor` 未選択の新規登録で `'none'` として保存されること（要件15.2）
 
 ### PWA / UI / 非機能テストの考慮（スモーク・計測）
 
@@ -890,7 +989,8 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - **UI 見た目**: パステル配色・角丸・44×44 CSS px タッチ領域・rem による文字サイズ追従・横スクロールなしのポートレートレイアウト（要件7.4〜7.8）、および大人かわいいテーマの配色/角丸/影/余白/トランジションのトークン適用・`prefers-reduced-motion` での短縮（要件9.1〜9.7）は、スナップショットテストと目視・複数フォントサイズでの確認、および CSS/トークン検査（トランジション値が 200〜500ms、`prefers-reduced-motion` で 0/短縮、主表示 rem > 副表示 rem）で扱う。
 - **一覧カードの表示/お気に入り度表示（見た目側）**: 主表示を先頭・副表示より大きく表示する配置（要件10.4）、詳細でも一覧と同一の視覚表現を用いること（要件12.2）はスナップショット/例示テストで確認する（表示テキスト・記号個数・テキスト等価物の導出ロジック自体は Property 18/19 で検証）。
 - **並び順選択 UI / NavigationBar 表示制御**: 並び順の選択手段が存在すること（要件11.1）、各タブ選択で `App` の `view` が期待どおり遷移すること（`goToList`/`goToGacha`/`goToBattle`/`goToAdd`、要件13.2〜13.5）、`NavigationBar` が主要画面（list/gacha/battle）で表示され詳細・登録/編集フォームで非表示になること（要件13.6, 13.7）、アクティブタブが現在ビューに一致すること（要件13.6）、各タブが 44×44 px・320〜430 px 幅で横スクロールなし（要件13.8, 13.9）を、例示テスト（React Testing Library）とスナップショットで確認する。
-- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する（要件3.8）。
+- **イメージカラー縁取りの見た目**: `imageColor` が `'none'` 以外のとき `CharacterCard` の枠・`CharacterDetailView` の写真枠に `--image-color-*` の縁取りがトークン経由で適用され、`'none'` では縁取りが出ないこと、角丸維持・横スクロールなし・44×44 CSS px タッチ領域維持（要件15.6〜15.10）は、スナップショット/例示テストと CSS 検査で確認する（縁取りの有無・参照トークンの導出ロジックは Property 22 で検証）。
+- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する。`metOn`・`imageColor` を含む一切のデータを外部送信しない（要件3.8, 14.12, 15.11）。
 - **タイミング計測**: IndexedDB 永続化3秒以内（要件3.1）、ガチャ表示2秒以内（要件5.4）を計測（統合テスト）で確認する。
 
 ## Design Theme and Design System（大人かわいい / Adult_Cute_Theme）
@@ -917,6 +1017,23 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 - 色は要素へ直接ハードコードせず、常にトークン参照（`var(--color-...)`）で適用する（要件9.1）。
 - 本文と背景・アクセント上テキストのコントラストは可読性を確保する値とする（要件7.8 と整合）。
+
+### イメージカラートークン（縁取り用パステル・要件15.1, 15.9）
+
+イテレーション6の Image_Color（イメージカラー）で用いる縁取り色を、`tokens.css` に `--image-color-*` として追加する。5 色は既存トークン（`--color-primary` / `--color-secondary` / `--color-accent` 等）と調和する彩度控えめのパステルとし、大人かわいいテーマに整合させる。`CharacterCard` の枠・`CharacterDetailView` の写真枠の縁取りは、`deriveImageColorStyle` が返す `borderVarName`（例 `--image-color-rose`）を `border-color` に用いてトークン経由で適用する（要件15.6, 15.7, 15.9）。`'none'`（Image_Color_None）は縁取りを一切適用しない（要件15.8）。
+
+```css
+:root {
+  --image-color-rose: #e8a9b8;      /* くすませたローズ（--color-primary と同系） */
+  --image-color-mint: #a9cabb;      /* スモーキーミント（--color-secondary と同系） */
+  --image-color-lavender: #c3b3dd;  /* スモーキーラベンダー（--color-accent と同系） */
+  --image-color-butter: #ecd8a6;    /* やわらかいバター（暖色パステル） */
+  --image-color-sky: #a9c4dd;       /* スモーキースカイ（寒色パステル） */
+}
+```
+
+- `--image-color-*` は縁取り（`border-color`）専用のトークンであり、`'none'` は縁取り自体を出さないためトークンを持たない（`deriveImageColorStyle` が `hasBorder: false` を返す）。
+- 縁取りの太さ・角丸（`--radius-large`）は写真枠の既存トークンに合わせ、色のみを Image_Color で切り替える。これにより横スクロールなし・44×44 CSS px タッチ領域を維持する（要件15.9, 15.10）。
 
 ### コーナー半径トークン（角丸・要件9.2 / 7.5）
 
@@ -988,12 +1105,12 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 ### 再利用可能コンポーネントのスタイル
 
-- `CharacterCard`: 写真枠（`--radius-large`）・主表示/副表示（ニックネーム優先、要件10）・お気に入り度表示（要件12）。影は `--shadow-soft`、余白は `--space-*` トークン。写真デコード失敗時プレースホルダー（要件2.3〜2.6, 2.4）。
+- `CharacterCard`: 写真枠（`--radius-large`）・主表示/副表示（ニックネーム優先、要件10）・お気に入り度表示（要件12）。影は `--shadow-soft`、余白は `--space-*` トークン。写真デコード失敗時プレースホルダー（要件2.3〜2.6, 2.4）。`imageColor` が `'none'` 以外のとき `deriveImageColorStyle` の `borderVarName`（`--image-color-*`）でカード枠に縁取りを適用する（要件15.6, 15.8, 15.9）。
 - `FavoriteLevelPicker`: 1〜5 のかわいい選択（ハート等、44px 以上、要件1.7, 7.7, 9.6）。
 - `FavoriteLevelDisplay`: 表示専用の度合い表示（塗り記号 5 個中 N 個＋テキスト等価物「5段階中N」を `aria-label` 等で提供、要件12.1〜12.4）。
 - `PastelButton`: `--color-primary` / `--radius-medium` / `--shadow-raised` / `--transition-fast` / 最小 44×44 px（要件7.5, 7.7, 9.2, 9.4）。
 - `EmptyStateView`: 空状態（要件2.7, 5.6, 8.6）。
-- `PhotoFrame`: 角丸写真枠（`--radius-large`）、Object URL 表示・`onError` フォールバック。
+- `PhotoFrame`: 角丸写真枠（`--radius-large`）、Object URL 表示・`onError` フォールバック。詳細画面では `imageColor` が `'none'` 以外のとき `--image-color-*` の縁取りを写真枠へ適用する（要件15.7, 15.8, 15.9）。
 - `PhotoInput`: `<input type="file" accept="image/*" capture="environment">`（要件1.2）。
 - `NavigationBar`: 下部固定タブ 4 項目。配色・角丸・影・余白・トランジションを大人かわいいテーマのトークンで統一し、各タブは最小 44×44 px、320〜430 px 幅でも横スクロールなしで 4 項目を配置する（要件13.8, 13.9, 13.10, 要件9）。
 
@@ -1016,3 +1133,5 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件11（一覧の並び替え） | `sortCharacters`（domain）/ `useCollection`（`sortOrder`/`setSortOrder`）/ `CollectionView`（並び順選択 UI）/ `SortOrder` 型 / Property 17 |
 | 要件12（お気に入り度の視覚的強調） | `FavoriteLevelDisplay`（表示専用）/ `deriveFavoriteLevelDisplay`（domain）/ `CharacterCard` / `CharacterDetailView` / Property 19 |
 | 要件13（共通ナビゲーションバー） | `NavigationBar` / `App`（`view` 状態と表示制御・遷移ハンドラ）/ フロー4（画面切替）/ UI 例示・スナップショット |
+| 要件14（出会った日 Met_On の登録・詳細表示） | `Character.metOn` / `CharacterDraft.metOn` / `normalizeMetOn`・`formatMetOn`（domain）/ `CharacterValidator`（field 'metOn'）/ `RegistrationForm`（`<input type="date">`）/ `CharacterDetailView`（表示）/ `IndexedDbCharacterStore.fetchAll`（読み出し正規化・後方互換）/ Property 20, 21 / 一覧・ガチャ・対戦は非表示（例示） |
+| 要件15（イメージカラー Image_Color の登録・縁取り反映） | `Character.imageColor` / `CharacterDraft.imageColor` / `ImageColor` 型 / `deriveImageColorStyle`（domain）/ `CharacterValidator`（field 'imageColor'）/ `RegistrationForm`（6択）/ `CharacterCard`・`CharacterDetailView`・`PhotoFrame`（縁取り）/ tokens.css `--image-color-*` / 読み出し正規化（後方互換）/ Property 20, 22 |

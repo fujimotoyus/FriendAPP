@@ -29,6 +29,7 @@ function makeCharacter(id: string, name = `name-${id}`): Character {
     favoriteLevel: 3,
     photo: { data: new Uint8Array([120]).buffer, type: 'image/png' },
     createdAt: Number(id.replace(/\D/g, '')) || 1,
+    imageColor: 'none',
   };
 }
 

@@ -366,6 +366,19 @@ select {
   flex-direction: column;
   gap: var(--space-sm);
   width: 100%;
+  /* 縁取り分の外形ずれを防ぐため、全カードに透明の border をベースで確保する。
+     box-sizing: border-box のため、縁取り有無で外形・角丸・44px タッチ領域は不変
+     （横スクロールを発生させない、要件15.10）。--bordered で色のみ差し替える。 */
+  border: var(--image-color-border-width) solid transparent;
+}
+
+/* イメージカラー設定時の縁取り（要件15.6, 15.9）。
+   border-color は CharacterCard 側から var(--image-color-*) をインライン指定するため、
+   ここでは太さ・線種・角丸維持のみを担う。色はハードコードしない。 */
+.character-card--bordered {
+  border-style: solid;
+  border-width: var(--image-color-border-width);
+  border-radius: var(--radius-large); /* 角丸大を明示的に維持 (要件15.10) */
 }
 
 /* タップ可能なカードはボタン既定色を打ち消し、面色・左寄せ・全幅にする。 */
@@ -560,6 +573,83 @@ select {
   flex-wrap: wrap;
 }
 
+/* 出会った日（任意・詳細のみ表示）の日付入力。グローバルの input 規則で
+ * 角丸・パディング・44×44 CSS px を継承するため、幅の抑制のみを担う (要件14.1, 15.10)。 */
+.registration-form__met-on {
+  align-self: flex-start;
+  max-width: 16rem;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+ * ImageColorPicker — 「なし」＋プリセット5色の6択スウォッチ (要件15.1, 15.2, 15.3, 15.10)
+ * flex-wrap で狭幅でも折り返し、横スクロールを出さない (要件9.6, 9.7 / 7.6)。
+ * 各スウォッチは最小 44×44 CSS px。色は var(--image-color-*) 経由でトークン参照し
+ * ハードコードしない。選択中は枠線（--color-focus-ring）で明示する。
+ * ------------------------------------------------------------------------- */
+.image-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.image-color-picker__swatch {
+  position: relative;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  padding: 0;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background-color: var(--color-surface);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast) ease,
+    border-color var(--transition-fast) ease;
+}
+
+.image-color-picker__swatch:active {
+  transform: scale(0.97);
+}
+
+/* 選択中は太めのフォーカスリング色で縁取り、色/記号のみに依存せずチェックも重ねる。 */
+.image-color-picker__swatch--selected {
+  border-color: var(--color-focus-ring);
+  box-shadow: var(--shadow-raised);
+}
+
+/* 「なし」は色を持たないためグレー面に斜線で表現する。 */
+.image-color-picker__swatch--none {
+  background-color: var(--color-surface);
+}
+
+.image-color-picker__none-mark {
+  position: absolute;
+  inset: 6px;
+  border-radius: var(--radius-small);
+  background: linear-gradient(
+    to top right,
+    transparent 0%,
+    transparent calc(50% - 1px),
+    var(--color-text-secondary) calc(50% - 1px),
+    var(--color-text-secondary) calc(50% + 1px),
+    transparent calc(50% + 1px),
+    transparent 100%
+  );
+}
+
+/* 選択中を示すチェック。読みやすさのためテキスト色を確保する。 */
+.image-color-picker__check {
+  position: relative;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
 /* ---------------------------------------------------------------------------
  * CharacterDetailView — 詳細表示 (要件2.8)
  * ------------------------------------------------------------------------- */
@@ -578,6 +668,19 @@ select {
   max-width: 20rem;
   aspect-ratio: 1 / 1;
   align-self: center;
+  /* 縁取り分の外形ずれを防ぐため、透明の border をベースで確保する。
+     box-sizing: border-box のため、縁取り有無で外形・角丸・レイアウトは不変。
+     --bordered で color のみ差し替える（要件15.9）。 */
+  border: var(--image-color-border-width) solid transparent;
+}
+
+/* イメージカラー設定時の写真枠の縁取り（要件15.7, 15.9）。
+   border-color は CharacterDetailView 側から var(--image-color-*) をインライン指定するため、
+   ここでは太さ・線種・角丸維持のみを担う。色はハードコードしない。 */
+.character-detail__photo--bordered {
+  border-style: solid;
+  border-width: var(--image-color-border-width);
+  border-radius: var(--radius-large); /* 角丸大を明示的に維持 */
 }
 
 .character-detail__body {

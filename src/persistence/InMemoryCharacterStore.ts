@@ -15,6 +15,7 @@
 import type { Character } from '../domain/types';
 import type { CharacterStore } from './CharacterStore';
 import { StoreErrorException } from './IndexedDbCharacterStore';
+import { normalizeNewFields } from './normalizeCharacterFields';
 
 /** 保持可能な Character の上限（要件2.2）。実ストアと同じ値でミラーする。 */
 const CAPACITY_LIMIT = 1000;
@@ -39,9 +40,15 @@ export class InMemoryCharacterStore implements CharacterStore {
   /**
    * 全 Character を `createdAt` 降順（新しい順）で返す（要件2.1）。
    * 実ストアと同様に、入力集合の並べ替えのみを行い要素の過不足はない（Property 9）。
+   *
+   * 実ストア（{@link IndexedDbCharacterStore}）と挙動を揃えるため、読み出し時に
+   * `metOn` / `imageColor` の後方互換正規化を適用する（`metOn` 欠落/不正 → `undefined`、
+   * `imageColor` 欠落/不正 → `'none'`。{@link normalizeNewFields}、要件14.11, 15.5）。
    */
   async fetchAll(): Promise<Character[]> {
-    return [...this.characters.values()].sort((a, b) => b.createdAt - a.createdAt);
+    return [...this.characters.values()]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((character) => normalizeNewFields(character));
   }
 
   /**

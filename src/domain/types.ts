@@ -26,6 +26,18 @@ export interface PhotoData {
 }
 
 /**
+ * イメージカラーのプリセット列挙（要件15）。
+ *
+ * `'none'` は縁取りなし（既定値）。5 色は大人かわいいテーマ（Adult_Cute_Theme）の
+ * トークン由来のパステルで、各色は `tokens.css` の `--image-color-{color}`
+ * （例 `--image-color-rose`）に対応する。`CharacterCard` の枠・`CharacterDetailView`
+ * の写真枠の縁取りへ `deriveImageColorStyle` を介してトークン経由で反映する。
+ *
+ * 参照: design.md「Data Models」「イメージカラートークン」、要件15.1, 15.4, 15.7〜15.9
+ */
+export type ImageColor = 'none' | 'rose' | 'mint' | 'lavender' | 'butter' | 'sky';
+
+/**
  * 登録された 1 件のお気に入りキャラクター（ドメインの中心エンティティ）。
  * IndexedDB の `characters` オブジェクトストアに `keyPath: 'id'` で永続化される。
  *
@@ -46,6 +58,18 @@ export interface Character {
   photo: PhotoData;
   /** 登録日時（epoch ミリ秒）。一覧の並び順（新しい順）・暦日固定選出の安定キー。要件2.1, 5.2 */
   createdAt: number;
+  /**
+   * 出会った日（任意）。ISO 8601 の `YYYY-MM-DD`。未設定は `undefined`。
+   * 詳細画面でのみ表示し、一覧・ガチャ・対戦には出さない。旧データ（未設定）は
+   * `IndexedDbCharacterStore.fetchAll` の読み出し時に `undefined` へ正規化する。
+   * 要件14.1, 14.5〜14.8, 14.11
+   */
+  metOn?: string;
+  /**
+   * イメージカラー（プリセット列挙）。既定は `'none'`（縁取りなし）。
+   * 旧データ（未設定/不正値）は読み出し時に `'none'` へ正規化する。要件15.1, 15.5
+   */
+  imageColor: ImageColor;
 }
 
 /**
@@ -65,6 +89,13 @@ export interface CharacterDraft {
   favoriteLevel: number;
   /** 写真。ArrayBuffer(バイト列)+MIME。未取得は null（写真は登録時に必須）。要件1.3, 1.8 */
   photo: PhotoData | null;
+  /**
+   * 出会った日の入力（`<input type="date">` の値 `YYYY-MM-DD`）。空/未入力は `undefined`。
+   * 要件14.1
+   */
+  metOn?: string;
+  /** イメージカラーの選択。既定は `'none'`。要件15.1 */
+  imageColor: ImageColor;
   /** 未指定なら新規登録、値ありなら当該 id の Character を編集。要件6.1 */
   editingId?: string;
 }
@@ -155,7 +186,7 @@ export type PhotoError =
  */
 export interface FieldError {
   /** エラー対象のフィールド */
-  field: 'name' | 'nickname' | 'memo' | 'favoriteLevel' | 'photo';
+  field: 'name' | 'nickname' | 'memo' | 'favoriteLevel' | 'photo' | 'metOn' | 'imageColor';
   /** ユーザー向けの説明メッセージ */
   message: string;
 }

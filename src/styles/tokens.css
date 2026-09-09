@@ -30,6 +30,22 @@
   --color-on-primary: #ffffff; /* primary 面上のテキスト（コントラスト確保） */
 
   /* ---------------------------------------------------------------------
+   * Image color tokens — イメージカラーの縁取り用パステル (要件15.1, 15.9 / 9.1)
+   * CharacterCard の枠・CharacterDetailView の写真枠の border-color に
+   * deriveImageColorStyle の borderVarName（例 --image-color-rose）経由で用いる。
+   * 'none'（縁取りなし）は既定値でありトークンを持たない。既存トークンと調和する
+   * 彩度控えめのパステルで、大人かわいいテーマに整合させる。
+   * ------------------------------------------------------------------- */
+  --image-color-rose: #e8a9b8; /* くすませたローズ（--color-primary と同系） */
+  --image-color-mint: #a9cabb; /* スモーキーミント（--color-secondary と同系） */
+  --image-color-lavender: #c3b3dd; /* スモーキーラベンダー（--color-accent と同系） */
+  --image-color-butter: #ecd8a6; /* やわらかいバター（暖色パステル） */
+  --image-color-sky: #a9c4dd; /* スモーキースカイ（寒色パステル） */
+  /* 縁取りの太さ。カード枠・写真枠で共通に用い、box-sizing: border-box 前提で
+     縁取り有無による外形ずれを防ぐ（透明 border のベース幅と一致させる）。 */
+  --image-color-border-width: 2px;
+
+  /* ---------------------------------------------------------------------
    * Corner radius tokens — 角丸 (要件9.2 / 7.5)
    * ------------------------------------------------------------------- */
   --radius-small: 0.5rem; /* 小要素（バッジ・タグ） */

@@ -12,6 +12,8 @@
 - **イテレーション2**: 今日の一枚ガチャ（要件5）
 - **イテレーション3**: ランキング対戦（要件4）
 - **イテレーション4**: 仕上げ（編集・削除・エラー/空状態ハンドリング）（要件6, 8）
+- **イテレーション5**: 見た目と使い勝手の底上げ（大人かわいいテーマ・ニックネーム優先表示・並び替え・お気に入り度の視覚強調・共通ナビゲーションバー）（要件9, 10, 11, 12, 13）
+- **イテレーション6**: 登録項目の拡張（任意の「出会った日」＝ Met_On を詳細でのみ表示、パステルプリセットから選ぶ「イメージカラー」＝ Image_Color をカードと詳細の写真枠の縁取りへ反映。旧データは既定値で補完し後方互換を維持）（要件14, 15）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -328,12 +330,78 @@
 - [x] 25. Iteration 5 チェックポイント（見た目と使い勝手の底上げ）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `vite build`（＝ `tsc -b && vite build`）と `vitest run` がグリーンであることを確認する。
 
+- [x] 26. ドメイン型・テーマトークンの拡張（イメージカラー / 出会った日）
+  - `src/domain/types.ts` に `type ImageColor = 'none' | 'rose' | 'mint' | 'lavender' | 'butter' | 'sky'` を追加する（design.md「Data Models」）
+  - `Character` に `metOn?: string`（ISO 8601 の `YYYY-MM-DD`、任意・未設定は `undefined`）と `imageColor: ImageColor`（既定 `'none'`）を追加する。`CharacterDraft` に `metOn?: string` と `imageColor: ImageColor` を追加する。`FieldError` の `field` 取り得る値に `'metOn'` と `'imageColor'` を追加する（既存フィールドは破壊せず追記）
+  - `src/styles/tokens.css` に `--image-color-rose` / `--image-color-mint` / `--image-color-lavender` / `--image-color-butter` / `--image-color-sky` を大人かわいいテーマ（Adult_Cute_Theme）の配色に整合するパステル色として追加する（要件15.1, 15.9 / 9.1）
+  - _Requirements: 14.1, 14.11, 15.1, 15.5_
+
+- [x] 27. ドメイン純粋関数: 出会った日の正規化・整形とイメージカラー縁取り導出
+  - [x] 27.1 `normalizeMetOn` と `formatMetOn` を実装する
+    - `src/domain/metOn.ts` に `normalizeMetOn(value: string | undefined, today: CalendarDay): string | undefined` を実装する。入力が `YYYY-MM-DD` 形式かつ 1900-01-01 以上 `today` 以下の実在する暦日である場合のみ、その正規化済み `YYYY-MM-DD` 文字列を返す。空文字・`undefined`・形式不正・実在しない日付・1900 以前・未来日はいずれも `undefined` を返す（要件14.2, 14.3, 14.4, 14.10, 14.11）
+    - 同ファイルに `formatMetOn(metOn: string): string` を実装する。妥当な `YYYY-MM-DD` を「YYYY年M月D日」へ整形し、月/日はゼロ埋めしない（例: `'2024-03-05'` → `'2024年3月5日'`、要件14.5）
+    - _Requirements: 14.2, 14.3, 14.4, 14.5, 14.10, 14.11_
+
+  - [x] 27.2 `deriveImageColorStyle` を実装する
+    - `src/domain/imageColor.ts` に `deriveImageColorStyle(imageColor: ImageColor): { hasBorder: boolean; borderVarName?: string }` を実装する。`'none'` または許容値以外は `{ hasBorder: false }`（`borderVarName` を持たない）、プリセット5色は `{ hasBorder: true, borderVarName: `--image-color-${color}` }` を返す（要件15.4, 15.6, 15.7, 15.8）
+    - _Requirements: 15.4, 15.6, 15.7, 15.8_
+
+  - [x]* 27.3 出会った日の正規化の妥当性のプロパティテスト
+    - **Property 21: 出会った日の正規化の妥当性**（`YYYY-MM-DD` かつ 1900-01-01〜`today` の実在日のみそのまま返し、空/不正形式/実在しない日/範囲外/未来日は `undefined`）
+    - **Validates: Requirements 14.2, 14.3, 14.4, 14.10, 14.11**
+    - `// Feature: chara-collection, Property 21` タグ・`numRuns: 100`。対象 `normalizeMetOn`
+
+  - [x]* 27.4 イメージカラーの正規化と縁取り導出のプロパティテスト
+    - **Property 22: イメージカラーの正規化と縁取り導出**（`'none'`/許容値以外は `hasBorder === false`、プリセット5色はちょうど対応する `--image-color-{color}` を伴い `hasBorder === true`）
+    - **Validates: Requirements 15.4, 15.6, 15.7, 15.8**
+    - `// Feature: chara-collection, Property 22` タグ・`numRuns: 100`。対象 `deriveImageColorStyle`
+
+- [x] 28. CharacterValidator を新フィールドへ拡張する
+  - `src/domain/CharacterValidator.ts` の `validate(draft)` に、`metOn` は `normalizeMetOn` を用いて正規化不能な値を未設定へ落とす方針で扱い（必要に応じて `FieldError`（`field: 'metOn'`）を返す）、`imageColor` はプリセット許容値のみ受理し許容値以外・未設定は `'none'` へ正規化する検証を追加する。既存の名前/ニックネーム/メモ/お気に入り度/写真の検証は不変とする（design.md「CharacterValidator」）
+  - _Requirements: 14.4, 15.4_
+
+- [x] 29. Persistence の後方互換正規化（読み出し時）
+  - `src/persistence/IndexedDbCharacterStore.ts` の `fetchAll` の読み出し時に、既存 `PhotoData` 正規化と同じ場所で `metOn` 欠落/不正 → `undefined`、`imageColor` 欠落/不正 → `'none'` を補完する。DB バージョンは 1 のまま据え置き、スキーマ変更は行わない（要件14.11, 15.5）
+  - `src/persistence/InMemoryCharacterStore.ts` も同様に、読み出し結果が `metOn`（`undefined` 可）・`imageColor`（既定 `'none'`）を含むよう整合させる
+  - _Requirements: 14.11, 15.5_
+
+  - [x]* 29.1 新フィールドを含む保存・復元ラウンドトリップのプロパティテスト
+    - **Property 20: 出会った日・イメージカラーを含む保存・復元ラウンドトリップ**（任意の妥当な `metOn`（`YYYY-MM-DD` または `undefined`）と任意の `ImageColor` を持つ Character を保存後に取得すると写真バイト内容を含む全属性・`metOn`・`imageColor` が等価に復元され、`metOn` 欠落は `undefined`・`imageColor` 欠落/不正は `'none'` に正規化される）
+    - **Validates: Requirements 14.2, 14.3, 14.11, 15.2, 15.3, 15.5**
+    - `// Feature: chara-collection, Property 20` タグ・`numRuns: 100`。対象 `InMemoryCharacterStore` ＋読み出し正規化
+
+- [x] 30. useRegistration を新フィールドへ拡張する
+  - `src/hooks/useRegistration.ts` の `draft` に `metOn`・`imageColor` を持たせ、`setField` で更新できるようにする。編集モードでは既存 Character の `metOn`（未設定なら空欄）・`imageColor` を初期化する。`save()` で `normalizeMetOn` を適用して `metOn` を確定し（クリア時は未設定へ更新、要件14.10）、`imageColor` はそのまま保存する。既存の写真取得・検証・保存分岐は不変とする（要件14.9, 14.10, 15.2, 15.3）
+  - _Requirements: 14.9, 14.10, 15.2, 15.3_
+
+- [x] 31. RegistrationForm に「出会った日」「イメージカラー」入力 UI を追加する
+  - `src/components/RegistrationForm.tsx` に「出会った日」= `<input type="date">`（任意項目・未入力可、最小 44×44 CSS px、横スクロールなし、大人かわいいテーマ整合）を追加し、`useRegistration` の `metOn` に接続する。編集時は既存 `metOn` を初期表示し、クリア（空）にして確定すると未設定へ更新する（要件14.1, 14.9, 14.10）
+  - 「イメージカラー」= 「なし」＋プリセット5色の**6択**スウォッチ選択 UI（各 44×44 CSS px 以上、横スクロールなし、既定選択 `'none'`）を追加し、`useRegistration` の `imageColor` に接続する。編集時は既存 `imageColor` を初期選択にする（要件15.1, 15.2, 15.3, 15.10）
+  - _Requirements: 14.1, 14.9, 14.10, 15.1, 15.2, 15.3, 15.10_
+
+- [x] 32. CharacterCard / CharacterDetailView / PhotoFrame に縁取りと詳細の Met_On 表示を反映する
+  - [x] 32.1 CharacterCard・PhotoFrame に縁取りを適用する
+    - `src/components/CharacterCard.tsx`（および必要に応じて `src/components/PhotoFrame.tsx`）で `deriveImageColorStyle(character.imageColor)` の結果に基づき、`hasBorder === true` のときのみ `borderVarName`（`--image-color-*`）を `border-color` にトークン経由で適用し、`'none'` のときは縁取りを適用しない。角丸（`--radius-large`）を維持し、横スクロールなし・44×44 CSS px を崩さない。`metOn` は一覧カードに表示しない（要件14.7, 15.6, 15.8, 15.9, 15.10）
+    - _Requirements: 14.7, 15.6, 15.8, 15.9, 15.10_
+
+  - [x] 32.2 CharacterDetailView に写真枠の縁取りと Met_On 表示を追加する
+    - `src/components/CharacterDetailView.tsx` で写真枠に `deriveImageColorStyle` に基づく縁取りを反映する（`'none'` は縁取りなし、角丸維持、要件15.7, 15.8, 15.9）。`metOn` が設定済み（`normalizeMetOn` を通過した妥当な値）のときのみ `formatMetOn(metOn)` の結果「YYYY年M月D日」を表示し、未設定のときは当該行を表示しない（要件14.5, 14.6）
+    - Daily_Gacha・Ranking_Battle の各画面に `metOn` を出さないことを担保する（要件14.8）
+    - _Requirements: 14.5, 14.6, 14.8, 15.7, 15.8, 15.9_
+
+  - [x]* 32.3 UI 追加・表示分岐のユニットテスト
+    - `RegistrationForm` に日付入力欄と6択のイメージカラー選択が存在すること、編集時に `metOn`/`imageColor` が初期表示され `metOn` をクリアできること（要件14.9, 14.10, 15.3）、`CharacterDetailView` が `metOn` 設定時のみ「YYYY年M月D日」を表示し未設定時は非表示にすること（要件14.5, 14.6）、一覧/ガチャ/対戦に `metOn` を表示しないこと（要件14.7, 14.8）、`imageColor` 未選択で `'none'` として保存されること（要件15.2）を検証する
+    - _Requirements: 14.1, 14.5, 14.6, 14.7, 14.8, 14.9, 14.10, 15.1, 15.2_
+
+- [x] 33. Iteration 6 チェックポイント（登録項目の拡張）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜19）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜22）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -357,7 +425,13 @@
     { "id": 12, "tasks": ["20", "21.1", "22.1", "23.1"] },
     { "id": 13, "tasks": ["21.2", "21.3", "22.2", "23.2"] },
     { "id": 14, "tasks": ["24.1"] },
-    { "id": 15, "tasks": ["24.2"] }
+    { "id": 15, "tasks": ["24.2"] },
+    { "id": 16, "tasks": ["26"] },
+    { "id": 17, "tasks": ["27.1", "27.2"] },
+    { "id": 18, "tasks": ["27.3", "27.4", "28", "29", "32.1"] },
+    { "id": 19, "tasks": ["29.1", "30", "32.2"] },
+    { "id": 20, "tasks": ["31"] },
+    { "id": 21, "tasks": ["32.3"] }
   ]
 }
 ```
