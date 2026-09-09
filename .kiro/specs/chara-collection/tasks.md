@@ -14,6 +14,7 @@
 - **イテレーション4**: 仕上げ（編集・削除・エラー/空状態ハンドリング）（要件6, 8）
 - **イテレーション5**: 見た目と使い勝手の底上げ（大人かわいいテーマ・ニックネーム優先表示・並び替え・お気に入り度の視覚強調・共通ナビゲーションバー）（要件9, 10, 11, 12, 13）
 - **イテレーション6**: 登録項目の拡張（任意の「出会った日」＝ Met_On を詳細でのみ表示、パステルプリセットから選ぶ「イメージカラー」＝ Image_Color をカードと詳細の写真枠の縁取りへ反映。旧データは既定値で補完し後方互換を維持）（要件14, 15）
+- **イテレーション7**: 一覧の並び替えに「出会った日の新しい順」を追加（Sort_Order に 'metOn' を追加。Met_On 降順・未設定は後方・タイブレークは createdAt 降順→id 昇順。既存データ・機能に破壊的変更なし）（要件11.1, 11.7）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -396,6 +397,20 @@
 - [x] 33. Iteration 6 チェックポイント（登録項目の拡張）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [x] 34. 一覧の並び替えに「出会った日の新しい順」を追加（要件11.1, 11.7）
+  - `src/domain/types.ts` の `type SortOrder` に `'metOn'` を追加する（`'newest' | 'favorite' | 'name' | 'metOn'`）。コメントに「'metOn': 出会った日（Met_On）の新しい順。Met_On 降順、未設定は後方」を追記する
+  - `src/domain/sortCharacters.ts` に `'metOn'` の case を追加する。Met_On が設定されている要素を Met_On（`YYYY-MM-DD` 文字列）の降順、Met_On 未設定（`undefined`）の要素は後方、Met_On 同値または両方未設定は `createdAt` 降順 → `id` 昇順のタイブレークで並べる。`YYYY-MM-DD` は辞書順＝日付順のため文字列のコードポイント比較で降順にできる（要件14.4 で不正値は未設定化済みのため、値は妥当な `YYYY-MM-DD` か `undefined`）。元配列は変更しない純粋関数を維持する
+  - `src/components/CollectionView.tsx` の並び順選択 UI（`SORT_OPTIONS`）に「出会った日順」（value: `'metOn'`）を追加し、4 種の選択肢にする。各ボタンは最小 44×44 CSS px・横スクロールなし・大人かわいいテーマ整合を維持する（要件11.1）
+  - `useCollection` は既存の汎用実装（`sortCharacters(source, sortOrder)`）で `'metOn'` を透過的に扱うため変更不要（表示順のみ変更・ストア/データ不変、要件11.5, 11.6）
+  - _Requirements: 11.1, 11.5, 11.6, 11.7_
+
+  - [x]* 34.1 並び替え（'metOn' を含む）のプロパティテストを更新する
+    - **Property 17: 並び替えは決定的で要素を保存する** の対象に `'metOn'` を含める。Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`/`'metOn'`）の組で、入力集合の並べ替え（要素の過不足なし）・元配列不変・決定的順序を検証し、`'metOn'` のタイブレーク（Met_On 降順→未設定後方→`createdAt` 降順→`id` 昇順）を確認する。生成器は Met_On 設定/未設定の混在、同一 Met_On、同一 createdAt を含める
+    - **Validates: Requirements 11.2, 11.3, 11.4, 11.5, 11.6, 11.7**
+    - `// Feature: chara-collection, Property 17` タグ・`numRuns: 100`。対象 `sortCharacters`
+
+- [x] 35. Iteration 7 チェックポイント（出会った日順の追加）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。

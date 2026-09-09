@@ -197,7 +197,8 @@ export interface FieldError {
  * - `'newest'`  : 登録日時（createdAt）の新しい順
  * - `'favorite'`: お気に入り度（favoriteLevel）の高い順
  * - `'name'`    : 名前の Unicode コードポイント順（昇順、空名は後方）
+ * - `'metOn'`   : 出会った日（Met_On）の新しい順。Met_On 降順、未設定は後方
  *
  * 参照: design.md「補助的な値型 / SortOrder」「sortCharacters」、要件11.2〜11.6
  */
-export type SortOrder = 'newest' | 'favorite' | 'name';
+export type SortOrder = 'newest' | 'favorite' | 'name' | 'metOn';

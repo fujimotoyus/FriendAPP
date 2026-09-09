@@ -20,7 +20,7 @@
 - **イテレーション2**: 今日の一枚ガチャ（要件5）
 - **イテレーション3**: ランキング対戦（要件4）
 - **イテレーション4**: 仕上げ（編集・削除、メモ・ニックネーム、UI調整）（要件6、要件8）
-- **イテレーション5**: 見た目と使い勝手の底上げ（「大人かわいい」UIテーマ、一覧でのニックネーム優先表示、一覧の並び替え、お気に入り度の視覚的強調、共通ナビゲーションバー）（要件9、要件10、要件11、要件12、要件13）
+- **イテレーション5**: 見た目と使い勝手の底上げ（「大人かわいい」UIテーマ、一覧でのニックネーム優先表示、一覧の並び替え、お気に入り度の視覚的強調、共通ナビゲーションバー）（要件9、要件10、要件11、要件12、要件13）。並び替え（要件11）は、イテレーション6でMet_On（出会った日）が加わった後に「出会った日の新しい順」を後追いで拡張する
 - **イテレーション6**: 登録項目の拡張（任意の「出会った日」を登録し詳細でのみ表示、パステルプリセットから選ぶ「イメージカラー」を登録しカードと詳細の写真枠の縁取りへ反映。旧データは既定値で補完し後方互換を維持）（要件14、要件15）
 
 ## Glossary
@@ -41,7 +41,7 @@
 - **Daily_Gacha**: 登録済みキャラクターから1件をランダムに選び「今日の相棒」として表示するモード。同一暦日（利用者の端末ローカルの日付）内は選択結果を固定する
 - **PWA**: Webアプリをネイティブアプリのように端末へインストール・オフライン利用できる仕組み（Web App Manifest + Service Worker）
 - **大人かわいいテーマ（Adult_Cute_Theme）**: 落ち着いたパステルを基調とし、上品なアクセント・洗練された余白/影/フォント/トランジションで構成する視覚テーマ。要件7で定めた制約（パステル基調、角丸、横スクロールなし、最小44×44 CSSピクセルのタッチ領域、rem追従）をすべて満たしたうえで美観を高める上位互換の位置づけとする
-- **Sort_Order**: Collection_Viewにおける一覧の並び順。「登録日時の新しい順」「Favorite_Levelの高い順」「名前の昇順」のいずれかを指す。並び順の変更は表示順のみに作用し、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
+- **Sort_Order**: Collection_Viewにおける一覧の並び順。「登録日時の新しい順」「Favorite_Levelの高い順」「名前の昇順」「出会った日の新しい順（Met_Onの降順、未設定は後方）」のいずれかを指す。並び順の変更は表示順のみに作用し、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
 - **Navigation_Bar**: 画面下部に固定表示されるタブ型の共通ナビゲーション。「図鑑」「今日の相棒」「トーナメント」「新規登録」の4つの遷移項目を持ち、それぞれCollection_View・Daily_Gacha・Ranking_Battle・Registration_Form（新規登録）への到達手段を提供する。現在表示中の画面に対応するタブを選択状態として視覚的に区別する
 - **Met_On（出会った日）**: Characterに紐づく任意（未設定可）の日付属性。当該Characterと「出会った日」を暦日（年月日）で表す。妥当な暦日のみを保持し、未入力または不正な日付文字列は未設定として扱う。CharacterDetailView（詳細画面）でのみ表示し、Collection_View・Daily_Gacha・Ranking_Battleには表示しない。この属性を持たない既存Characterは未設定として扱う（後方互換）
 - **Image_Color（イメージカラー）**: Characterに紐づく属性で、大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン由来のパステルのプリセット色から選ぶ縁取り色。選択肢はプリセット5色と「なし（Image_Color_None）」で構成し、既定値は「なし」とする。CharacterCard（一覧カード）の枠および詳細画面の写真枠の縁取りへ反映する。プリセットの許容値以外・未設定・この属性を持たない既存Characterはいずれも「なし」として扱う（後方互換）
@@ -203,12 +203,13 @@
 
 #### 受け入れ基準
 
-1. THE Collection_View SHALL Sort_Orderとして「登録日時の新しい順」「Favorite_Levelの高い順」「名前の昇順」を選択する手段を提供する
+1. THE Collection_View SHALL Sort_Orderとして「登録日時の新しい順」「Favorite_Levelの高い順」「名前の昇順」「出会った日の新しい順」を選択する手段を提供する
 2. WHEN 利用者がSort_Orderを選択していない初期状態でCollection_Viewを開く, THE Collection_View SHALL 全Characterを登録日時（createdAt）の新しい順で一覧表示する
 3. WHEN 利用者が「Favorite_Levelの高い順」を選択する, THE Collection_View SHALL 全CharacterをFavorite_Levelの降順に並べ替え、Favorite_Levelが同値のCharacterどうしは登録日時（createdAt）の新しい順で並べ、それも同値の場合はCharacterのidの昇順で並べて一覧表示する
 4. WHEN 利用者が「名前の昇順」を選択する, THE Collection_View SHALL 全Characterを名前のUnicodeコードポイント順（大文字小文字・ロケールに依存しない一貫した順序）で昇順に並べ替え、名前が空（空文字または空白のみ）のCharacterは名前を持つCharacterより後に配置し、比較が同値の場合はCharacterのidの昇順で並べて一覧表示する
 5. WHEN 利用者がSort_Orderを変更する, THE Collection_View SHALL 一覧の表示順のみを変更し、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
 6. THE Collection_View SHALL 同一のCharacter集合と同一のSort_Orderに対して、常に同一の並び順（決定的な順序）で一覧表示する
+7. WHEN 利用者が「出会った日の新しい順」を選択する, THE Collection_View SHALL 全Characterを、Met_Onが設定されているCharacterをMet_Onの降順に並べ、Met_Onが未設定のCharacterはMet_Onを持つCharacterより後に配置し、Met_Onが同値または両方が未設定の場合は登録日時（createdAt）の降順で並べ、それも同値の場合はCharacterのidの昇順で並べて一覧表示する
 
 ### 要件12: お気に入り度の視覚的強調
 

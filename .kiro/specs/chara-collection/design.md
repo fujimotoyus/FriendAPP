@@ -172,12 +172,12 @@ React コンポーネント（View）と hooks（View-State）を分離し、意
 
 登録済み Character を、現在選択中の `Sort_Order` に従って一覧表示する。初期状態（未選択）は登録日時の新しい順（`createdAt` 降順、要件2.1, 11.2）。各カードは写真・主表示/副表示（ニックネーム優先、要件10）・お気に入り度の視覚表現（要件12）を表示する（要件2.3, 2.5, 2.6）。0 件時は空状態メッセージと新規登録導線を表示（要件2.7, 8.6）。写真読み込み失敗時は当該カードのみプレースホルダー表示にフォールバックし、他カードの表示は継続する（要件2.4）。ストア読み込み失敗時は再試行手段を提示（要件2.9）。
 
-一覧の先頭に、大人かわいいテーマに沿った **並び順の選択 UI**（セグメント/ドロップダウン等。各操作要素は最小 44×44 CSS px、横スクロールなし）を配置し、「登録日時の新しい順」「Favorite_Level の高い順」「名前の昇順」を切り替える（要件11.1, 9.6, 9.7, 13 と整合）。並び替えは表示順のみを変更し、Character_Store のデータおよび Character の内容は変更しない（要件11.5）。
+一覧の先頭に、大人かわいいテーマに沿った **並び順の選択 UI**（セグメント/ドロップダウン等。各操作要素は最小 44×44 CSS px、横スクロールなし）を配置し、「登録日時の新しい順」「Favorite_Level の高い順」「名前の昇順」「出会った日の新しい順」の4種を切り替える（要件11.1, 11.7, 9.6, 9.7, 13 と整合）。並び替えは表示順のみを変更し、Character_Store のデータおよび Character の内容は変更しない（要件11.5）。なお「出会った日の新しい順」は並び替えキーに Met_On を用いるのみで、一覧カードに Met_On を表示するわけではない（Met_On は詳細画面のみ表示、要件14.7）。
 
 ```tsx
 function CollectionView(): JSX.Element {
   const { characters, sortOrder, setSortOrder, loadState, reload } = useCollection();
-  // 並び順選択 UI（newest/favorite/name）、grid/list、empty-state、retry-on-error を分岐表示
+  // 並び順選択 UI（newest/favorite/name/metOn）、grid/list、empty-state、retry-on-error を分岐表示
   // 各カードは deriveCardDisplay(character) の主表示/副表示と FavoriteLevelDisplay を描画
 }
 ```
@@ -304,6 +304,11 @@ interface CharacterValidator {
 //   'favorite' : favoriteLevel 降順 → createdAt 降順 → id 昇順
 //   'name'     : name の Unicode コードポイント順で昇順（ロケール非依存の一貫比較）。
 //                名前が空（空文字/空白のみ）は名前を持つ要素より後方。比較同値は id 昇順。
+//   'metOn'    : Met_On が設定されている要素を Met_On（YYYY-MM-DD 文字列）の降順、
+//                Met_On 未設定（undefined）の要素は後方、Met_On 同値または両方未設定は
+//                createdAt 降順 → id 昇順。
+//                Met_On は妥当な YYYY-MM-DD 文字列または undefined（要件14.4 で不正値は未設定化済み）。
+//                YYYY-MM-DD は辞書順＝日付順のため、文字列のコードポイント比較で降順にできる。
 function sortCharacters(characters: readonly Character[], order: SortOrder): Character[];
 
 // 一覧カードの表示モデル導出（要件10）— 純粋関数。
@@ -468,7 +473,8 @@ interface CalendarDay {      // 端末ローカル暦日（要件5.2）
 }
 
 // 一覧の並び順（要件11）。表示順のみに作用し、Character の内容やストアを変更しない。
-type SortOrder = 'newest' | 'favorite' | 'name';
+// 'metOn': 出会った日（Met_On）の新しい順。Met_On 降順、未設定は後方。
+type SortOrder = 'newest' | 'favorite' | 'name' | 'metOn';
 
 interface BattlePair { left: string; right: string; }   // 不戦勝は Pair を生成しない
 // 対戦結果（勝敗はアプリが自動判定するため BattleSide は廃止。実況テキストを含む）
@@ -857,9 +863,9 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 ### Property 17: 並び替えは決定的で要素を保存する
 
-*任意の* Character 集合と *任意の* `SortOrder` について、`sortCharacters(characters, order)` は入力集合の並べ替え（要素の過不足がない同一の多重集合）を返し、入力配列を変更しない。さらに各 `SortOrder` について決定的な順序を返す（同一入力・同一 order に対して何度呼んでも同一の順序）。順序は order ごとに、`'newest'` は `createdAt` 降順 → `id` 昇順、`'favorite'` は `favoriteLevel` 降順 → `createdAt` 降順 → `id` 昇順、`'name'` は名前の Unicode コードポイント順で昇順（名前が空のものは名前を持つものより後方）→ `id` 昇順のタイブレークに従う。
+*任意の* Character 集合と *任意の* `SortOrder` について、`sortCharacters(characters, order)` は入力集合の並べ替え（要素の過不足がない同一の多重集合）を返し、入力配列を変更しない。さらに各 `SortOrder` について決定的な順序を返す（同一入力・同一 order に対して何度呼んでも同一の順序）。順序は order ごとに、`'newest'` は `createdAt` 降順 → `id` 昇順、`'favorite'` は `favoriteLevel` 降順 → `createdAt` 降順 → `id` 昇順、`'name'` は名前の Unicode コードポイント順で昇順（名前が空のものは名前を持つものより後方）→ `id` 昇順、`'metOn'` は Met_On 降順（Met_On 未設定のものは後方）→ `createdAt` 降順 → `id` 昇順のタイブレークに従う。
 
-**Validates: Requirements 11.2, 11.3, 11.4, 11.5, 11.6**
+**Validates: Requirements 11.2, 11.3, 11.4, 11.5, 11.6, 11.7**
 
 ### Property 18: 一覧カードの主表示/副表示の決定
 
@@ -1130,7 +1136,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件8（空状態・入力エラー） | `CharacterValidator` / `EmptyStateView` / Error Handling マッピング表 / Property 1〜4, 7 |
 | 要件9（大人かわいい UI テーマ） | Design Theme and Design System（Adult_Cute_Theme のカラー/角丸/影/余白/トランジショントークン、`prefers-reduced-motion` 短縮）/ 全 UI コンポーネント（トークン経由適用）/ UI スモーク・CSS 検査 |
 | 要件10（一覧でのニックネーム優先表示） | `CharacterCard` / `deriveCardDisplay`（domain）/ `CollectionView` / Property 18（表示配置 10.4 は UI スナップショット） |
-| 要件11（一覧の並び替え） | `sortCharacters`（domain）/ `useCollection`（`sortOrder`/`setSortOrder`）/ `CollectionView`（並び順選択 UI）/ `SortOrder` 型 / Property 17 |
+| 要件11（一覧の並び替え。出会った日の新しい順 `'metOn'` を含む、11.7） | `sortCharacters`（domain。`'metOn'` の Met_On 降順→未設定後方→createdAt 降順→id 昇順タイブレーク）/ `useCollection`（`sortOrder`/`setSortOrder`）/ `CollectionView`（並び順選択 UI・4種）/ `SortOrder` 型（`'metOn'` 追加）/ Property 17 |
 | 要件12（お気に入り度の視覚的強調） | `FavoriteLevelDisplay`（表示専用）/ `deriveFavoriteLevelDisplay`（domain）/ `CharacterCard` / `CharacterDetailView` / Property 19 |
 | 要件13（共通ナビゲーションバー） | `NavigationBar` / `App`（`view` 状態と表示制御・遷移ハンドラ）/ フロー4（画面切替）/ UI 例示・スナップショット |
 | 要件14（出会った日 Met_On の登録・詳細表示） | `Character.metOn` / `CharacterDraft.metOn` / `normalizeMetOn`・`formatMetOn`（domain）/ `CharacterValidator`（field 'metOn'）/ `RegistrationForm`（`<input type="date">`）/ `CharacterDetailView`（表示）/ `IndexedDbCharacterStore.fetchAll`（読み出し正規化・後方互換）/ Property 20, 21 / 一覧・ガチャ・対戦は非表示（例示） |

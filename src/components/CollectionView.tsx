@@ -28,11 +28,12 @@ export interface CollectionViewProps {
   onSelect: (character: Character) => void;
 }
 
-/** 並び順選択 UI に表示する 3 種のオプション（表示ラベルと値）。要件11.1〜11.4 */
+/** 並び順選択 UI に表示する 4 種のオプション（表示ラベルと値）。要件11.1〜11.4 */
 const SORT_OPTIONS: ReadonlyArray<{ value: SortOrder; label: string }> = [
   { value: 'newest', label: '新しい順' },
   { value: 'favorite', label: 'お気に入り順' },
   { value: 'name', label: '名前順' },
+  { value: 'metOn', label: '出会った日順' },
 ];
 
 export function CollectionView({
