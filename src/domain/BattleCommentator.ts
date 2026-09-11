@@ -101,6 +101,50 @@ const SITUATION_TEMPLATES: Readonly<
 };
 
 /**
+ * 観点ワード入り（aspect 差し込み）の状況別実況テンプレート集（要件19.6, 19.2, 19.3）。
+ *
+ * `narrate` に `aspect`（Theme_Aspect、お題の観点ワード）が渡されたときに用いる。各状況
+ * （favored/upset/even）につき複数を用意し、`{aspect}` をお題の観点ワードとして差し込む。
+ * すべて勝者名 `w` を必ず含み、`aspect` を織り込んだ非空文字列を返す
+ * （Correctness Property 25, 28 の不変条件）。
+ */
+const SITUATION_ASPECT_TEMPLATES: Readonly<
+  Record<BattleSituation, ReadonlyArray<(w: string, l: string, aspect: string) => string>>
+> = {
+  favored: [
+    (w, l, a) => `${a}で ${w} が ${l} を圧倒！ 順当な勝利だ！`,
+    (w, l, a) => `${a}なら ${w} が一枚上手！ ${l} を危なげなく下した！`,
+    (w, l, a) => `本命 ${w} が ${a}で実力を証明！ ${l} は一歩及ばず…`,
+    (w, l, a) => `${a}の差を見せつけた ${w}！ ${l} を退けて勝ち上がり！`,
+  ],
+  upset: [
+    (w, l, a) => `まさかの ${a}逆転！ ${w} が ${l} を破った！`,
+    (w, l, a) => `番狂わせ！ ${a}で ${w} が格上の ${l} を撃破！`,
+    (w, l, a) => `大金星！ ${w} が ${a}で ${l} を打ち破った！`,
+    (w, l, a) => `${a}で伏兵 ${w} が主役に！ ${l} はまさかの敗退！`,
+  ],
+  even: [
+    (w, l, a) => `${a}は互角…！ 競り勝ったのは ${w}！ ${l} も見事！`,
+    (w, l, a) => `${a}で紙一重の勝負！ ${w} が ${l} を辛くも制す！`,
+    (w, l, a) => `甲乙つけがたい ${a}！ 最後に笑ったのは ${w}！ ${l} も譲らず！`,
+    (w, l, a) => `${a}は五分五分！ ${w} が ${l} を振り切った！`,
+  ],
+};
+
+/**
+ * 観点ワード入り（aspect 差し込み）の汎用実況テンプレート集（要件19.6）。
+ *
+ * `situation` が省略され `aspect` のみが渡された場合に用いる。状況に依らずお題の観点ワード
+ * `{aspect}` を織り込んだ文面を返す。すべて勝者名 `w` を必ず含み非空。
+ */
+const GENERIC_ASPECT_TEMPLATES: ReadonlyArray<(w: string, l: string, aspect: string) => string> = [
+  (w, l, a) => `${a}で ${w} が ${l} を制した！`,
+  (w, l, a) => `${a}を競う一戦、勝者は ${w}！ ${l} も健闘！`,
+  (w, l, a) => `${a}対決を ${w} がものにした！ ${l} は惜しくも敗退…`,
+  (w, l, a) => `${a}で ${w} が ${l} を上回った！ 見事な勝利！`,
+];
+
+/**
  * [0,1) を想定した rng からテンプレート配列のインデックスを安全に導出する。
  *
  * 範囲外・NaN・非有限が渡されても 0..length-1 に収まるようクランプする
@@ -137,19 +181,37 @@ function indexFromRng(rng: () => number, length: number): number {
  * を用いる（**後方互換**：既存呼び出し `narrate(pair, rng)` は挙動不変）。いずれの場合も勝者名を
  * 必ず含む非空文字列を返す（要件19.2, 19.3、Correctness Property 14, 25）。
  *
+ * `aspect`（Theme_Aspect、お題の観点ワード、要件19.6）が非空で渡された場合は、お題に沿った
+ * 実況を生成する。`situation` も指定されていれば当該状況の観点ワード入りテンプレート集
+ * （{@link SITUATION_ASPECT_TEMPLATES}）、`situation` 省略時は汎用の観点ワード入りテンプレート集
+ * （{@link GENERIC_ASPECT_TEMPLATES}）から rng で 1 つを選び `{aspect}` を差し込む。`aspect` が
+ * 空文字/undefined のときは aspect なしの従来経路へフォールバックする（**後方互換**）。
+ * 観点ワード入り経路でも勝者名を必ず含む非空文字列を返す（Correctness Property 28）。
+ *
  * @param pair 勝者・敗者の表示名（{@link BattleNames}）
  * @param rng [0,1) の一様乱数を返す関数（本番は `Math.random`、テストは固定/シード rng）
  * @param situation 対戦の状況区分（省略時は汎用テンプレートを使用＝後方互換）
+ * @param aspect お題の観点ワード（Theme_Aspect）。非空なら実況へ織り込む（省略/空文字なら従来経路）
  * @returns 勝者名を必ず含む非空の実況文字列
  */
 export function narrate(
   pair: BattleNames,
   rng: () => number,
   situation?: BattleSituation,
+  aspect?: string,
 ): string {
   const { winner, loser } = pair;
 
-  // 状況が指定されていれば状況別テンプレート、省略時は従来相当の汎用テンプレートを使う。
+  // aspect が非空なら観点ワードを織り込む経路を使う（お題に沿った実況、要件19.6）。
+  if (aspect && aspect.length > 0) {
+    const aspectTemplates = situation
+      ? SITUATION_ASPECT_TEMPLATES[situation]
+      : GENERIC_ASPECT_TEMPLATES;
+    const aspectIndex = indexFromRng(rng, aspectTemplates.length);
+    return aspectTemplates[aspectIndex](winner, loser, aspect);
+  }
+
+  // aspect なし: 状況が指定されていれば状況別テンプレート、省略時は従来相当の汎用テンプレートを使う。
   const templates = situation ? SITUATION_TEMPLATES[situation] : TEMPLATES;
   // rng からテンプレート番号を導出する。範囲外・NaN でも安全に 0..length-1 へ収める。
   const index = indexFromRng(rng, templates.length);

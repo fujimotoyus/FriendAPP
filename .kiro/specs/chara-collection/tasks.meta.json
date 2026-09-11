@@ -7,6 +7,10 @@
     "37.2 今日の一言の決定的・非空・50文字以下のプロパティテスト": {
       "status": "passed",
       "lastRunTimestamp": 1789093544509
+    },
+    "59.1 お題の観点ワードを織り込んだ実況のプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1789110304748
     }
   },
   "executionHistory": {

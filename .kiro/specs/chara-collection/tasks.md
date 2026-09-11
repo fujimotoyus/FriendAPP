@@ -17,6 +17,9 @@
 - **イテレーション7**: 一覧の並び替えに「出会った日の新しい順」を追加（Sort_Order に 'metOn' を追加。Met_On 降順・未設定は後方・タイブレークは createdAt 降順→id 昇順。既存データ・機能に破壊的変更なし）（要件11.1, 11.7）
 - **イテレーション8**: 今日の相棒に一言（Daily_Gacha のメッセージを相棒キャラ本人のセリフ風の一言＝Daily_Line に置き換え。暦日＋相棒 id＋salt から決定的に選ぶその日固定の選出。50文字保証・名前空でも成立・外部送信なし。既存 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替え）（要件5 の改定と要件16）
 - **イテレーション9**: 対戦を魅せる（試合ごとのリザルト表示・勝者ハイライト/ペア入場アニメ・優勝の紙吹雪風演出・勝ち上がりを可視化するトーナメント表。自動再生/効果音/総評なし。`TournamentEngine` を勝ち上がり履歴 `bracket` の公開のため拡張（既存セマンティクス・Property 11〜13 は不変）。`useRankingBattle` を「勝負！」→「次へ」の2段階進行へ拡張）（要件17, 18、要件4 と整合）
+- **イテレーション10**: 対戦をもっと楽しく（状況別実況・準優勝/ベスト4 表示・対戦のお題 Battle_Theme。`TournamentEngine` の勝敗判定は不変）（要件19, 20, 21、要件4/17/18 と整合）
+- **イテレーション11**: トーナメント表を図に（`TournamentBracketView` を接続線つき縦向きブラケット図へ表示強化。データ/ドメイン/エンジン変更なし）（要件18.7 の表示強化）
+- **イテレーション12**: お題に沿った実況（各試合の Battle_Commentary に、その回のお題 Battle_Theme の観点ワード＝Theme_Aspect を織り込む。状況別実況を維持しつつお題に沿った文面にする。`battleTheme` に `getBattleThemeAspect` を追加し既存8お題すべてに観点ワードを定義（未知ラベルは非空フォールバック）、`BattleCommentator.narrate` を末尾任意引数 `aspect?` で後方互換拡張、`useRankingBattle` が観点ワードを実況へ渡す。`TournamentEngine` の勝敗判定・`pickBattleTheme` シグネチャは不変、既存 Property 11〜14, 24, 25, 26, 27 を保持）（要件19.6、要件19/21 の拡張）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -558,12 +561,36 @@
 - [ ] 57. Iteration 11 チェックポイント（トーナメント表を図に）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [ ] 58. ドメイン: `battleTheme` にお題の観点ワード（Theme_Aspect）対応を追加する（要件19.6, 21）
+  - `src/domain/battleTheme.ts` に `getBattleThemeAspect(theme: string): string` を追加する。お題ラベル→観点ワードの対応を持ち、既存8お題すべてに観点ワードを定義する（例「かわいい選手権」→「かわいさ」、「たよれる度No.1決定戦」→「頼れる度」、「今いちばん会いたい子は？」→「会いたい度」、「キュンとくるのは誰だ！？」→「キュン度」、「癒やしオーラ王者決定戦」→「癒やし度」、「いっしょにいたい子グランプリ」→「いっしょにいたい度」、「ときめきトーナメント」→「ときめき度」、「推し度ナンバーワン決定戦」→「推し度」等）。対応が未定義の任意のラベルには汎用の非空フォールバック（例「魅力」）を返す。常に非空文字列を返す純粋関数とする。`pickBattleTheme` / `BATTLE_THEME_COUNT` は**戻り値・シグネチャを変えず不変**とする。`Math.random()` は使用せず外部送信も行わない（要件19.6, 3.8）
+  - _Requirements: 19.6, 21_
+
+- [ ] 59. ドメイン: `BattleCommentator.narrate` を観点ワード（aspect）織り込みに拡張する（要件19.6, 19.2, 19.3）
+  - `src/domain/BattleCommentator.ts` の `narrate` を `narrate(pair: { winner: string; loser: string }, rng: () => number, situation?: BattleSituation, aspect?: string): string` へ**末尾に任意引数を足す**形で拡張する。各状況（favored/upset/even）につき観点ワード差し込み版の実況テンプレート群を追加し、`aspect` が渡されたら当該状況（省略時は汎用/従来相当の扱い）の観点ワード入りテンプレート集から rng で 1 つ選び、お題に沿った文面（例 favored: 「{aspect}で{winner}が{loser}を圧倒！」）を生成する。`aspect` 省略時は従来どおり（既存呼び出し `narrate(pair, rng)` / `narrate(pair, rng, situation)` を壊さない**後方互換**）。各状況・各テンプレートは複数存在し、いずれも非空で勝者名を含む文字列を返す（既存 Property 25 を維持、要件19.6, 19.2, 19.3）。純粋関数・rng 外部注入・副作用なしを維持する
+  - _Requirements: 19.6, 19.2, 19.3_
+
+  - [ ]* 59.1 お題の観点ワードを織り込んだ実況のプロパティテスト
+    - **Property 28: お題の観点ワードを織り込んだ実況**（任意の勝者/敗者名・rng・`situation`（favored/upset/even/省略）・`aspect`（非空文字列）について、(a) `getBattleThemeAspect` は既存8お題および対応未定義の任意ラベルにも非空の観点ワードを返す、(b) `narrate(pair, rng, situation, aspect)` は非空で勝者名を含む文字列を返す、(c) `aspect` を指定すると観点を織り込んだ文面を生成しうる（aspect を含むテンプレートが存在し反映される）、(d) rng を変えると同一入力でも複数の異なる文面が生じうる、(e) `aspect` 省略は既存挙動（Property 25）を保ち勝敗判定に影響しない）
+    - **Validates: Requirements 19.6, 21**
+    - `// Feature: chara-collection, Property 28` タグ・`numRuns: 100`。対象 `getBattleThemeAspect` / `BattleCommentator.narrate`（aspect 拡張・rng 注入）。既存 Property 25（`BattleCommentator.situation.test.ts` 等）・Property 27（`battleTheme.test.ts`）のテストは不変で保持する
+
+- [ ] 60. Hook: `useRankingBattle` の実況生成でお題観点ワードを `narrate` へ渡す（要件19.6）
+  - `src/hooks/useRankingBattle.ts` の実況生成箇所（`runBattle`）で、その回のお題（既に保持している `theme`）から `getBattleThemeAspect(theme)` で観点ワード（Theme_Aspect）を導出し、`narrate(names, rng, situation, aspect)` へ渡してお題に沿った状況別実況を生成する。既存の戻り値・セマンティクス（`start`/`advance`/`resolveCurrentBattle`/`next`/`reset`/`theme`/`currentCommentary`/`phase`/`bracket` 等）は不変とし、`narrate` への引数追加のみを行う。勝敗判定は不変（要件19.4）
+  - _Requirements: 19.6_
+
+  - [ ]* 60.1 実況にお題の観点が反映されうることのユニットテスト（任意）
+    - `getBattleThemeAspect(theme)` を `narrate` へ `aspect` として渡すと、生成される実況にお題に沿った観点の文面が現れうることを、ドメイン直接（`getBattleThemeAspect` / `narrate`）または `useRankingBattle` 経由で rng を固定/シードして例示テストで確認する（要件19.6）。既存の対戦実況・お題表示テストは不変で保持する
+    - _Requirements: 19.6_
+
+- [ ] 61. Iteration 12 チェックポイント（お題に沿った実況）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜27）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜28）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -608,7 +635,11 @@
     { "id": 33, "tasks": ["53"] },
     { "id": 34, "tasks": ["53.1"] },
     { "id": 35, "tasks": ["55", "56"] },
-    { "id": 36, "tasks": ["56.1"] }
+    { "id": 36, "tasks": ["56.1"] },
+    { "id": 37, "tasks": ["58"] },
+    { "id": 38, "tasks": ["59"] },
+    { "id": 39, "tasks": ["59.1", "60"] },
+    { "id": 40, "tasks": ["60.1"] }
   ]
 }
 ```

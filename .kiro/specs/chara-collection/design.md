@@ -66,6 +66,15 @@
 - **勝者ハイライト・Bye・優勝強調の維持**: 勝者側の強調（`👑`・`--winner`）、不戦勝（Bye）表記、`winnerHighlightId`（最終優勝者）の軽い強調（`--champion`）は維持する。読み取り専用（操作要素を置かず対戦結果やデータを変更しない、要件18.4）を守り、操作要素があれば最小 44×44 CSS px を維持する。
 - **トークン経由・reduced-motion 尊重**: 配色・角丸・影・余白、および接続線の色はすべて大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`、接続線は例えば `--color-border` / `--color-accent` 相当のトークン）経由で適用する。もしトランジションを用いる場合は `--transition-*`（200〜500ms）経由とし、`@media (prefers-reduced-motion: reduce)` で無効化/短縮する（要件9.4, 9.5）。
 
+### イテレーション12（お題に沿った実況、要件19.6）
+
+イテレーション12では、イテレーション10で追加した対戦のお題（Battle_Theme）と状況別実況（Battle_Situation）を結び付け、**各試合の Battle_Commentary をその回のお題に沿った内容にする**。既存機能への**破壊的でない拡張**として設計し、**`TournamentEngine` の勝敗判定は一切変更しない（勝率は 50/50 のまま）**。現状はお題と実況が独立で実況がお題を参照していないため、お題ごとの「観点ワード（Theme_Aspect、例「かわいさ」「頼れる度」）」を状況別実況テンプレートへ織り込む方針（軽い案A）を採る。要点は次のとおり。
+
+- **お題の観点ワード（Theme_Aspect）の導出（要件19.6）**: `battleTheme` に、お題ラベル→観点ワードの対応を持つ純粋関数 `getBattleThemeAspect(theme: string): string` を追加する。既存8お題すべてに観点ワードを定義し、対応が未定義のラベルには汎用の非空フォールバック（例「魅力」）を返す。`pickBattleTheme(rng): string`・`BATTLE_THEME_COUNT` は**戻り値・シグネチャを変えず不変**とし（既存 Property 27・既存テストを壊さない）、観点ワードは別途この関数で引く。観点ワードは端末内で導出し外部送信しない（要件19.6, 3.8）。
+- **状況別実況への観点ワードの織り込み（要件19.6, 19.2, 19.3）**: `BattleCommentator.narrate` を `narrate(pair, rng, situation?, aspect?)` へ**末尾に任意引数を足す**形で拡張する（既存呼び出し `narrate(pair, rng)` / `narrate(pair, rng, situation)` を壊さない後方互換）。`aspect` が渡された場合は、各状況（favored/upset/even）につき観点ワード差し込み版の実況テンプレート群から rng で 1 つ選び、お題に沿った文面（例 favored: 「{aspect}で{winner}が{loser}を圧倒！」）を生成する。`aspect` 省略時は従来どおり（状況別または汎用テンプレート）。いずれの場合も非空で勝者名を含み、rng の値で文面が変動しうる（既存 Property 25 は拡張後も維持、要件19.2, 19.3）。
+- **hook からお題観点を渡す（要件19.6）**: `useRankingBattle` の実況生成箇所（`runBattle`）で、その回のお題（既に保持している `theme`）から `getBattleThemeAspect(theme)` で観点ワードを導出し、`narrate(names, rng, situation, aspect)` へ渡す。既存の戻り値・セマンティクス（`start`/`advance`/`resolveCurrentBattle`/`next`/`reset`/`theme`/`currentCommentary` 等）は不変とし、`narrate` への引数追加のみを行う。
+- **不変の制約の維持**: `TournamentEngine` の勝敗判定・終了性・不戦勝・bracket セマンティクスは不変（既存 Property 11〜14, 24, 25, 26, 27 を保持）。特に `pickBattleTheme` のシグネチャ・`narrate` の既存呼び出しは壊さない。Theme_Aspect を含む一切のデータを外部送信しない（要件19.6, 3.8）。観点ワード導出・実況生成はいずれも Domain 層の純粋関数（`getBattleThemeAspect` / `narrate` 拡張）へ寄せ、property-based testing で検証する（新規 Correctness Property 28）。
+
 ### 技術方針
 
 - **プラットフォーム**: Web（PWA）。iPhone Safari でホーム画面に追加し、スタンドアロン・ポートレートで起動する（要件7.1, 7.2）。オフラインファースト設計とする。
@@ -259,7 +268,7 @@ function CollectionView(): JSX.Element {
 **イテレーション10の追加（対戦をもっと楽しく、要件19, 20, 21）**:
 
 - **お題（Battle_Theme）の表示（要件21）**: `useRankingBattle` の `theme: string`（`start` 時に `pickBattleTheme(rng)` で選出）を対戦画面の上部等に表示する。表示は大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で適用し、ビューポート幅 320〜430 CSS px でも横スクロールを発生させない（要件21.4, 21.5, 9）。本コンポーネントはロジックを持たず、hook から受け取った `theme` を描画するのみとする（お題選択は Domain の `pickBattleTheme` が担う）。
-- **状況別の実況（要件19）**: `currentCommentary`（`BattleOutcome`）の実況文は、`useRankingBattle` が勝者・敗者の Favorite_Level から `deriveBattleSituation` で導いた状況（favored/upset/even）を `narrate(names, rng, situation)` へ渡して生成する。本コンポーネントは受け取った実況文字列を描画するのみで、状況の導出ロジックは持たない（要件19.2, 19.3）。
+- **状況別の実況（要件19）**: `currentCommentary`（`BattleOutcome`）の実況文は、`useRankingBattle` が勝者・敗者の Favorite_Level から `deriveBattleSituation` で導いた状況（favored/upset/even）を `narrate(names, rng, situation)` へ渡して生成する。本コンポーネントは受け取った実況文字列を描画するのみで、状況の導出ロジックは持たない（要件19.2, 19.3）。**イテレーション12（要件19.6）**: `useRankingBattle` はさらにその回のお題（`theme`）から `getBattleThemeAspect(theme)` で観点ワードを導出して `narrate(names, rng, situation, aspect)` へ渡すため、実況はお題に沿った文面になる。本コンポーネントは引き続き受け取った実況文字列を描画するのみで、観点ワード導出ロジックは持たない。
 - **準優勝・ベスト4 の表示（要件20）**: `phase === 'champion'` の優勝発表画面に、`useRankingBattle` が公開する `runnerUp: Character | null`（準優勝）と `semifinalists: Character[]`（ベスト4）を表示する。`runnerUp` が `null` の場合は準優勝行を表示せず、`semifinalists` が空の場合はベスト4行を表示しない（参加者が少なく定義できない順位は非表示、要件20.1, 20.2, 20.3）。表示はトークン経由・横スクロールなし・44×44 CSS px を維持する（要件9）。
 
 #### App（ルート・ビュー状態と NavigationBar 制御）
@@ -361,6 +370,9 @@ function useRankingBattle(): {
 // 状況別実況: resolveCurrentBattle()（および advance）で engine.lastResult の勝者・敗者の favoriteLevel を
 //   deriveBattleSituation(winner.favoriteLevel, loser.favoriteLevel) に渡して situation を導出し、
 //   narrate(names, rng, situation) で状況別の実況を生成して currentCommentary に反映する（要件19.1, 19.2）。勝敗判定は不変（要件19.4）。
+// 【イテレーション12・非破壊拡張（要件19.6）】お題に沿った実況: runBattle で、その回のお題（既に保持している theme）から
+//   getBattleThemeAspect(theme) で観点ワード（Theme_Aspect）を導出し、narrate(names, rng, situation, aspect) へ渡して
+//   お題に沿った状況別実況を生成する。既存の戻り値・セマンティクス（theme/currentCommentary 等）は不変で、narrate への引数追加のみ。
 // runnerUp/semifinalists: engine.champion 確定時に deriveRanking(engine.bracket, championId) を計算し、
 //   得られた id を fetchAll 済みの Character へ解決して runnerUp（Character | null）・semifinalists（Character[]）として公開する（要件20.1, 20.2, 20.3）。
 //   bracket を読み取るのみで対戦結果・ストアを変更しない（要件20.4）。
@@ -471,10 +483,15 @@ interface BattleCommentator {
   //   situation 省略時は従来相当の汎用テンプレート（後方互換）。状況を渡しても勝敗判定には影響しない（要件19.4）。
   //   各状況（favored/upset/even）にテンプレートが複数存在し、rng で変動しうる（要件19.2）。
   //   いずれの状況でも非空で勝者名を含む文字列を返す（既存 Property 14 を維持、要件19.3）。
+  // 【イテレーション12・非破壊拡張（要件19.6）】末尾に省略可能な aspect（お題の観点ワード Theme_Aspect、非空文字列）を追加する。
+  //   aspect が渡されたら、各状況につき観点ワード差し込み版の実況テンプレート群から rng で 1 つ選び、
+  //   お題に沿った文面（例 favored: 「{aspect}で{winner}が{loser}を圧倒！」）を生成する。aspect 省略時は従来どおり。
+  //   既存呼び出し narrate(pair, rng) / narrate(pair, rng, situation) は壊さない（後方互換）。いずれも非空・勝者名を含み rng で変動しうる（既存 Property 25 を維持、要件19.6, 19.2, 19.3）。
   narrate(
     pair: { winner: string; loser: string },
     rng: () => number,
     situation?: BattleSituation,
+    aspect?: string,
   ): string;
 }
 
@@ -506,6 +523,14 @@ function deriveRanking(
 //   毎回ランダム（決定的固定はしない、要件21.2）。rng 注入により決定性テスト可能。常に非空文字列を返す。
 //   端末内で選び外部送信しない（要件21.3, 3.8）。
 function pickBattleTheme(rng: () => number): string;
+
+// お題の観点ワード（Theme_Aspect、要件19.6）— 純粋関数。イテレーション12で追加。
+//   お題ラベル→観点ワードの対応（例「かわいい選手権」→「かわいさ」、「たよれる度No.1決定戦」→「頼れる度」、
+//   「今いちばん会いたい子は？」→「会いたい度」、「癒やしオーラ王者決定戦」→「癒やし度」等）を持つ。
+//   既存8お題すべてに観点ワードを定義し、対応が未定義のラベルには汎用の非空フォールバック（例「魅力」）を返す。
+//   常に非空文字列を返す。pickBattleTheme/BATTLE_THEME_COUNT は不変（本関数は別途 aspect を引く）。
+//   端末内で導出し外部送信しない（要件19.6, 3.8）。narrate に aspect として渡し、お題に沿った実況を生成する。
+function getBattleThemeAspect(theme: string): string;
 
 // 画像検証・正規化（要件1.10, 8.2, 8.3）
 interface PhotoProcessor {
@@ -962,7 +987,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 *プロパティとは、システムのすべての正当な実行にわたって成り立つべき特性や振る舞いのことであり、システムが何をすべきかについての形式的な言明である。プロパティは、人間が読める仕様と機械が検証可能な正当性保証との橋渡しとなる。*
 
-以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜16へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19、イテレーション6（要件14〜15）で追加した出会った日の正規化・イメージカラー正規化/縁取り導出・新フィールドを含む保存往復のプロパティは Property 20〜22、イテレーション8（要件16）で追加した今日の相棒の一言（Daily_Line）の決定的選出プロパティは Property 23 として末尾に追加している（既存 Property 1〜22 は保持）。イテレーション8では既存メッセージ生成 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替えるため、メッセージ長を検証する Property 16 の対象は `buildDailyLine`（相棒本人のセリフ風の一言）となるが、50文字以下の不変条件は維持される。Property 23 は決定性・非空を追加検証する点で Property 16（長さ）と相補的である。イテレーション9（要件17〜18）で追加した勝ち上がり履歴（Tournament_Bracket）の整合性プロパティは Property 24 として末尾に追加している（既存 Property 1〜23 は保持）。特に `TournamentEngine` に読み取り専用の `bracket` を追加する拡張は既存セマンティクスを変えないため、トーナメント自動終了・敗者除外・不戦勝を検証する **Property 11・12・13 は不変で保持**する。イテレーション10（要件19〜21）で追加した状況別実況・準優勝/ベスト4 導出・お題選択のプロパティは Property 25〜27 として末尾に追加している（既存 Property 1〜24 は保持）。イテレーション10では `TournamentEngine` の勝敗判定を一切変更しないため、**Property 11〜14, 24 は不変で保持**する。特に `BattleCommentator.narrate` は省略可能な `situation` 引数を追加する後方互換拡張であり、既存 **Property 14 は拡張後も維持**される。
+以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜16へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19、イテレーション6（要件14〜15）で追加した出会った日の正規化・イメージカラー正規化/縁取り導出・新フィールドを含む保存往復のプロパティは Property 20〜22、イテレーション8（要件16）で追加した今日の相棒の一言（Daily_Line）の決定的選出プロパティは Property 23 として末尾に追加している（既存 Property 1〜22 は保持）。イテレーション8では既存メッセージ生成 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替えるため、メッセージ長を検証する Property 16 の対象は `buildDailyLine`（相棒本人のセリフ風の一言）となるが、50文字以下の不変条件は維持される。Property 23 は決定性・非空を追加検証する点で Property 16（長さ）と相補的である。イテレーション9（要件17〜18）で追加した勝ち上がり履歴（Tournament_Bracket）の整合性プロパティは Property 24 として末尾に追加している（既存 Property 1〜23 は保持）。特に `TournamentEngine` に読み取り専用の `bracket` を追加する拡張は既存セマンティクスを変えないため、トーナメント自動終了・敗者除外・不戦勝を検証する **Property 11・12・13 は不変で保持**する。イテレーション10（要件19〜21）で追加した状況別実況・準優勝/ベスト4 導出・お題選択のプロパティは Property 25〜27 として末尾に追加している（既存 Property 1〜24 は保持）。イテレーション10では `TournamentEngine` の勝敗判定を一切変更しないため、**Property 11〜14, 24 は不変で保持**する。特に `BattleCommentator.narrate` は省略可能な `situation` 引数を追加する後方互換拡張であり、既存 **Property 14 は拡張後も維持**される。イテレーション12（要件19.6）で追加した「お題の観点ワード（Theme_Aspect）を織り込んだ実況」のプロパティは Property 28 として末尾に追加している（既存 Property 1〜27 は保持）。イテレーション12では `TournamentEngine` の勝敗判定・`pickBattleTheme` のシグネチャを一切変更せず、`narrate` は末尾に省略可能な `aspect` 引数を足す後方互換拡張であるため、**Property 11〜14, 24, 25, 26, 27 は不変で保持**する。
 
 ### Property 1: フィールド文字数バリデーション
 
@@ -1126,6 +1151,12 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 **Validates: Requirements 21**
 
+### Property 28: お題の観点ワードを織り込んだ実況
+
+*任意の* 勝者名・敗者名の組と *任意の* rng、*任意の* `situation`（`'favored'` / `'upset'` / `'even'` または省略）、および *任意の* `aspect`（お題の観点ワード Theme_Aspect。非空文字列）について、次が成り立つ。(a) **観点ワード導出**: `getBattleThemeAspect(theme)` は各お題ラベルに非空の観点ワードを返し、対応が未定義の任意のラベルにも非空のフォールバックを返す（すなわち任意の文字列入力に対して常に非空文字列を返す、要件19.6）。(b) **実況の妥当性**: `BattleCommentator.narrate(pair, rng, situation, aspect)` は空でない実況文字列を返し、その中に勝者を表す情報（勝者名／ニックネーム）が差し込まれている（要件19.3、既存 Property 25 と整合）。(c) **観点の反映**: `aspect` を指定したとき、その観点ワードを織り込んだ文面を生成しうる（各状況に aspect を含むテンプレートが存在し、aspect 指定時に観点が反映される）。(d) **rng で変動しうる**: 同一の勝者/敗者・同一 situation・同一 aspect でも、rng の値を変えると**複数の異なる実況文面が生成されうる**（要件19.2、要件4.5）。(e) **後方互換・勝率不変**: `aspect` の省略は既存挙動（Property 25）を保ち、`aspect` の値は実況文面の選択にのみ影響し、勝敗の自動判定（要件4.2）には一切影響しない（`TournamentEngine` は `aspect` を受け取らない。要件19.4）。
+
+**Validates: Requirements 19.6, 21**
+
 ## Error Handling
 
 エラーハンドリング
@@ -1158,7 +1189,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 ### 方針: ユニットテスト + プロパティテストの併用
 
 - **ユニットテスト（Vitest + React Testing Library）**: 具体例・エッジケース・エラー分岐・UI 分岐（空状態、ファイル選択キャンセル/ブロック、削除確認、写真読込失敗のプレースホルダー、対戦2件未満、対戦中リセット等）を検証する。
-- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜27）を、広い入力空間にわたって検証する。
+- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜28）を、広い入力空間にわたって検証する。
 
 ### 実行環境の注記
 
@@ -1171,8 +1202,8 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 各プロパティテストには、対応する設計プロパティを参照するコメントを付与する。タグ形式:
   `// Feature: chara-collection, Property {number}: {property_text}`
 - 各 Correctness Property は **単一の** プロパティテストで実装する。
-- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**、**`metOn` 入力（`YYYY-MM-DD` 妥当日・1900-01-01/当日/未来日/範囲外・不正形式・実在しない日付（例 2 月 30 日）・うるう年 2/29・空/undefined）と固定基準日 `today` の組（出会った日の正規化）**、**`ImageColor` の6プリセット値および許容値以外の任意文字列（イメージカラー正規化/縁取り導出）**、**`metOn`（妥当/undefined）・`imageColor`（6値）を含む `Character`（新フィールドを含む保存往復）**、**相棒 `{ id, name }`（`id` は任意文字列、`name` は空文字・空白のみ・絵文字/サロゲートペア・長文を含む任意）と `CalendarDay`・salt の組（今日の相棒の一言 Daily_Line の決定的選出。決定性・非空・50コードポイント以下を検証）**、**2 件以上（偶数/奇数、不戦勝を含む）の id 集合と任意の rng シード列の組（トーナメント表 Tournament_Bracket。champion 確定まで進めた後の bracket が勝者妥当・ラウンド間引き継ぎ整合・頂点＝champion・`advance()` 系列と無矛盾を満たすことを検証）**、**勝者/敗者の Favorite_Level の組（範囲内 1〜5・範囲外・非数値・同値を含む）と勝者/敗者名・rng・situation（favored/upset/even/省略）の組（状況別実況。deriveBattleSituation の分類と narrate の非空・勝者名含む・rng 変動を検証）**、**2 件以上（偶数/奇数・小規模 2/3 件・不戦勝を含む）の id 集合と任意の rng シード列の組（準優勝・ベスト4 導出 deriveRanking。runnerUp＝決勝敗者・semifinalists＝準決勝敗者集合・champion と相異なり重複なし・小規模で null/空を検証）**、**任意の rng（お題選択 pickBattleTheme。非空・お題集合の要素・rng で変動しうることを検証）**。
-- 乱数を用いる `TournamentEngine` と `BattleCommentator` は rng（`() => number`）を外部注入するため、テストでは固定/シード rng（例: 値の系列を返すスタブ）を渡して決定的に検証する。本番は `Math.random` を注入する。Tournament_Bracket（Property 24）、状況別実況（Property 25）、お題選択（Property 27）も同一の rng 注入で検証する。準優勝・ベスト4 導出（Property 26）は rng 注入で champion まで進めた bracket を対象に検証する。
+- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**、**`metOn` 入力（`YYYY-MM-DD` 妥当日・1900-01-01/当日/未来日/範囲外・不正形式・実在しない日付（例 2 月 30 日）・うるう年 2/29・空/undefined）と固定基準日 `today` の組（出会った日の正規化）**、**`ImageColor` の6プリセット値および許容値以外の任意文字列（イメージカラー正規化/縁取り導出）**、**`metOn`（妥当/undefined）・`imageColor`（6値）を含む `Character`（新フィールドを含む保存往復）**、**相棒 `{ id, name }`（`id` は任意文字列、`name` は空文字・空白のみ・絵文字/サロゲートペア・長文を含む任意）と `CalendarDay`・salt の組（今日の相棒の一言 Daily_Line の決定的選出。決定性・非空・50コードポイント以下を検証）**、**2 件以上（偶数/奇数、不戦勝を含む）の id 集合と任意の rng シード列の組（トーナメント表 Tournament_Bracket。champion 確定まで進めた後の bracket が勝者妥当・ラウンド間引き継ぎ整合・頂点＝champion・`advance()` 系列と無矛盾を満たすことを検証）**、**勝者/敗者の Favorite_Level の組（範囲内 1〜5・範囲外・非数値・同値を含む）と勝者/敗者名・rng・situation（favored/upset/even/省略）の組（状況別実況。deriveBattleSituation の分類と narrate の非空・勝者名含む・rng 変動を検証）**、**2 件以上（偶数/奇数・小規模 2/3 件・不戦勝を含む）の id 集合と任意の rng シード列の組（準優勝・ベスト4 導出 deriveRanking。runnerUp＝決勝敗者・semifinalists＝準決勝敗者集合・champion と相異なり重複なし・小規模で null/空を検証）**、**任意の rng（お題選択 pickBattleTheme。非空・お題集合の要素・rng で変動しうることを検証）**、**お題ラベル（既知の8お題および対応未定義の任意文字列）と勝者/敗者名・rng・situation（favored/upset/even/省略）・aspect（非空文字列。お題の観点ワード）の組（お題に沿った実況。getBattleThemeAspect の非空フォールバック・narrate の非空・勝者名含む・aspect 反映・rng 変動を検証）**。
+- 乱数を用いる `TournamentEngine` と `BattleCommentator` は rng（`() => number`）を外部注入するため、テストでは固定/シード rng（例: 値の系列を返すスタブ）を渡して決定的に検証する。本番は `Math.random` を注入する。Tournament_Bracket（Property 24）、状況別実況（Property 25）、お題選択（Property 27）、お題に沿った実況（Property 28）も同一の rng 注入で検証する。準優勝・ベスト4 導出（Property 26）は rng 注入で champion まで進めた bracket を対象に検証する。
 
 ### プロパティ ↔ テスト対応
 
@@ -1205,6 +1236,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 25 | 状況別実況の妥当性（状況分類・非空・勝者名含む・rng 変動・勝率不変） | `deriveBattleSituation` / `BattleCommentator.narrate`（situation 拡張・rng 注入） |
 | 26 | 準優勝・ベスト4 導出（決勝敗者＝runnerUp・準決勝敗者＝semifinalists・重複なし・小規模で null/空） | `deriveRanking`（rng 注入で進めた bracket） |
 | 27 | お題は非空・要素性・rng 変動 | `pickBattleTheme`（rng 注入） |
+| 28 | お題の観点ワードを織り込んだ実況（getBattleThemeAspect 非空・narrate 非空/勝者名含む・aspect 反映・rng 変動・後方互換） | `getBattleThemeAspect` / `BattleCommentator.narrate`（aspect 拡張・rng 注入） |
 
 ### ユニットテスト（例示・エッジ・エラー分岐）
 
@@ -1225,6 +1257,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 今日の相棒の一言（Daily_Line）が吹き出し風に表示されること、固定相棒で salt を変えると複数の異なる一言が生じうること（テンプレートが複数存在する。要件16.1, 16.3 の存在量化は例示で確認）、名前が空の相棒でも空でない一言が表示されること（要件16.6）
 - 対戦の進行フェーズ（`phase`）が `pair`→`result`→`champion` の順に遷移すること、「勝負！」（`resolveCurrentBattle`）で結果発表フェーズ（勝者ハイライト・実況）が表示され、「次へ」（`next`）で次ペア提示または優勝発表へ進むこと、2 件未満ガード（要件4.8）が維持されること、`TournamentBracketView` が勝ち上がり（bracket）を表示することを例示テスト（React Testing Library）で確認する（要件17.1〜17.5, 18.1〜18.3）
 - （イテレーション10）対戦画面にお題（Battle_Theme）が表示されること（要件21.1）、`start` を複数回呼ぶとお題が変わりうること（複数テンプレートの存在を例示で確認、要件21.2）、優勝発表画面に準優勝が表示され、参加者数に応じてベスト4 が表示されること、参加者が少なく定義できない順位が表示されないこと（要件20.1, 20.2, 20.3）を例示テスト（React Testing Library）で確認する
+- （イテレーション12）実況にその回のお題の観点ワード（Theme_Aspect）が反映されうること（`getBattleThemeAspect(theme)` を `narrate` へ `aspect` として渡した場合、生成される実況にお題に沿った文面が現れうること）を、ドメイン直接（`getBattleThemeAspect` / `narrate`）または hook 経由で rng を固定/シードして例示テストで確認する（要件19.6）
 
 ### PWA / UI / 非機能テストの考慮（スモーク・計測）
 
@@ -1234,7 +1267,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - **並び順選択 UI / NavigationBar 表示制御**: 並び順の選択手段が存在すること（要件11.1）、各タブ選択で `App` の `view` が期待どおり遷移すること（`goToList`/`goToGacha`/`goToBattle`/`goToAdd`、要件13.2〜13.5）、`NavigationBar` が主要画面（list/gacha/battle）で表示され詳細・登録/編集フォームで非表示になること（要件13.6, 13.7）、アクティブタブが現在ビューに一致すること（要件13.6）、各タブが 44×44 px・320〜430 px 幅で横スクロールなし（要件13.8, 13.9）を、例示テスト（React Testing Library）とスナップショットで確認する。
 - **イメージカラー縁取りの見た目**: `imageColor` が `'none'` 以外のとき `CharacterCard` の枠・`CharacterDetailView` の写真枠に `--image-color-*` の縁取りがトークン経由で適用され、`'none'` では縁取りが出ないこと、角丸維持・横スクロールなし・44×44 CSS px タッチ領域維持（要件15.6〜15.10）は、スナップショット/例示テストと CSS 検査で確認する（縁取りの有無・参照トークンの導出ロジックは Property 22 で検証）。
 - **対戦演出・トーナメント表の見た目（イテレーション9、要件17, 18）**: 勝者ハイライト・ペア入場・優勝の紙吹雪風演出のトランジション/アニメーションがトークン経由（`--transition-*` が 200〜500ms、`prefers-reduced-motion: reduce` で 0/短縮）で適用されること（要件17.7, 17.8）、効果音を用いないこと（要件17.6）、`TournamentBracketView` が勝ち上がりを 320〜430 px 幅でも横スクロールなしで表示し操作要素が 44×44 px を維持すること（要件18.5, 17.10, 17.11）を、スナップショット/例示テストと CSS/トークン検査で確認する（bracket と勝ち上がり・champion の整合ロジックは Property 24 で検証）。**イテレーション11（トーナメント表を図に、要件18.7）**: `TournamentBracketView` が **接続線つきの縦向きブラケット図** として表示されること（ラウンドが縦積みで、各対戦カードが表示され、勝者から次ラウンドへの接続線要素が存在すること）、320〜430 px 幅でも図コンテナ・画面全体に横スクロールが出ないこと、勝者ハイライト（`--winner`/👑）・不戦勝（Bye）表記・優勝強調（`winnerHighlightId` 一致時の `--champion`）が引き続き出ること、`matches` が空のとき何も描画しないこと、既存の bracket 表示テスト（`RankingBattleView.iteration10.test.tsx` 等）が引き続き通ることを、スナップショット/例示テスト（React Testing Library）と CSS/トークン検査で確認する（描画は読み取り専用でデータ/エンジンを変更しないため PBT 対象は増やさない）。
-- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する。`metOn`・`imageColor` を含む一切のデータを外部送信しない（要件3.8, 14.12, 15.11）。今日の相棒の一言（Daily_Line）も端末内の純粋関数 `buildDailyLine` で生成し、外部サーバーへ送信しないことをコード検査で確認する（要件16.5, 3.8）。Tournament_Bracket を含む対戦の一切のデータも外部送信しないことをコード検査で確認する（要件18.6, 3.8）。対戦のお題（Battle_Theme）も端末内の純粋関数 `pickBattleTheme` で選び、外部送信しないことをコード検査で確認する（要件21.3, 3.8）。
+- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する。`metOn`・`imageColor` を含む一切のデータを外部送信しない（要件3.8, 14.12, 15.11）。今日の相棒の一言（Daily_Line）も端末内の純粋関数 `buildDailyLine` で生成し、外部サーバーへ送信しないことをコード検査で確認する（要件16.5, 3.8）。Tournament_Bracket を含む対戦の一切のデータも外部送信しないことをコード検査で確認する（要件18.6, 3.8）。対戦のお題（Battle_Theme）も端末内の純粋関数 `pickBattleTheme` で選び、外部送信しないことをコード検査で確認する（要件21.3, 3.8）。お題の観点ワード（Theme_Aspect）も端末内の純粋関数 `getBattleThemeAspect` で導出し、外部送信しないことをコード検査で確認する（要件19.6, 3.8）。
 - **対戦のお題・準優勝/ベスト4 の見た目（イテレーション10、要件20, 21）**: お題（Battle_Theme）が対戦画面に表示され、320〜430 px 幅でも横スクロールなし・トークン経由の外観で表示されること（要件21.4, 21.5）、優勝発表画面に準優勝・ベスト4 がトークン経由・横スクロールなし・44×44 CSS px を維持して表示されること（要件20, 9）を、スナップショット/例示テストと CSS/トークン検査で確認する（お題選択・順位導出のロジックは Property 25〜27 で検証）。
 - **タイミング計測**: IndexedDB 永続化3秒以内（要件3.1）、ガチャ表示2秒以内（要件5.4）を計測（統合テスト）で確認する。
 
@@ -1385,6 +1418,6 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件16（今日の相棒の一言 Daily_Line） | `buildDailyLine`（domain。相棒 id/name＋暦日＋salt から決定的にセリフを選び名前差し込み・50文字保証・名前空でも非空、旧 `buildDailyMessage` を作り替え）/ `useDailyGacha`（相棒 id/name・today・salt を渡し `message` に反映）/ `DailyGachaView`（吹き出し風表示）/ フロー2 / 決定的選出アルゴリズム（`DailyPickSelector` と同じ FNV-1a 系ハッシュ思想）/ Property 23（決定性・非空・50文字以下）・Property 16（長さ）/ 外部送信なしはコード検査（要件16.5, 3.8）|
 | 要件17（試合ごとのリザルト表示と対戦の演出） | `RankingBattleView`（結果発表フェーズ・勝者ハイライト・「勝負！」「次へ」・優勝の紙吹雪風演出）/ `useRankingBattle`（`phase`・`resolveCurrentBattle`・`next`、既存 `advance`/`start`/`reset` は保持）/ フロー3 / `global.css` の keyframes＋トークン（`--transition-*` 200〜500ms、`prefers-reduced-motion` 短縮）/ UI 例示・スナップショット・CSS 検査（自動再生/効果音なし・44×44 px・横スクロールなし）。**イテレーション10で状況別実況（`deriveBattleSituation`/`narrate` 拡張）とお題（Battle_Theme）表示を非破壊追加** |
 | 要件18（勝ち上がりを可視化するトーナメント表 Tournament_Bracket。18.7 は接続線つき縦向きブラケット図） | `TournamentEngine`（`readonly bracket: TournamentBracket`・`advance` 時に match/不戦勝を記録、既存セマンティクス不変）/ `BracketMatch`・`TournamentBracket`・`ResolvedBracketMatch` 型 / `useRankingBattle`（`bracket` を Character 解決して公開）/ `TournamentBracketView`（読み取り専用可視化・320〜430 px 横スクロールなし・props（`matches`/`winnerHighlightId`）不変）/ トーナメント表記録アルゴリズム / Property 24（勝者妥当・ラウンド間引き継ぎ・頂点＝champion・advance 無矛盾）/ 外部送信なしはコード検査（要件18.6, 3.8）。**イテレーション10で `bracket` から準優勝・ベスト4 を導出（`deriveRanking`）して表示（読み取り専用・エンジン不変、Property 26）。イテレーション11で `TournamentBracketView` を接続線つき縦向きブラケット図へ表示強化（勝者を次ラウンドへ接続線で図示・横スクロールなし・トークン経由・reduced-motion 尊重。データ/ドメイン/エンジン不変で `global.css` の `.tournament-bracket*` と JSX/CSS のみ更新、要件18.7）。表示のみのため新規 Property は追加せず UI スモーク/例示で確認** |
-| 要件19（状況別の対戦実況） | `BattleCommentator.narrate`（省略可能な `situation` 引数を追加する後方互換拡張・状況別テンプレート群）/ `deriveBattleSituation`（domain・勝者/敗者 Favorite_Level 比較→favored/upset/even）/ `useRankingBattle`（状況導出して `narrate` へ渡す）/ `RankingBattleView`（状況別実況を描画）/ フロー3 / Property 25（分類妥当・非空・勝者名含む・rng 変動・勝率不変）。既存 Property 14 は拡張後も維持 |
+| 要件19（状況別の対戦実況。19.6 はお題観点ワードの織り込み） | `BattleCommentator.narrate`（省略可能な `situation` 引数を追加する後方互換拡張・状況別テンプレート群。**イテレーション12で末尾に省略可能な `aspect` を追加し観点ワード差し込み版テンプレートを追加、後方互換**）/ `deriveBattleSituation`（domain・勝者/敗者 Favorite_Level 比較→favored/upset/even）/ `getBattleThemeAspect`（domain・お題ラベル→観点ワード、未知ラベルは非空フォールバック、イテレーション12）/ `useRankingBattle`（状況導出して `narrate` へ渡す。**イテレーション12でお題 `theme` から観点ワードを導出し `narrate` へ `aspect` として渡す**）/ `RankingBattleView`（状況別・お題に沿った実況を描画）/ フロー3 / Property 25（分類妥当・非空・勝者名含む・rng 変動・勝率不変）・**Property 28（お題観点ワードの織り込み・getBattleThemeAspect 非空・aspect 反映・後方互換）**。既存 Property 14, 25 は拡張後も維持 |
 | 要件20（準優勝・ベスト4 の表示） | `deriveRanking`（domain・`bracket`＋championId→runnerUp/semifinalists）/ `RankingDerivation` 型 / `useRankingBattle`（`runnerUp: Character \| null`・`semifinalists: Character[]` を Character 解決して公開）/ `RankingBattleView`（優勝発表画面に準優勝・ベスト4 を表示、定義不能な順位は非表示）/ Property 26（決勝敗者＝runnerUp・準決勝敗者＝semifinalists・重複なし・小規模で null/空・読み取り専用）/ `TournamentEngine` は変更なし（既存 Property 24 保持） |
-| 要件21（対戦のお題 Battle_Theme） | `pickBattleTheme`（domain・rng でお題配列から1つ選ぶ純粋関数）/ `useRankingBattle`（`start` 時に選出し `theme: string` を公開）/ `RankingBattleView`（お題をトークン経由・横スクロールなしで表示）/ Property 27（非空・要素性・rng 変動）/ 外部送信なしはコード検査（要件21.3, 3.8） |
+| 要件21（対戦のお題 Battle_Theme。観点ワード Theme_Aspect を伴う） | `pickBattleTheme`（domain・rng でお題配列から1つ選ぶ純粋関数。**シグネチャ不変**）/ `getBattleThemeAspect`（domain・お題ラベル→観点ワード Theme_Aspect、既存8お題すべてに定義・未知ラベルは非空フォールバック、イテレーション12）/ `useRankingBattle`（`start` 時に選出し `theme: string` を公開。**イテレーション12で `theme` から観点ワードを導出して実況へ織り込む**）/ `RankingBattleView`（お題をトークン経由・横スクロールなしで表示）/ Property 27（非空・要素性・rng 変動）・**Property 28（観点ワードを織り込んだ実況）**/ 外部送信なしはコード検査（要件21.3, 19.6, 3.8） |

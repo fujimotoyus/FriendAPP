@@ -65,3 +65,43 @@ export function pickBattleTheme(rng: () => number): string {
  * お題が複数存在する（rng により変動しうる）ことを外部から確認する用途に用いる。
  */
 export const BATTLE_THEME_COUNT = BATTLE_THEMES.length;
+
+/**
+ * お題ラベル → 観点ワード（Theme_Aspect）の対応表（要件19.6, 21）。
+ *
+ * 各お題ラベルに、実況へ織り込むための短い観点ワードを対応づける。`getBattleThemeAspect`
+ * がこの表を引き、対応があればその観点ワードを返す。既存 8 お題すべてに定義する。
+ */
+const THEME_ASPECTS: Readonly<Record<string, string>> = {
+  かわいい選手権: 'かわいさ',
+  'たよれる度No.1決定戦': '頼れる度',
+  '今いちばん会いたい子は？': '会いたい度',
+  'キュンとくるのは誰だ！？': 'キュン度',
+  癒やしオーラ王者決定戦: '癒やし度',
+  いっしょにいたい子グランプリ: 'いっしょにいたい度',
+  ときめきトーナメント: 'ときめき度',
+  推し度ナンバーワン決定戦: '推し度',
+};
+
+/**
+ * 対応が未定義のお題ラベルに対して返す汎用フォールバックの観点ワード（非空）。
+ */
+const DEFAULT_THEME_ASPECT = '魅力';
+
+/**
+ * お題（Battle_Theme）ラベルから観点ワード（Theme_Aspect）を導出する純粋関数（要件19.6, 21）。
+ *
+ * 既存 8 お題ラベルには対応表で定義した観点ワードを返し、対応が未定義の任意のラベル
+ * （未知の文字列・空文字を含む）には汎用の非空フォールバック（`DEFAULT_THEME_ASPECT`）を
+ * 返す。**常に非空文字列を返す**。副作用なし・外部送信なし。
+ *
+ * この観点ワードは `BattleCommentator.narrate` の `aspect` 引数へ渡され、お題に沿った
+ * 実況文面（例「かわいさで {winner} が {loser} を圧倒！」）を生成するために使う。
+ *
+ * @param theme お題ラベル（`pickBattleTheme` の返り値など）
+ * @returns 観点ワード（非空文字列）
+ */
+export function getBattleThemeAspect(theme: string): string {
+  const aspect = THEME_ASPECTS[theme];
+  return aspect && aspect.length > 0 ? aspect : DEFAULT_THEME_ASPECT;
+}

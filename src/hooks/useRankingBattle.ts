@@ -51,7 +51,7 @@ import {
   type TournamentEngine,
 } from '../domain/TournamentEngine';
 import { narrate, deriveBattleSituation } from '../domain/BattleCommentator';
-import { pickBattleTheme } from '../domain/battleTheme';
+import { pickBattleTheme, getBattleThemeAspect } from '../domain/battleTheme';
 import type { CharacterStore } from '../persistence/CharacterStore';
 import { defaultCharacterStore } from '../persistence/defaultStore';
 
@@ -405,6 +405,7 @@ export function useRankingBattle(
           { winner: winnerName, loser: loserName },
           rng,
           situation,
+          getBattleThemeAspect(theme),
         );
         // BattleOutcome の winner/loser は id を保持する（design.md の定義に従う）。
         setCurrentCommentary({
@@ -418,7 +419,7 @@ export function useRankingBattle(
       syncBracket(engine);
       return true;
     },
-    [rng, syncFromEngine, syncBracket],
+    [rng, theme, syncFromEngine, syncBracket],
   );
 
   /**
