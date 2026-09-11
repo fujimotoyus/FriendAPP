@@ -46,10 +46,12 @@ import type {
 } from '../domain/types';
 import {
   createTournament,
+  deriveRanking,
   type Rng,
   type TournamentEngine,
 } from '../domain/TournamentEngine';
-import { narrate } from '../domain/BattleCommentator';
+import { narrate, deriveBattleSituation } from '../domain/BattleCommentator';
+import { pickBattleTheme } from '../domain/battleTheme';
 import type { CharacterStore } from '../persistence/CharacterStore';
 import { defaultCharacterStore } from '../persistence/defaultStore';
 
@@ -81,6 +83,23 @@ export interface UseRankingBattleResult {
   currentCommentary: BattleOutcome | null;
   /** 勝ち残り 1 件確定時の champion（Character）。未確定時は `null`。要件4.7 */
   champion: Character | null;
+  /**
+   * 準優勝の Character（champion 確定時に {@link deriveRanking} で導出、要件20.1, 20.2）。
+   * champion 未確定時・準優勝が導出できない（決勝が不戦勝等）場合は `null`。
+   * `start`/`reset` で `null` に初期化する。
+   */
+  runnerUp: Character | null;
+  /**
+   * ベスト4（準決勝敗退者）の Character 群（champion 確定時に {@link deriveRanking} で導出、要件20.3）。
+   * 準決勝ラウンドが無い小規模トーナメントや champion 未確定時は空配列。
+   * `start`/`reset` で空配列に初期化する。
+   */
+  semifinalists: Character[];
+  /**
+   * 今回の対戦のお題（Battle_Theme、要件21）。`start()` のたびに {@link pickBattleTheme} で
+   * 選び直すため毎回変わりうる（要件21.1, 21.2）。未開始・`reset()` 後は空文字。
+   */
+  theme: string;
   /** 対戦を開始できるか（Character が 2 件以上か）。要件4.8 */
   canStart: boolean;
   /**
@@ -203,6 +222,9 @@ export function useRankingBattle(
   const [currentCommentary, setCurrentCommentary] =
     useState<BattleOutcome | null>(null);
   const [champion, setChampion] = useState<Character | null>(null);
+  const [runnerUp, setRunnerUp] = useState<Character | null>(null);
+  const [semifinalists, setSemifinalists] = useState<Character[]>([]);
+  const [theme, setTheme] = useState<string>('');
   const [canStart, setCanStart] = useState<boolean>(false);
   const [phase, setPhase] = useState<BattlePhase>('pair');
   const [bracket, setBracket] = useState<ResolvedBracketMatch[]>([]);
@@ -246,8 +268,27 @@ export function useRankingBattle(
       const championId = engine.champion;
       if (championId == null) {
         setChampion(null);
+        // champion 未確定時は準優勝・ベスト4 も無い。
+        setRunnerUp(null);
+        setSemifinalists([]);
       } else {
         setChampion(charactersByIdRef.current.get(championId) ?? null);
+        // champion 確定時、bracket から準優勝・ベスト4 を導出して Character へ解決する（要件20）。
+        const { runnerUp: runnerUpId, semifinalists: semifinalistIds } =
+          deriveRanking(engine.bracket, championId);
+        setRunnerUp(
+          runnerUpId == null
+            ? null
+            : charactersByIdRef.current.get(runnerUpId) ?? null,
+        );
+        const resolvedSemifinalists: Character[] = [];
+        for (const id of semifinalistIds) {
+          const character = charactersByIdRef.current.get(id);
+          if (character != null) {
+            resolvedSemifinalists.push(character);
+          }
+        }
+        setSemifinalists(resolvedSemifinalists);
       }
     },
     [applyPairCharacters],
@@ -270,6 +311,9 @@ export function useRankingBattle(
       setCurrentPairCharacters(null);
       setCurrentCommentary(null);
       setChampion(null);
+      setRunnerUp(null);
+      setSemifinalists([]);
+      setTheme('');
       setCanStart(false);
       setPhase('pair');
       setBracket([]);
@@ -284,6 +328,9 @@ export function useRankingBattle(
       setCurrentPairCharacters(null);
       setCurrentCommentary(null);
       setChampion(null);
+      setRunnerUp(null);
+      setSemifinalists([]);
+      setTheme('');
       setCanStart(false);
       setPhase('pair');
       setBracket([]);
@@ -305,6 +352,11 @@ export function useRankingBattle(
     engineRef.current = engine;
     setCanStart(true);
     setCurrentCommentary(null);
+    // 開始のたびにお題を選び直す（毎回変わりうる。要件21.1, 21.2）。
+    setTheme(pickBattleTheme(rng));
+    // 準優勝・ベスト4 は champion 確定時に導出するため開始時は初期化する（要件20）。
+    setRunnerUp(null);
+    setSemifinalists([]);
     setPhase('pair');
     syncFromEngine(engine);
     syncBracket(engine);
@@ -337,9 +389,22 @@ export function useRankingBattle(
           result.loser,
           charactersByIdRef.current,
         );
+        // 勝者・敗者の Character を解決し、Favorite_Level から状況区分を導出して
+        // 状況別実況を出し分ける（要件19.1, 19.2, 19.3）。解決できない稀なケースは
+        // situation 省略（従来の汎用実況）にフォールバックする。勝敗判定には影響しない（要件19.4）。
+        const winnerCharacter = charactersByIdRef.current.get(result.winner);
+        const loserCharacter = charactersByIdRef.current.get(result.loser);
+        const situation =
+          winnerCharacter != null && loserCharacter != null
+            ? deriveBattleSituation(
+                winnerCharacter.favoriteLevel,
+                loserCharacter.favoriteLevel,
+              )
+            : undefined;
         const commentary = narrate(
           { winner: winnerName, loser: loserName },
           rng,
+          situation,
         );
         // BattleOutcome の winner/loser は id を保持する（design.md の定義に従う）。
         setCurrentCommentary({
@@ -434,6 +499,9 @@ export function useRankingBattle(
     setCurrentPairCharacters(null);
     setCurrentCommentary(null);
     setChampion(null);
+    setRunnerUp(null);
+    setSemifinalists([]);
+    setTheme('');
     setCanStart(false);
     setPhase('pair');
     setBracket([]);
@@ -444,6 +512,9 @@ export function useRankingBattle(
     currentPairCharacters,
     currentCommentary,
     champion,
+    runnerUp,
+    semifinalists,
+    theme,
     canStart,
     phase,
     bracket,

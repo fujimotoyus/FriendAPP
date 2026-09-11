@@ -25,6 +25,7 @@
 - **イテレーション7**: 一覧の並び替えに「出会った日の新しい順」を追加（Sort_Orderに 'metOn' を追加。Met_On降順・未設定は後方・タイブレークはcreatedAt降順→id昇順。既存データ・機能に破壊的変更なし）（要件11.1、要件11.7）
 - **イテレーション8**: 今日の相棒に一言（Daily_Gachaのメッセージを相棒キャラ本人のセリフ風の一言に置き換え、同一暦日・同一相棒・同一 salt 内で固定＝その日固定の決定的選出。要件5.2・5.5と整合）（要件5の改定と要件16）
 - **イテレーション9**: 対戦を魅せる（試合ごとのリザルト表示・勝者ハイライト/ペア入場アニメ・優勝演出・勝ち上がりを可視化するトーナメント表。自動再生/効果音なし。TournamentEngine を勝ち上がり履歴の公開のため拡張）（要件17・要件18、要件4と整合）
+- **イテレーション10**: 対戦をもっと楽しく（実況を状況別＝順当/番狂わせ/互角に拡充、優勝画面に準優勝・ベスト4を表示、対戦開始ごとにお題＝Battle_Theme をランダム表示。TournamentEngine の勝敗判定は不変）（要件19・要件20・要件21、要件4/17/18 と整合）
 
 ## Glossary
 
@@ -52,6 +53,8 @@
 - **Daily_Line（今日の一言）**: Daily_Gachaで選出された「今日の相棒」Characterに紐づけて表示する、当該相棒キャラ本人のセリフ風の短いメッセージ（最大50文字、Unicodeコードポイント数）。暦日（利用者の端末ローカルのCalendarDay）と当該相棒のid、および現在のsaltから決定的に選ばれ、同一暦日・同一相棒・同一saltでは再オープンしても同一の一言になる（要件5.2の「同一暦日は固定」の思想に整合する）。端末内で生成し、いかなる外部サーバーへも送信しない（要件3.8）
 - **Tournament_Bracket（トーナメント表）**: Ranking_Battleにおいて、全ラウンドの対戦ペアと各対戦の勝者・不戦勝（Bye）を勝ち上がり順に表す読み取り専用の構造。TournamentEngineが対戦の進行に応じて保持・公開し、RankingBattleViewが可視化する。表示（読み取り専用の可視化）のみに用い、対戦の判定結果やCharacter_Storeのデータを変更しない。いかなる外部サーバーへも送信しない（要件3.8）
 - **Battle_Result_Phase（試合結果発表フェーズ）**: Ranking_Battleにおいて、各対戦で勝者を演出（勝者ハイライト・Battle_Commentary）付きで発表し、利用者の「次へ」操作で次のBattle_Pairへ進む表示フェーズ。対戦は自動再生せず、利用者の操作でのみ進行する
+- **Battle_Theme（対戦のお題）**: Ranking_Battleを開始するたびにChara_Appがランダム要素を含めて1つ選ぶ短いテーマ文言（例「かわいい選手権」「たよれる度No.1決定戦」「今いちばん会いたい子は？」等）。対戦画面に表示し、Battle_Commentaryにも軽く反映しうる。端末内で選び、いかなる外部サーバーへも送信しない（要件3.8）。開始のたびに変わりうる（決定的固定ではない）
+- **Battle_Situation（対戦の状況区分）**: 各Battle_Pairの勝敗が決まったときに、勝者と敗者のFavorite_Levelの比較から導く区分。勝者のFavorite_Levelが敗者より高ければ `favored`（順当）、低ければ `upset`（番狂わせ）、両者が同値または比較不能であれば `even`（互角）とする。Battle_Commentaryの出し分けにのみ用い、勝敗の判定（要件4.2の自動判定・勝率50/50）には一切影響しない
 
 ## Requirements
 
@@ -327,3 +330,43 @@
 4. THE Chara_App SHALL Tournament_Bracketを表示（読み取り専用の可視化）のみに用い、対戦の判定結果およびCharacter_Storeのデータを変更しない
 5. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面でTournament_Bracketを表示する, THE Chara_App SHALL 横スクロールを発生させないレイアウト（大きい場合は縦積みまたは折り返し等）でTournament_Bracketを表示する（要件7.6、要件9.7と整合）
 6. THE Chara_App SHALL Tournament_Bracketを含む一切のデータをいかなる外部サーバーへも送信しない（要件3.8と整合）
+
+### 要件19: 状況別の対戦実況
+
+**ユーザーストーリー:** カップルとして、対戦の実況が順当勝ちか番狂わせかで変わってほしい。そうすることで、一戦ごとのドラマを二人でより楽しめる。
+
+本要件は要件4を破壊せず、Battle_Commentaryを状況（Battle_Situation）別に出し分ける非破壊拡張として整理する。要件4.2（rngによる自動判定・勝率は状況区分に依存しない）は維持する。
+
+#### 受け入れ基準
+
+1. WHEN あるBattle_Pairの勝敗が自動判定される, THE Chara_App SHALL 当該対戦の勝者と敗者のFavorite_LevelからBattle_Situation（favored・upset・even）を導出する
+2. WHEN Battle_Situationが導出される, THE Chara_App SHALL 当該Battle_Situationに応じたBattle_Commentaryを、実行のたびにランダムに変わる非空のテキストとして表示する（要件4.3、要件4.5と整合）
+3. THE Chara_App SHALL Battle_Commentaryに当該対戦の勝者を表す情報（勝者の名前またはニックネーム）を含める（要件4.3と整合）
+4. THE Chara_App SHALL Battle_Situationの導出をBattle_Commentaryの出し分けのみに用い、Battle_Pairの勝敗の自動判定（要件4.2）の結果および各Characterの勝率を変更しない
+5. WHERE 勝者と敗者のFavorite_Levelを比較できない、または両者が同値である場合, THE Chara_App SHALL Battle_Situationをeven（互角）として扱う
+
+### 要件20: 準優勝・ベスト4の表示
+
+**ユーザーストーリー:** カップルとして、優勝だけでなく準優勝やベスト4も知りたい。そうすることで、トーナメントの上位の顔ぶれを二人で振り返れる。
+
+本要件は要件18を破壊せず、Tournament_Bracketから上位順位を導出して優勝発表に表示する非破壊拡張として整理する。要件18.4（読み取り専用・データ不変）は維持する。
+
+#### 受け入れ基準
+
+1. WHEN 優勝が確定して優勝発表を表示する, THE Chara_App SHALL 優勝者に加えて準優勝（決勝＝最終ラウンドの対戦の敗者）を、Tournament_Bracketから導出して表示する
+2. WHERE 参加者数に応じてベスト4（準決勝＝最終ラウンドの1つ前のラウンドの各対戦の敗者）が定義できる場合, THE Chara_App SHALL 当該ベスト4をTournament_Bracketから導出して表示する
+3. IF 参加者が少なくベスト4または準優勝が定義できない場合, THEN THE Chara_App SHALL 定義できる分（存在する順位）のみを表示し、定義できない順位は表示しない
+4. THE Chara_App SHALL 準優勝・ベスト4の導出および表示を読み取り専用の可視化のみに用い、対戦の判定結果およびCharacter_Storeのデータを変更しない（要件18.4、要件4.7と整合）
+5. THE Chara_App SHALL 準優勝・ベスト4の各順位に、優勝者および相互に重複しない相異なるCharacterを表示する
+
+### 要件21: 対戦のお題（Battle_Theme）
+
+**ユーザーストーリー:** カップルとして、対戦ごとに「かわいい選手権」みたいなお題が出てほしい。そうすることで、毎回ちがう切り口でトーナメントを二人で盛り上がれる。
+
+#### 受け入れ基準
+
+1. WHEN 利用者がRanking_Battleを開始する, THE Chara_App SHALL Battle_Themeをランダム要素を含めて1つ選び、対戦画面に表示する
+2. WHEN 同一の利用者がRanking_Battleを複数回開始する, THE Chara_App SHALL 開始のたびにBattle_Themeが変わりうる結果を生成する（決定的な固定を行わない）
+3. THE Chara_App SHALL Battle_Themeを端末内で選び、いかなる外部サーバーへも送信しない（要件3.8と整合）
+4. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面でBattle_Themeを表示する, THE Chara_App SHALL 横スクロールを発生させないレイアウトでBattle_Themeを表示する（要件7.6、要件9.7と整合）
+5. THE Chara_App SHALL Battle_Themeの表示を大人かわいいテーマ（Adult_Cute_Theme）の配色・角丸・テーマトークンに整合した外観で適用する（要件9と整合）

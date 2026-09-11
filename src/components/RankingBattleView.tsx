@@ -20,7 +20,12 @@
  * 操作要素は最小 44×44 CSS px（{@link PastelButton}）・横スクロールなしを維持する（要件17.10, 17.11）。
  * 進行状態は非永続のため、画面を離れて戻る（再マウント）と初期化される（要件4.9）。
  *
- * Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.9, 4.7, 9.4
+ * イテレーション10の追加表示（ロジックは持たず hook の値を描画するのみ）:
+ * - お題バッジ（`theme`, `ranking-battle__theme`）: 対戦中にヘッダー直下へ表示（要件21.1）。
+ * - 準優勝（`runnerUp`, `ranking-battle__runner-up`）・ベスト4（`semifinalists`,
+ *   `ranking-battle__semifinalists`）: champion 発表内に表示。null/空なら非表示（要件20.1〜20.3）。
+ *
+ * Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.9, 4.7, 9.4, 20.1, 20.2, 20.3, 21.1, 21.4, 21.5
  */
 import { useEffect, useState } from 'react';
 import type { Character } from '../domain/types';
@@ -91,6 +96,11 @@ export function RankingBattleView({
     currentPairCharacters,
     currentCommentary,
     champion,
+    // 準優勝・ベスト4（champion 確定時のみ。定義できない小規模トーナメントは null/空。要件20）。
+    runnerUp,
+    semifinalists,
+    // 今回のお題（start のたびに変わる。未開始/reset 後は空文字。要件21）。
+    theme,
     canStart,
     phase,
     // 勝ち上がり（id を Character へ解決済み）。TournamentBracketView で可視化する（要件18.1）。
@@ -138,6 +148,14 @@ export function RankingBattleView({
         </PastelButton>
         <h1>ランキング対戦</h1>
       </header>
+
+      {/* お題バッジ（Battle_Theme、要件21.1）: 対戦が始まっており theme が非空のときのみ表示する。
+          theme は hook が start のたびに選ぶため毎回変わりうる。ロジックは持たず値を描画するのみ。 */}
+      {battleStarted && theme.length > 0 ? (
+        <p className="ranking-battle__theme" aria-label={`お題: ${theme}`}>
+          お題: {theme}
+        </p>
+      ) : null}
 
       {/* 2 件未満: 対戦を開始せず、2 件以上の登録が必要である旨と登録導線を表示する（要件4.8）。
           hasAttempted=true（start 完了後）かつ canStart=false のときにのみ確定表示する。 */}
@@ -290,6 +308,30 @@ export function RankingBattleView({
           <h2 className="ranking-battle__champion-name">
             {displayNameOf(champion)}
           </h2>
+
+          {/* 準優勝（要件20.1, 20.2）: 決勝の敗者。null（決勝が不戦勝等で定義できない）なら非表示（要件20.3）。 */}
+          {runnerUp != null ? (
+            <p className="ranking-battle__runner-up">
+              準優勝: {displayNameOf(runnerUp)}
+            </p>
+          ) : null}
+
+          {/* ベスト4（要件20.3）: 準決勝敗退者。準決勝ラウンドが無い小規模トーナメントは空で非表示。
+              複数名は折り返して収める（CSS の flex-wrap）。各要素は displayNameOf で名前解決。 */}
+          {semifinalists.length > 0 ? (
+            <p className="ranking-battle__semifinalists">
+              <span className="ranking-battle__semifinalists-label">ベスト4:</span>
+              {semifinalists.map((character) => (
+                <span
+                  key={character.id}
+                  className="ranking-battle__semifinalist"
+                >
+                  {displayNameOf(character)}
+                </span>
+              ))}
+            </p>
+          ) : null}
+
           <PastelButton onClick={handleRestart}>もう一度対戦 🔄</PastelButton>
         </section>
       ) : null}

@@ -179,6 +179,23 @@ export interface BracketMatch {
 export type TournamentBracket = BracketMatch[];
 
 /**
+ * 対戦の状況区分（Battle_Situation、要件19）。
+ *
+ * 各 Battle_Pair の勝敗が決まったときに、勝者と敗者の Favorite_Level の比較から導く
+ * （{@link ../domain/BattleCommentator.deriveBattleSituation}）区分。
+ *
+ * - `'favored'`: 勝者の Favorite_Level が敗者より高い（順当勝ち）
+ * - `'upset'`  : 勝者の Favorite_Level が敗者より低い（番狂わせ）
+ * - `'even'`   : 両者が同値、または比較不能（NaN/非有限など）（互角）
+ *
+ * Battle_Commentary（実況テキスト）の出し分けにのみ用い、勝敗の自動判定（要件4.2 の
+ * rng による 50/50）や各 Character の勝率には一切影響しない（要件19.4）。
+ *
+ * 参照: design.md「Data Models」「イテレーション10」、要件19.1, 19.5、Correctness Property 25
+ */
+export type BattleSituation = 'favored' | 'upset' | 'even';
+
+/**
  * 表示用に id を Character へ解決した bracket の match（hooks / UI で使用、要件18 の可視化用）。
  *
  * TournamentEngine が公開する id ベースの {@link BracketMatch} を、`useRankingBattle` が

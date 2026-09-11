@@ -483,12 +483,67 @@
 - [ ] 46. Iteration 9 チェックポイント（対戦を魅せる）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [ ] 47. ドメイン: BattleCommentator を状況別（Battle_Situation）に拡張する（要件19, 4.3, 4.5）
+  - `src/domain/types.ts` に `type BattleSituation = 'favored' | 'upset' | 'even'` を追加する（既存の型は破壊せず追記。design.md「Data Models」）
+  - `src/domain/BattleCommentator.ts` の `narrate` を `narrate(pair: { winner: string; loser: string }, rng: () => number, situation?: BattleSituation): string` へ拡張する。状況別（favored/upset/even）の実況テンプレート群を持ち、`situation` が渡されたら当該状況のテンプレート集から rng で 1 つ選ぶ。`situation` 省略時は従来相当の汎用テンプレートを用いる（**後方互換**：既存呼び出し `narrate(pair, rng)` が壊れないこと）。各状況にテンプレートは複数存在し、いずれの状況でも非空で勝者名を含む文字列を返す（既存 Property 14 を維持、要件19.2, 19.3）。純粋関数・rng 外部注入・副作用なしを維持する
+  - _Requirements: 19.1, 19.2, 19.3, 4.3, 4.5_
+
+- [ ] 48. ドメイン: deriveBattleSituation を実装する（要件19.1, 19.5）
+  - `src/domain/BattleCommentator.ts`（または `src/domain` の適所）に `deriveBattleSituation(winnerFavoriteLevel: number, loserFavoriteLevel: number): BattleSituation` を実装する。`winner > loser` → `'favored'`、`winner < loser` → `'upset'`、等値または比較不能（非数値等）→ `'even'` を返す純粋関数。勝敗判定には影響しない（要件19.4）
+  - _Requirements: 19.1, 19.5_
+
+- [ ] 49. ドメイン: deriveRanking（準優勝・ベスト4 導出）を実装する（要件20）
+  - `src/domain/TournamentEngine.ts`（または `src/domain` の適所）に `deriveRanking(bracket: TournamentBracket, championId: string): { runnerUp: string | null; semifinalists: string[] }` を実装する。準優勝 = `championId` が勝者として現れる最終ラウンドの対戦（決勝）の敗者（存在しなければ `null`）、ベスト4 = 最終ラウンドの1つ前のラウンド（準決勝）の各対戦の敗者集合（不戦勝の match は敗者なし、定義できない小規模トーナメントは空配列）。`runnerUp`・`semifinalists` の各要素は `championId` と異なり相互に重複しない（要件20.5）。`bracket` を変更しない純粋関数とする（要件20.4）。`TournamentEngine` の勝敗判定・既存セマンティクスは一切変更しない
+  - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
+
+- [ ] 50. ドメイン: pickBattleTheme（お題選択）を実装する（要件21）
+  - `src/domain` に `pickBattleTheme(rng: () => number): string` を実装する。お題テンプレート配列（例「かわいい選手権」「たよれる度No.1決定戦」「今いちばん会いたい子は？」等の短い文言、複数）を持ち、rng で 1 つ選んで返す純粋関数。常に非空文字列（お題配列の要素）を返す。毎回ランダム（決定的固定はしない、要件21.2）。`Math.random()` は使用せず rng を外部注入し、外部送信も行わない（要件21.3, 3.8）
+  - _Requirements: 21.1, 21.2, 21.3_
+
+  - [ ]* 50.1 状況別実況の妥当性のプロパティテスト
+    - **Property 25: 状況別実況は妥当で状況を反映しつつ勝率に影響しない**（任意の勝者/敗者名・rng・`situation`（favored/upset/even/省略）について、`deriveBattleSituation` が Favorite_Level 比較で状況を正しく分類し、`narrate` は非空で勝者名を含む文字列を返し、各状況にテンプレートが複数存在し rng で変動しうる。`situation` は実況選択のみに用い勝敗判定に影響しない）
+    - **Validates: Requirements 19, 4.3, 4.5**
+    - `// Feature: chara-collection, Property 25` タグ・`numRuns: 100`。対象 `deriveBattleSituation` / `BattleCommentator.narrate`（rng 注入）。既存 `BattleCommentator` の Property 14 テストは不変で保持する
+
+  - [ ]* 50.2 準優勝・ベスト4 導出の bracket 整合のプロパティテスト
+    - **Property 26: 準優勝・ベスト4 の導出は bracket と整合する**（2 件以上の id 集合・任意の rng シード列で champion 確定まで進めた bracket と championId について、`deriveRanking` の `runnerUp` は決勝＝最終ラウンドの敗者（存在すれば）に一致し、`semifinalists` は準決勝＝最終ラウンドの1つ前のラウンドの敗者集合に一致し、いずれも champion と相異なり重複しない。小規模で定義できない順位は `null`/空。`bracket` を変更しない）
+    - **Validates: Requirements 20, 18.4, 4.7**
+    - `// Feature: chara-collection, Property 26` タグ・`numRuns: 100`。対象 `deriveRanking`（rng 注入で進めた `TournamentEngine.bracket`）。生成器は 2/3 件など小規模・偶数/奇数・不戦勝を含める。既存 Property 24 のテストは不変で保持する
+
+  - [ ]* 50.3 お題選択の非空・要素性・変動のプロパティテスト
+    - **Property 27: 対戦のお題は非空でお題集合の要素であり rng で変動しうる**（任意の rng について `pickBattleTheme` は非空文字列（お題集合の要素）を返し、rng を変えると複数の異なるお題が生じうる）
+    - **Validates: Requirements 21**
+    - `// Feature: chara-collection, Property 27` タグ・`numRuns: 100`。対象 `pickBattleTheme`（rng 注入）
+
+- [ ] 51. Hook: useRankingBattle にお題・状況別実況・準優勝/ベスト4 を追加する（要件19, 20, 21）
+  - `src/hooks/useRankingBattle.ts` に `theme: string` を追加し、`start()` 時に `pickBattleTheme(rng)` でお題を選んで公開する（毎回変わりうる、既存の `start` セマンティクスは不変。要件21.1, 21.2）
+  - `resolveCurrentBattle()`（および既存 `advance` の実況生成）で、`engine.lastResult` の勝者・敗者を Character へ解決し、`deriveBattleSituation(winner.favoriteLevel, loser.favoriteLevel)` で状況を導出して `BattleCommentator.narrate(names, rng, situation)` へ渡し `currentCommentary` に反映する（要件19.1, 19.2, 19.3）。勝敗判定は不変（要件19.4）
+  - `engine.champion` 確定時に `deriveRanking(engine.bracket, championId)` を計算し、得られた id を `fetchAll` 済みの Character へ解決した `runnerUp: Character | null`・`semifinalists: Character[]` を公開する（定義不能な順位は `null`/空、要件20.1, 20.2, 20.3, 20.4）
+  - 既存の戻り値・セマンティクス（`start`/`advance`/`resolveCurrentBattle`/`next`/`reset`/`canStart`/`champion`/`currentPair`/`currentCommentary`/`phase`/`bracket`）は保持し、追加のみとする
+  - _Requirements: 19.1, 19.2, 19.3, 20.1, 20.2, 20.3, 20.4, 21.1, 21.2_
+
+- [ ] 52. UI: RankingBattleView にお題表示・準優勝/ベスト4 表示を追加する（要件20, 21, 9）
+  - `src/components/RankingBattleView.tsx` に `useRankingBattle` の `theme` を対戦画面上部等に表示する（お題バッジ、要件21.1）。表示はトークン経由（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）で適用し、横スクロールなし・44×44 CSS px・rem 追従を維持する（要件21.4, 21.5, 9）
+  - `phase === 'champion'` の優勝発表画面に、`runnerUp`（準優勝、`null` なら非表示）と `semifinalists`（ベスト4、空なら非表示）を追加表示する（要件20.1, 20.2, 20.3）。表示はトークン経由・横スクロールなし・44×44 CSS px を維持する（要件9）。状況別実況は hook から受け取った `currentCommentary` を描画するのみとする（本コンポーネントは状況導出ロジックを持たない、要件19.2）
+  - _Requirements: 20.1, 20.2, 20.3, 21.1, 21.4, 21.5, 9.1, 9.2, 9.6, 9.7_
+
+- [ ] 53. CSS: お題バッジ・準優勝/ベスト4 表示のスタイルをトークン経由で追加する（要件21, 20, 9）
+  - `src/styles/global.css`（または該当 CSS）に、お題バッジ（Battle_Theme）と準優勝・ベスト4 表示のスタイルを、大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で追加する。横スクロールなし・44×44 CSS px・rem 追従を維持し、既存トークンの `prefers-reduced-motion` 対応に整合させる（要件21.5, 20, 9.1, 9.2, 9.6, 9.7）
+  - _Requirements: 21.5, 20.1, 9.1, 9.2, 9.6, 9.7_
+
+  - [ ]* 53.1 お題表示・準優勝/ベスト4 表示のユニットテスト
+    - 対戦画面にお題（Battle_Theme）が表示されること（要件21.1）、`start` を複数回呼ぶとお題が変わりうること（複数テンプレートの存在を例示で確認、要件21.2）、優勝発表画面（`phase === 'champion'`）に準優勝が表示され、参加者数に応じてベスト4 が表示されること、参加者が少なく定義できない順位が表示されないこと（要件20.1, 20.2, 20.3）を例示テスト（React Testing Library）で検証する。状況別実況が状況（favored/upset/even）に応じて出し分けられること（rng を固定/シードして決定的に確認、要件19.2）も併せて検証する
+    - _Requirements: 19.2, 20.1, 20.2, 20.3, 21.1, 21.2_
+
+- [ ] 54. Iteration 10 チェックポイント（対戦をもっと楽しく）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜24）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜27）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -526,7 +581,12 @@
     { "id": 26, "tasks": ["41.1", "42"] },
     { "id": 27, "tasks": ["43"] },
     { "id": 28, "tasks": ["44"] },
-    { "id": 29, "tasks": ["45.1"] }
+    { "id": 29, "tasks": ["45.1"] },
+    { "id": 30, "tasks": ["47", "48", "49", "50"] },
+    { "id": 31, "tasks": ["50.1", "50.2", "50.3", "51"] },
+    { "id": 32, "tasks": ["52"] },
+    { "id": 33, "tasks": ["53"] },
+    { "id": 34, "tasks": ["53.1"] }
   ]
 }
 ```

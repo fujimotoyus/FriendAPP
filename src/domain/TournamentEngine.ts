@@ -32,6 +32,79 @@
 import type { BattlePair, BracketMatch, TournamentBracket } from './types';
 
 /**
+ * 確定済みの {@link TournamentBracket} と champion（優勝者）id から、
+ * 準優勝（runnerUp）とベスト4（semifinalists）を導出する純粋関数（要件20）。
+ *
+ * 導出規則（design.md「イテレーション10」）:
+ * - **決勝ラウンド**: champion が「勝者」として現れる match のうち、最大の `round`。
+ *   （最終 round に不戦勝しか無いケースを避けるため、最終 round ではなく「champion が
+ *   勝者として現れる round の最大」を決勝ラウンドとみなす。）
+ * - **準優勝(runnerUp)**: 決勝の match（`bye: false`）の敗者（left/right のうち winner でない側）。
+ *   決勝が不戦勝（`right === null`）または該当 match が無い場合は `null`。
+ * - **ベスト4(semifinalists)**: 決勝ラウンドの 1 つ前のラウンド（準決勝）の各 match の敗者集合。
+ *   不戦勝 match は敗者が無いため含めない。準決勝ラウンドが存在しない小規模トーナメント
+ *   （参加者 2〜3 件など）では空配列。
+ * - `runnerUp`・`semifinalists` の各要素は `championId` と異なり相互に重複しない（要件20.5）。
+ *   通常は bracket 構造上自然に満たすが、念のため champion と一致するものは除外し、
+ *   semifinalists は重複を除去する。
+ *
+ * `bracket` は変更しない（読み取り専用、要件20.4, 18.4）。`createTournament` の既存実装・
+ * セマンティクスには一切影響しない（関数追加のみ）。
+ *
+ * @param bracket 確定済みのトーナメント表（{@link TournamentBracket}）
+ * @param championId 優勝者の Character id
+ * @returns 準優勝 id（無ければ `null`）とベスト4 id 群（無ければ空配列）
+ */
+export function deriveRanking(
+  bracket: TournamentBracket,
+  championId: string,
+): { runnerUp: string | null; semifinalists: string[] } {
+  // champion が「勝者」として現れる match のうち最大 round を決勝ラウンドとみなす。
+  let finalRound = -1;
+  for (const m of bracket) {
+    if (m.winner === championId && m.round > finalRound) {
+      finalRound = m.round;
+    }
+  }
+  // champion が勝者として現れる match が無い（不整合な入力）場合は導出不能。
+  if (finalRound < 0) {
+    return { runnerUp: null, semifinalists: [] };
+  }
+
+  // 決勝: 決勝ラウンドで champion が勝者の match。通常はちょうど 1 件。
+  const finalMatch = bracket.find(
+    (m) => m.round === finalRound && m.winner === championId,
+  );
+  let runnerUp: string | null = null;
+  if (finalMatch && !finalMatch.bye && finalMatch.right !== null) {
+    // 敗者 = left/right のうち winner でない側。
+    const loser = finalMatch.left === finalMatch.winner ? finalMatch.right : finalMatch.left;
+    if (loser !== championId) {
+      runnerUp = loser;
+    }
+  }
+
+  // 準決勝 = 決勝ラウンドの 1 つ前のラウンド。存在しなければベスト4 は空。
+  const semiRound = finalRound - 1;
+  const semifinalists: string[] = [];
+  if (semiRound >= 0) {
+    const seen = new Set<string>();
+    for (const m of bracket) {
+      if (m.round !== semiRound) continue;
+      // 不戦勝は敗者が無いため対象外。
+      if (m.bye || m.right === null || m.winner === null) continue;
+      const loser = m.left === m.winner ? m.right : m.left;
+      // champion と一致するものは除外し、重複も除去する（要件20.5）。
+      if (loser === championId || loser === runnerUp || seen.has(loser)) continue;
+      seen.add(loser);
+      semifinalists.push(loser);
+    }
+  }
+
+  return { runnerUp, semifinalists };
+}
+
+/**
  * トーナメントエンジンの公開インターフェース。
  *
  * 勝者は rng を用いてアプリが自動判定するため、利用者による勝敗選択
