@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CalendarDay, Character } from '../domain/types';
 import { pick } from '../domain/DailyPickSelector';
-import { buildDailyMessage } from '../domain/dailyMessage';
+import { buildDailyLine } from '../domain/dailyMessage';
 import type { CharacterStore } from '../persistence/CharacterStore';
 import { defaultCharacterStore } from '../persistence/defaultStore';
 
@@ -170,8 +170,8 @@ export function useDailyGacha(
    *
    * ストアから全 Character を取得し、id 集合と当日暦日・salt から {@link pick} で
    * 決定的に 1 件を選ぶ。0 件時は `needsRegistration` 状態にする（要件5.6）。
-   * 選出した id を Character へ解決し（写真・名前表示用）、{@link buildDailyMessage} で
-   * メッセージを生成する。
+   * 選出した id を Character へ解決し（写真・名前表示用）、{@link buildDailyLine} で
+   * 相棒本人のセリフ風の一言（Daily_Line）を当日暦日・salt から決定的に生成する（要件16.1, 16.2）。
    *
    * @param today 当日暦日
    * @param salt 用いる salt
@@ -211,7 +211,7 @@ export function useDailyGacha(
       }
 
       setPartner(selected);
-      setMessage(buildDailyMessage(selected.name));
+      setMessage(buildDailyLine({ id: selected.id, name: selected.name }, today, salt));
       setState('loaded');
     },
     [store],

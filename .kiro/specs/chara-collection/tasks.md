@@ -15,6 +15,7 @@
 - **イテレーション5**: 見た目と使い勝手の底上げ（大人かわいいテーマ・ニックネーム優先表示・並び替え・お気に入り度の視覚強調・共通ナビゲーションバー）（要件9, 10, 11, 12, 13）
 - **イテレーション6**: 登録項目の拡張（任意の「出会った日」＝ Met_On を詳細でのみ表示、パステルプリセットから選ぶ「イメージカラー」＝ Image_Color をカードと詳細の写真枠の縁取りへ反映。旧データは既定値で補完し後方互換を維持）（要件14, 15）
 - **イテレーション7**: 一覧の並び替えに「出会った日の新しい順」を追加（Sort_Order に 'metOn' を追加。Met_On 降順・未設定は後方・タイブレークは createdAt 降順→id 昇順。既存データ・機能に破壊的変更なし）（要件11.1, 11.7）
+- **イテレーション8**: 今日の相棒に一言（Daily_Gacha のメッセージを相棒キャラ本人のセリフ風の一言＝Daily_Line に置き換え。暦日＋相棒 id＋salt から決定的に選ぶその日固定の選出。50文字保証・名前空でも成立・外部送信なし。既存 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替え）（要件5 の改定と要件16）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -280,7 +281,7 @@
   - 主要コンポーネント（`PastelButton`・カード・写真枠・入力欄・各画面）が色/角丸/影/余白/トランジションをトークン経由で参照するよう `global.css` と各コンポーネントのクラスを整える。同一種別要素で角丸/影/余白が一致することを担保する。rem タイポグラフィ・44×44 CSS px・320〜430 px 横スクロールなしを維持する（要件9.3, 9.6, 9.7 / 7.6, 7.7, 7.8）
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
 
-- [ ] 21. 一覧の並び替え（要件11）
+- [x] 21. 一覧の並び替え（要件11）
   - [x] 21.1 ドメイン純粋関数 `sortCharacters` を実装する
     - `src/domain/types.ts` に `type SortOrder = 'newest' | 'favorite' | 'name'` を追加する
     - `src/domain/sortCharacters.ts` に `sortCharacters(characters: readonly Character[], order: SortOrder): Character[]` を実装する。元配列を変更せず新配列を返す。タイブレーク: `newest` = `createdAt` 降順 → `id` 昇順 / `favorite` = `favoriteLevel` 降順 → `createdAt` 降順 → `id` 昇順 / `name` = 名前の Unicode コードポイント順昇順（空名は後方）→ `id` 昇順。決定的順序とする
@@ -296,7 +297,7 @@
     - `CollectionView` に大人かわいいテーマ準拠の並び順選択 UI（3 種、各 44×44 CSS px、横スクロールなし）を追加する（要件11.1）
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
 
-- [ ] 22. 一覧でのニックネーム優先表示（要件10）
+- [x] 22. 一覧でのニックネーム優先表示（要件10）
   - [x] 22.1 表示モデル導出 `deriveCardDisplay` を実装し `CharacterCard` に適用する
     - `src/domain` に `deriveCardDisplay(character): { primary: string; secondary?: string }` を実装する。ニックネーム非空（空白のみ除く）→ `primary` = ニックネーム、（名前非空なら）`secondary` = 名前 / ニックネーム空かつ名前非空 → `primary` = 名前 / 両方空 → `primary` = 「名前未設定」
     - `CharacterCard` を `deriveCardDisplay` ベースに更新し、主表示を先頭かつ副表示より大きい文字サイズ、副表示を補助表示にする（要件10.4）。詳細画面（`CharacterDetailView`）の表示順は変更しない
@@ -307,7 +308,7 @@
     - **Validates: Requirements 10.1, 10.2, 10.3**
     - `// Feature: chara-collection, Property 18` タグ・`numRuns: 100`。対象 `deriveCardDisplay`
 
-- [ ] 23. お気に入り度の視覚的強調（要件12）
+- [x] 23. お気に入り度の視覚的強調（要件12）
   - [x] 23.1 表示モデル導出 `deriveFavoriteLevelDisplay` と `FavoriteLevelDisplay` を実装する
     - `src/domain` に `deriveFavoriteLevelDisplay(favoriteLevel: number): { filled: number; total: 5; textEquivalent: string }` を実装する。1〜5 整数 → `filled = level`、範囲外/未設定/非整数 → `filled = 0`、`total` 常に 5、`textEquivalent = `5段階中${filled}``
     - `src/components/FavoriteLevelDisplay.tsx`（表示専用）を実装する。塗り記号 `filled` 個＋未塗りで合計 5 個、色/記号のみに依存しないよう `aria-label` 等で「5段階中N」を提供する。`CharacterCard` と `CharacterDetailView` に配置する（要件12.1, 12.2, 12.3, 12.4）
@@ -318,7 +319,7 @@
     - **Validates: Requirements 12.1, 12.3, 12.4**
     - `// Feature: chara-collection, Property 19` タグ・`numRuns: 100`。対象 `deriveFavoriteLevelDisplay`
 
-- [ ] 24. 共通ナビゲーションバー（要件13）
+- [x] 24. 共通ナビゲーションバー（要件13）
   - [x] 24.1 `NavigationBar` を実装し App に配線する
     - `src/components/NavigationBar.tsx`（下部固定タブ 4 項目「図鑑/今日の相棒/トーナメント/新規登録」、アクティブタブ表示、各 44×44 CSS px、320〜430 px 横スクロールなし、大人かわいいテーマ整合）を実装する
     - `App.tsx` を更新する: `NavigationBar` を `view` が `'list'`/`'gacha'`/`'battle'` のときのみ表示し、`'detail'`/`'add'` では非表示にする（要件13.6, 13.7）。各タブは `goToList`/`goToGacha`/`goToBattle`/`goToAdd`（`goToAdd` は編集状態を引き継がない新規）に対応させる。アクティブタブは現在の `view` から導出する
@@ -421,12 +422,34 @@
     - CollectionView の並び順選択に 名前/お気に入り/出会った日 の3ボタンが左からこの順で存在し新しい順が無いこと、初期状態で名前が選択状態(aria-pressed=true)であること、useCollection の初期 sortOrder が name であることを検証する（要件11.1, 11.2）
     - _Requirements: 2.1, 11.1, 11.2_
 
+- [ ] 37. 今日の相棒の一言（Daily_Line）の決定的セリフ選択（要件16, 5.5）
+  - [ ] 37.1 ドメイン `buildDailyLine` を実装し `buildDailyMessage` を置換/内部委譲する
+    - `src/domain/dailyMessage.ts` に `buildDailyLine(input: { id: string; name: string }, day: CalendarDay, salt: number): string` を実装する。複数のセリフ風テンプレート集（相棒本人の一言として表現する文。名前差し込み用と名前なし用の双方を含む）を持ち、`DailyPickSelector` と同じ FNV-1a 系の決定的ハッシュ（`day` の year/month/day＋相棒 `id`＋`salt` を連結した文字列をハッシュ）でテンプレートを 1 つ選び、名前を差し込む。同一の `{ id, day, salt }` では常に同一の一言を返す（決定的、要件16.2）。名前が空（空文字・空白のみ）のときは名前を差し込まないテンプレートを用い、空でない一言を返す（要件16.6）。長さは常に最大50文字（Unicode コードポイント数、`MAX_MESSAGE_LENGTH`）以下を保証する（要件16.4, 5.5）。`Math.random()` は使用せず外部送信も行わない純粋関数とする（要件16.5, 3.8）
+    - 既存 `buildDailyMessage(name)` は `buildDailyLine` へ作り替える（または `buildDailyLine` へ内部委譲する形で置換し、呼び出し側 `useDailyGacha` を新シグネチャへ差し替える）。既存の 50文字切り詰めユーティリティ（`codePointLength` / `truncateToCodePoints` / `MAX_MESSAGE_LENGTH`）は再利用する
+    - _Requirements: 16.1, 16.2, 16.4, 16.6, 5.5_
+
+  - [ ]* 37.2 今日の一言の決定的・非空・50文字以下のプロパティテスト
+    - **Property 23: 今日の一言は決定的・要素妥当・50文字以下**（任意の相棒 `{ id, name }`（名前は空/空白/絵文字/長文を含む）・固定 `CalendarDay`・固定 salt に対し、`buildDailyLine` は (a) 何度呼んでも同一文字列＝決定的、(b) 長さ50コードポイント以下、(c) 空でない文字列を返す）
+    - **Validates: Requirements 5.5, 16.1, 16.2, 16.4, 16.6**
+    - `// Feature: chara-collection, Property 23` タグ・`numRuns: 100`。対象 `buildDailyLine`。既存 `dailyMessage.test.ts`（Property 16）は 50文字以下の検証を維持する（対象は `buildDailyLine`）
+
+- [ ] 38. useDailyGacha を新関数シグネチャへ更新する（要件16, 5.2, 5.3）
+  - `src/hooks/useDailyGacha.ts` の `selectWithSalt` 内で、`pick` により相棒を確定した後、その相棒の `id` と `name`・当日暦日（`today`）・現在の `salt` を `buildDailyLine({ id, name }, today, salt)` へ渡して `message` に反映する（従来の `buildDailyMessage(selected.name)` からの差し替え）。`loadToday`（同一暦日固定）・`reroll`（salt +1 再計算）の双方でこの一言が決定的に固定/更新される（要件16.2, 16.3, 5.2, 5.3）。既存の salt 管理・0件ガード・エラー処理は不変とする
+  - _Requirements: 16.1, 16.2, 16.3, 5.2, 5.3_
+
+- [ ] 39. UI: DailyGachaView のメッセージ表示を吹き出し風セリフに更新する（要件16.1, 要件9）
+  - `src/components/DailyGachaView.tsx` の `message` 表示（`.daily-gacha__message`）を、相棒キャラ本人のセリフ風の一言として**吹き出し風**に表示するよう更新する（要件16.1）。見た目（背景・角丸・影・余白・吹き出しの尻尾等）は `src/styles/global.css`（または該当 CSS）で大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で適用し、最小 44×44 CSS px・横スクロールなし・rem 追従を維持する（要件9.1, 9.2, 9.6, 9.7）。本コンポーネントはロジックを持たず、hook から受け取った `message` を描画するのみとする
+  - _Requirements: 16.1, 9.1, 9.2, 9.6, 9.7_
+
+- [ ] 40. Iteration 8 チェックポイント（今日の相棒に一言）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜22）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜23）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -456,7 +479,10 @@
     { "id": 18, "tasks": ["27.3", "27.4", "28", "29", "32.1"] },
     { "id": 19, "tasks": ["29.1", "30", "32.2"] },
     { "id": 20, "tasks": ["31"] },
-    { "id": 21, "tasks": ["32.3"] }
+    { "id": 21, "tasks": ["32.3", "34", "36"] },
+    { "id": 22, "tasks": ["34.1", "36.1", "37.1"] },
+    { "id": 23, "tasks": ["37.2", "38"] },
+    { "id": 24, "tasks": ["39"] }
   ]
 }
 ```

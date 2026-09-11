@@ -27,6 +27,15 @@
 - **UI 反映**: `RegistrationForm` に「出会った日」（`<input type="date">`・任意）と「イメージカラー」（なし＋5色の6択）の入力 UI を追加し、`CharacterCard`・`CharacterDetailView` は `imageColor` に応じた縁取りをトークン経由で適用する。`CharacterDetailView` は `metOn` 設定時のみ「YYYY年M月D日」で表示する。`Collection_View`・`Daily_Gacha`・`Ranking_Battle` には `metOn` を表示しない（要件14.7, 14.8）。
 - **不変の制約の維持**: `metOn`・`imageColor` を含む一切のデータを外部サーバーへ送信しない（要件3.8, 14.12, 15.11）。縁取りは大人かわいいテーマのトークン経由で適用し、角丸・横スクロールなし・44×44 CSS px タッチ領域を維持する（要件15.9, 15.10）。
 
+### イテレーション8（今日の相棒に一言、要件16）
+
+イテレーション8では、今日の一枚ガチャ（Daily_Gacha）で選出された「今日の相棒」に併記する短いメッセージを、**相棒キャラ本人のセリフ風の一言（Daily_Line）** に置き換える。既存機能への**破壊的でない拡張**として設計し、要点は次のとおり。
+
+- **既存メッセージの置き換え（別枠追加ではない）**: 要件5.5 の「最大50文字の短いメッセージ」の枠をそのまま使い、その内容を「選出された相棒キャラ本人のセリフ風の一言」に変更する。`DailyGachaView` ではこの一言を吹き出し風に表示する（表示のみの変更で、ロジックは持たない）。
+- **ドメイン純粋関数として決定的に選ぶ**: 既存の `buildDailyMessage(name)`（名前を埋め込む固定定型文）を、**決定的にセリフを選ぶ関数へ作り替える**。決定性は既存 `DailyPickSelector`（FNV-1a 系の決定的ハッシュ + 暦日 + salt）と同じ思想に揃え、暦日（`CalendarDay`）と相棒の id（および現在の salt）から複数のセリフテンプレート集の 1 つを決定的に選ぶ。これにより同一暦日・同一相棒・同一 salt では再オープンしても同一の一言になり（要件16.2、要件5.2 と整合）、引き直し（salt 変更）で相棒や salt が変われば一言も変わりうる（要件16.3、要件5.3 と整合）。
+- **50文字上限の維持**: 一言の長さは常に最大50文字（Unicode コードポイント数）以下を保証する（要件16.4、要件5.5、Correctness Property 16 を維持）。名前が空でも成立するテンプレートを含め、空でない一言を返す（要件16.6）。
+- **不変の制約の維持**: Daily_Line は端末内で決定的に生成し、いかなる外部サーバーへも送信しない（要件16.5、要件3.8）。意思決定ロジックは従来どおり Domain 層の純粋関数へ寄せ、property-based testing で検証する（Correctness Property 23）。
+
 ### 技術方針
 
 - **プラットフォーム**: Web（PWA）。iPhone Safari でホーム画面に追加し、スタンドアロン・ポートレートで起動する（要件7.1, 7.2）。オフラインファースト設計とする。
@@ -204,6 +213,8 @@ function CollectionView(): JSX.Element {
 
 「今日の相棒」を写真・名前・短いメッセージ（最大50文字）とともに表示（要件5.4, 5.5）。引き直しボタンを提供（要件5.3）。0 件時は登録を促す（要件5.6）。
 
+**イテレーション8の変更（要件16）**: 併記する短いメッセージは、相棒キャラ本人のセリフ風の一言（Daily_Line）とし、**吹き出し風**に表示する（要件16.1）。この一言は `useDailyGacha` の `message` として受け取り、本コンポーネントはロジックを持たず受け取った文字列を描画するのみとする（Daily_Line の決定的選出・50文字保証は Domain 層の純粋関数が担う）。吹き出しの見た目は大人かわいいテーマのトークン経由で適用し、44×44 CSS px・横スクロールなしを維持する（要件9）。
+
 #### RankingBattleView（ランキング対戦）
 
 現在の `BattlePair` 2 件を並べて表示する（要件4.1）。勝敗は利用者が選ぶのではなく、**Chara_App が自動的に勝者を判定**し、ランダムに変わる実況（`Battle_Commentary`）と勝敗結果を表示して自動進行する（要件4.2, 4.3）。利用者の操作は対戦を進めるための「開始」「次へ／自動再生」のみで、**勝敗の選択は行わない**。各対戦の実況表示後、勝者を次ラウンドへ進め、勝ち残りが 2 件以上ある間は次の `BattlePair` を提示する（要件4.4）。同一の組み合わせでも実行ごとに勝者・実況が変動しうる（要件4.5）。最終的に勝者 1 件を「最も好きなキャラ」として表示（要件4.7）。2 件未満なら開始せずメッセージ表示（要件4.8）。ページ再読み込み時は進行状態を破棄して初期化する（要件4.9）。
@@ -264,13 +275,17 @@ function useRegistration(editing?: Character): {
   save: () => Promise<SaveResult>;          // 'saved' | 'invalid' | 'storeError'
 };
 
-// 今日の一枚ガチャ（要件5）
+// 今日の一枚ガチャ（要件5, 16）
 function useDailyGacha(): {
   partner: Character | null;
-  message: string;                          // <= 50 文字
+  message: string;                          // 相棒キャラ本人のセリフ風の一言（Daily_Line）。<= 50 文字（要件5.5, 16.1, 16.4）
   loadToday: () => Promise<void>;           // 同一暦日は固定
   reroll: () => Promise<void>;              // salt をインクリメント
 };
+// message（Daily_Line）は、選出された相棒（id/name）・当日暦日（today）・現在の salt を
+// buildDailyLine へ渡して決定的に生成する（要件16.2, 16.3）。selectWithSalt 内で pick により
+// 相棒を確定した後、その id/name と today・salt で buildDailyLine を呼び message に反映する。
+// 名前が空でも成立し、常に 50 文字以下の空でない一言を返す（要件16.6, 16.4, 5.5）。
 
 // ランキング対戦（要件4）— 勝敗はアプリが自動判定し自動進行する（利用者の勝敗選択なし）
 function useRankingBattle(): {
@@ -348,6 +363,20 @@ interface DailyPickSelector {
   pick(ids: string[], day: CalendarDay, salt: number): string | null;
   // reroll は salt を増やして再計算（呼び出し側が salt を管理）
 }
+
+// 今日の相棒の一言（Daily_Line）を決定的に選ぶ純粋関数（要件16, 5.5）
+// 選出された相棒（少なくとも id と name）・当日暦日（CalendarDay）・現在の salt を受け取り、
+// 複数のセリフ風テンプレート集から FNV-1a 系の決定的ハッシュ（既存 DailyPickSelector と同じ思想）で
+// 1 つを選び、名前を差し込んで一言を返す。同一 { id, day, salt } では常に同一の文字列を返す（決定的）。
+// 名前が空（空白のみ含む）でも名前を差し込まないテンプレートで成立し、空でない文字列を返す（要件16.6）。
+// 戻り値の長さは常に最大 50 コードポイント以下を保証する（要件5.5, 16.4）。
+// buildDailyMessage（旧: 名前埋め込みの固定定型文）はこの決定的セリフ選択へ作り替え、
+// 呼び出し側 useDailyGacha は相棒の id/name・today・salt を渡す新シグネチャへ差し替える。
+function buildDailyLine(
+  input: { id: string; name: string },
+  day: CalendarDay,
+  salt: number,
+): string;
 
 // トーナメント（要件4）— 勝者はアプリが rng を用いて自動判定する（利用者選択なし）
 interface TournamentEngine {
@@ -576,17 +605,23 @@ sequenceDiagram
         H->>LS: 当日の salt を読む（無ければ 0、日付変化でリセット）
         H->>SEL: pick(ids, today, salt)
         SEL-->>H: 選ばれた id（同一暦日・同一 salt は固定）
-        H-->>GV: 今日の相棒 + メッセージ(<=50字)（要件5.2, 5.4, 5.5）
+        H->>SEL: buildDailyLine({id, name}, today, salt)
+        SEL-->>H: Daily_Line（相棒本人のセリフ風・決定的・<=50字）（要件16.1, 16.2, 16.4）
+        H-->>GV: 今日の相棒 + Daily_Line(吹き出し, <=50字)（要件5.2, 5.4, 5.5, 16.1）
     end
     U->>GV: 引き直し
     GV->>H: reroll()
     H->>LS: salt を +1 して保存（当日暦日に紐づく）
     H->>SEL: pick(ids, today, salt+1)
     SEL-->>H: 新しい id（要件5.3）
+    H->>SEL: buildDailyLine({id, name}, today, salt+1)
+    SEL-->>H: 新しい Daily_Line（相棒/salt 変化で変わりうる）（要件16.3）
     H-->>GV: 更新表示
 ```
 
 「今日の相棒」の固定は、当日暦日（`CalendarDay`）と現在の salt を `localStorage` に保存し、同一暦日内の再オープン時に同じ salt で再計算することで実現する（要件5.2）。日付が変わると salt を 0 にリセットする。
+
+**Daily_Line（今日の相棒の一言、要件16）** も同じ決定性で固定する。相棒を `pick` で確定した後、その相棒の id と当日暦日・現在の salt を `buildDailyLine({ id, name }, today, salt)` へ渡してセリフ風の一言を決定的に選ぶ。`buildDailyLine` は FNV-1a 系の決定的ハッシュ（`DailyPickSelector` と同じ思想）でテンプレート集から 1 つを選ぶ純粋関数のため、同一暦日・同一相棒・同一 salt では再オープンでも同一の一言になり（要件16.2, 5.2）、引き直しで相棒や salt が変われば一言も変わりうる（要件16.3, 5.3）。長さは常に 50 コードポイント以下を保証する（要件16.4, 5.5）。
 
 ### フロー3: ランキング対戦のトーナメント進行（自動判定・実況・不戦勝・再読み込みリセット込み、要件4）
 
@@ -763,7 +798,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 *プロパティとは、システムのすべての正当な実行にわたって成り立つべき特性や振る舞いのことであり、システムが何をすべきかについての形式的な言明である。プロパティは、人間が読める仕様と機械が検証可能な正当性保証との橋渡しとなる。*
 
-以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜15へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19、イテレーション6（要件14〜15）で追加した出会った日の正規化・イメージカラー正規化/縁取り導出・新フィールドを含む保存往復のプロパティは Property 20〜22 として末尾に追加している（既存 Property 1〜19 は保持）。
+以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜16へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19、イテレーション6（要件14〜15）で追加した出会った日の正規化・イメージカラー正規化/縁取り導出・新フィールドを含む保存往復のプロパティは Property 20〜22、イテレーション8（要件16）で追加した今日の相棒の一言（Daily_Line）の決定的選出プロパティは Property 23 として末尾に追加している（既存 Property 1〜22 は保持）。イテレーション8では既存メッセージ生成 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替えるため、メッセージ長を検証する Property 16 の対象は `buildDailyLine`（相棒本人のセリフ風の一言）となるが、50文字以下の不変条件は維持される。Property 23 は決定性・非空を追加検証する点で Property 16（長さ）と相補的である。
 
 ### Property 1: フィールド文字数バリデーション
 
@@ -857,9 +892,9 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 ### Property 16: 今日のメッセージは50文字以下
 
-*任意の* 選出された「今日の相棒」について、併記される短いメッセージの文字数は 50 以下である。
+*任意の* 選出された「今日の相棒」について、併記される短いメッセージ（相棒本人のセリフ風の一言 Daily_Line）の文字数（Unicode コードポイント数）は 50 以下である。
 
-**Validates: Requirements 5.5**
+**Validates: Requirements 5.5, 16.4**
 
 ### Property 17: 並び替えは決定的で要素を保存する
 
@@ -897,6 +932,12 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 **Validates: Requirements 15.4, 15.6, 15.7, 15.8**
 
+### Property 23: 今日の一言は決定的・要素妥当・50文字以下
+
+*任意の* 相棒（`{ id, name }`。名前は空文字・空白のみ・絵文字を含む任意）と *任意の* 固定した `CalendarDay` および salt について、`buildDailyLine({ id, name }, day, salt)` は次を満たす。(a) **決定性**: 同一の `{ id, day, salt }` に対して何度呼んでも常に同一の文字列を返す（要件16.2、要件5.2 と整合）。(b) **50文字以下**: 戻り値の長さ（Unicode コードポイント数）は常に 50 以下である（要件16.4、要件5.5）。(c) **非空**: 戻り値は空でない文字列であり、名前が空（空白のみ含む）の場合でも名前を差し込まないテンプレートにより空でない一言を返す（要件16.1, 16.6）。
+
+**Validates: Requirements 5.5, 16.1, 16.2, 16.4, 16.6**
+
 ## Error Handling
 
 エラーハンドリング
@@ -929,7 +970,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 ### 方針: ユニットテスト + プロパティテストの併用
 
 - **ユニットテスト（Vitest + React Testing Library）**: 具体例・エッジケース・エラー分岐・UI 分岐（空状態、ファイル選択キャンセル/ブロック、削除確認、写真読込失敗のプレースホルダー、対戦2件未満、対戦中リセット等）を検証する。
-- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜22）を、広い入力空間にわたって検証する。
+- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜23）を、広い入力空間にわたって検証する。
 
 ### 実行環境の注記
 
@@ -942,7 +983,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 各プロパティテストには、対応する設計プロパティを参照するコメントを付与する。タグ形式:
   `// Feature: chara-collection, Property {number}: {property_text}`
 - 各 Correctness Property は **単一の** プロパティテストで実装する。
-- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**、**`metOn` 入力（`YYYY-MM-DD` 妥当日・1900-01-01/当日/未来日/範囲外・不正形式・実在しない日付（例 2 月 30 日）・うるう年 2/29・空/undefined）と固定基準日 `today` の組（出会った日の正規化）**、**`ImageColor` の6プリセット値および許容値以外の任意文字列（イメージカラー正規化/縁取り導出）**、**`metOn`（妥当/undefined）・`imageColor`（6値）を含む `Character`（新フィールドを含む保存往復）**。
+- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**、**`metOn` 入力（`YYYY-MM-DD` 妥当日・1900-01-01/当日/未来日/範囲外・不正形式・実在しない日付（例 2 月 30 日）・うるう年 2/29・空/undefined）と固定基準日 `today` の組（出会った日の正規化）**、**`ImageColor` の6プリセット値および許容値以外の任意文字列（イメージカラー正規化/縁取り導出）**、**`metOn`（妥当/undefined）・`imageColor`（6値）を含む `Character`（新フィールドを含む保存往復）**、**相棒 `{ id, name }`（`id` は任意文字列、`name` は空文字・空白のみ・絵文字/サロゲートペア・長文を含む任意）と `CalendarDay`・salt の組（今日の相棒の一言 Daily_Line の決定的選出。決定性・非空・50コードポイント以下を検証）**。
 - 乱数を用いる `TournamentEngine` と `BattleCommentator` は rng（`() => number`）を外部注入するため、テストでは固定/シード rng（例: 値の系列を返すスタブ）を渡して決定的に検証する。本番は `Math.random` を注入する。
 
 ### プロパティ ↔ テスト対応
@@ -964,13 +1005,14 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 13 | 奇数ラウンドの不戦勝 | `TournamentEngine`（rng 注入） |
 | 14 | 実況の妥当性・実行ごとの変動（複数テンプレート＋rng） | `BattleCommentator`（rng 注入） |
 | 15 | 暦日内決定的・要素性 | `DailyPickSelector` |
-| 16 | メッセージ50文字以下 | メッセージ生成関数 |
+| 16 | メッセージ（Daily_Line）50文字以下 | メッセージ生成関数（`buildDailyLine`） |
 | 17 | 並び替えの決定性・要素保存・タイブレーク（Character 集合＋各 SortOrder） | `sortCharacters`（domain） |
 | 18 | 一覧カードの主表示/副表示の決定（ニックネーム/名前の空・非空の組） | `deriveCardDisplay`（domain） |
 | 19 | お気に入り度表示の個数一致・テキスト等価物（範囲内外） | お気に入り度表示モデル導出関数（`deriveFavoriteLevelDisplay`） |
 | 20 | metOn/imageColor を含む保存→取得ラウンドトリップ・欠落正規化 | `InMemoryCharacterStore` + 読み出し正規化 |
 | 21 | 出会った日の正規化（妥当日保持・範囲外/不正/未来日/空は undefined） | `normalizeMetOn`（domain） |
 | 22 | イメージカラー正規化/縁取り導出（none/許容外は縁取りなし・各色は対応トークン） | `deriveImageColorStyle`（domain） |
+| 23 | 今日の一言は決定的・非空・50文字以下（相棒 id/name＋暦日＋salt） | `buildDailyLine`（domain） |
 
 ### ユニットテスト（例示・エッジ・エラー分岐）
 
@@ -988,6 +1030,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 詳細画面で `metOn` 設定済みは「YYYY年M月D日」を表示し、未設定は当該行を表示しないこと（要件14.5, 14.6）
 - 一覧・ガチャ・対戦の各画面に `metOn` が表示されないこと（要件14.7, 14.8）
 - `imageColor` 未選択の新規登録で `'none'` として保存されること（要件15.2）
+- 今日の相棒の一言（Daily_Line）が吹き出し風に表示されること、固定相棒で salt を変えると複数の異なる一言が生じうること（テンプレートが複数存在する。要件16.1, 16.3 の存在量化は例示で確認）、名前が空の相棒でも空でない一言が表示されること（要件16.6）
 
 ### PWA / UI / 非機能テストの考慮（スモーク・計測）
 
@@ -996,7 +1039,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - **一覧カードの表示/お気に入り度表示（見た目側）**: 主表示を先頭・副表示より大きく表示する配置（要件10.4）、詳細でも一覧と同一の視覚表現を用いること（要件12.2）はスナップショット/例示テストで確認する（表示テキスト・記号個数・テキスト等価物の導出ロジック自体は Property 18/19 で検証）。
 - **並び順選択 UI / NavigationBar 表示制御**: 並び順の選択手段が存在すること（要件11.1）、各タブ選択で `App` の `view` が期待どおり遷移すること（`goToList`/`goToGacha`/`goToBattle`/`goToAdd`、要件13.2〜13.5）、`NavigationBar` が主要画面（list/gacha/battle）で表示され詳細・登録/編集フォームで非表示になること（要件13.6, 13.7）、アクティブタブが現在ビューに一致すること（要件13.6）、各タブが 44×44 px・320〜430 px 幅で横スクロールなし（要件13.8, 13.9）を、例示テスト（React Testing Library）とスナップショットで確認する。
 - **イメージカラー縁取りの見た目**: `imageColor` が `'none'` 以外のとき `CharacterCard` の枠・`CharacterDetailView` の写真枠に `--image-color-*` の縁取りがトークン経由で適用され、`'none'` では縁取りが出ないこと、角丸維持・横スクロールなし・44×44 CSS px タッチ領域維持（要件15.6〜15.10）は、スナップショット/例示テストと CSS 検査で確認する（縁取りの有無・参照トークンの導出ロジックは Property 22 で検証）。
-- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する。`metOn`・`imageColor` を含む一切のデータを外部送信しない（要件3.8, 14.12, 15.11）。
+- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する。`metOn`・`imageColor` を含む一切のデータを外部送信しない（要件3.8, 14.12, 15.11）。今日の相棒の一言（Daily_Line）も端末内の純粋関数 `buildDailyLine` で生成し、外部サーバーへ送信しないことをコード検査で確認する（要件16.5, 3.8）。
 - **タイミング計測**: IndexedDB 永続化3秒以内（要件3.1）、ガチャ表示2秒以内（要件5.4）を計測（統合テスト）で確認する。
 
 ## Design Theme and Design System（大人かわいい / Adult_Cute_Theme）
@@ -1130,7 +1173,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件2（一覧表示・図鑑） | `CollectionView` / `useCollection` / `CharacterCard` / `EmptyStateView` / `fetchAll`（降順）/ 上限1,000件 / Property 8〜10 |
 | 要件3（オフライン保存） | `CharacterStore` / `IndexedDbCharacterStore`（idb）/ ArrayBuffer+MIME 写真 / Service Worker / Persistence Design / PWA Design / Property 5, 7 |
 | 要件4（ランキング対戦） | `RankingBattleView` / `useRankingBattle`（`advance` 自動進行）/ `TournamentEngine`（rng 自動判定）/ `BattleCommentator`（実況生成）/ フロー3 / 自動判定トーナメントアルゴリズム / Property 11〜14 |
-| 要件5（今日の一枚ガチャ） | `DailyGachaView` / `useDailyGacha` / `DailyPickSelector` / localStorage salt / フロー2 / 決定的選出アルゴリズム / Property 15, 16 |
+| 要件5（今日の一枚ガチャ。5.5 は相棒本人のセリフ風の一言 Daily_Line） | `DailyGachaView`（吹き出し表示）/ `useDailyGacha`（相棒 id/name・today・salt を `buildDailyLine` へ）/ `DailyPickSelector` / `buildDailyLine`（決定的セリフ選択、旧 `buildDailyMessage` を作り替え）/ localStorage salt / フロー2 / 決定的選出アルゴリズム / Property 15, 16, 23 |
 | 要件6（編集・削除） | `RegistrationForm`（編集）/ `CharacterDetailView`（削除確認）/ `CharacterStore.update` / `delete` / Property 6, 8 |
 | 要件7（PWA・かわいいデザイン） | PWA Design（Manifest/Service Worker）/ Design Theme and Design System（CSS トークン/角丸/rem/44px/レスポンシブ） |
 | 要件8（空状態・入力エラー） | `CharacterValidator` / `EmptyStateView` / Error Handling マッピング表 / Property 1〜4, 7 |
@@ -1141,3 +1184,4 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件13（共通ナビゲーションバー） | `NavigationBar` / `App`（`view` 状態と表示制御・遷移ハンドラ）/ フロー4（画面切替）/ UI 例示・スナップショット |
 | 要件14（出会った日 Met_On の登録・詳細表示） | `Character.metOn` / `CharacterDraft.metOn` / `normalizeMetOn`・`formatMetOn`（domain）/ `CharacterValidator`（field 'metOn'）/ `RegistrationForm`（`<input type="date">`）/ `CharacterDetailView`（表示）/ `IndexedDbCharacterStore.fetchAll`（読み出し正規化・後方互換）/ Property 20, 21 / 一覧・ガチャ・対戦は非表示（例示） |
 | 要件15（イメージカラー Image_Color の登録・縁取り反映） | `Character.imageColor` / `CharacterDraft.imageColor` / `ImageColor` 型 / `deriveImageColorStyle`（domain）/ `CharacterValidator`（field 'imageColor'）/ `RegistrationForm`（6択）/ `CharacterCard`・`CharacterDetailView`・`PhotoFrame`（縁取り）/ tokens.css `--image-color-*` / 読み出し正規化（後方互換）/ Property 20, 22 |
+| 要件16（今日の相棒の一言 Daily_Line） | `buildDailyLine`（domain。相棒 id/name＋暦日＋salt から決定的にセリフを選び名前差し込み・50文字保証・名前空でも非空、旧 `buildDailyMessage` を作り替え）/ `useDailyGacha`（相棒 id/name・today・salt を渡し `message` に反映）/ `DailyGachaView`（吹き出し風表示）/ フロー2 / 決定的選出アルゴリズム（`DailyPickSelector` と同じ FNV-1a 系ハッシュ思想）/ Property 23（決定性・非空・50文字以下）・Property 16（長さ）/ 外部送信なしはコード検査（要件16.5, 3.8）|

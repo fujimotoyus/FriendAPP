@@ -800,9 +800,37 @@ select {
   color: var(--color-text-primary);
 }
 
-.daily-gacha__message {
-  color: var(--color-text-secondary);
+/* 相棒本人のセリフ風の一言を吹き出し（speech bubble）で表示する（要件16.1, 9.1, 9.2, 9.6）。
+ * 名前の直下に置き、上向きの「尻尾」で相棒（写真・名前）から発せられた一言であることを示す。
+ * 背景・角丸・影・余白・尻尾の色はすべて大人かわいいテーマのトークン経由で適用し、
+ * ハードコードした色/角丸/影/余白は増やさない。max-width で横スクロールを防ぐ（要件9.7 / 7.6）。 */
+.daily-gacha__bubble {
+  position: relative;
+  align-self: center;
+  max-width: min(100%, 22rem);
+  margin: 0;
+  margin-top: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--radius-large);
+  background-color: var(--color-background);
+  box-shadow: var(--shadow-soft);
+  color: var(--color-text-primary);
   line-height: var(--line-height-base);
+  text-align: center;
+  overflow-wrap: anywhere; /* 長い連続文字でも溢れさせない（要件9.7） */
+}
+
+/* 吹き出しの尻尾: 上向きの三角形。border-color に背景色トークンを参照し、
+ * 吹き出し本体（--color-background）と同色にして「話者が上にいる」ことを示す。
+ * 三角形の寸法だけ px を用いる（色/角丸/影/余白のトークン方針は維持）。 */
+.daily-gacha__bubble::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 0.5rem solid transparent;
+  border-bottom-color: var(--color-background);
 }
 
 /* ---------------------------------------------------------------------------

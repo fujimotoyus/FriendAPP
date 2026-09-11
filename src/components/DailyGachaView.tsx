@@ -75,7 +75,17 @@ export function DailyGachaView({
             className="daily-gacha__photo"
           />
           <h2 className="daily-gacha__name">{displayName}</h2>
-          <p className="daily-gacha__message">{message}</p>
+          {/* 相棒本人のセリフ風の一言（Daily_Line）を吹き出しで表示する（要件16.1）。
+              生成・決定性・50文字保証は Domain 層（buildDailyLine）が担い、ここは描画のみ。
+              message が空文字のときは吹き出しを出さない。 */}
+          {message.length > 0 ? (
+            <p
+              className="daily-gacha__bubble"
+              aria-label={`${displayName}の一言: ${message}`}
+            >
+              {message}
+            </p>
+          ) : null}
           <PastelButton onClick={() => void reroll()}>引き直し 🎲</PastelButton>
         </div>
       ) : null}

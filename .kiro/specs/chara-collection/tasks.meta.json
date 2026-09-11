@@ -3,6 +3,10 @@
     "29.1 新フィールドを含む保存・復元ラウンドトリップのプロパティテスト": {
       "status": "passed",
       "lastRunTimestamp": 1788932669911
+    },
+    "37.2 今日の一言の決定的・非空・50文字以下のプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1789093544509
     }
   },
   "executionHistory": {
@@ -775,6 +779,34 @@
         "executionId": "b7cb2e5d-d7e6-4ed9-a2f8-eebf32d8c6de",
         "chatSessionId": "sess_d3c81d5e-46b9-43c4-8ec7-a2d5d16ff6be",
         "timestamp": 1788933292838
+      }
+    ],
+    "21. 一覧の並び替え（要件11）": [
+      {
+        "executionId": "0faca25d-fda7-4ba2-bbaf-6fd1718ee0eb",
+        "chatSessionId": "sess_b5660c08-a3b8-4a30-b614-5f4338750d6b",
+        "timestamp": 1788936991960
+      }
+    ],
+    "22. 一覧でのニックネーム優先表示（要件10）": [
+      {
+        "executionId": "0faca25d-fda7-4ba2-bbaf-6fd1718ee0eb",
+        "chatSessionId": "sess_b5660c08-a3b8-4a30-b614-5f4338750d6b",
+        "timestamp": 1788936993342
+      }
+    ],
+    "23. お気に入り度の視覚的強調（要件12）": [
+      {
+        "executionId": "0faca25d-fda7-4ba2-bbaf-6fd1718ee0eb",
+        "chatSessionId": "sess_b5660c08-a3b8-4a30-b614-5f4338750d6b",
+        "timestamp": 1788936995436
+      }
+    ],
+    "24. 共通ナビゲーションバー（要件13）": [
+      {
+        "executionId": "0faca25d-fda7-4ba2-bbaf-6fd1718ee0eb",
+        "chatSessionId": "sess_b5660c08-a3b8-4a30-b614-5f4338750d6b",
+        "timestamp": 1788936995677
       }
     ]
   }
