@@ -16,17 +16,34 @@
  *   省略時は `Math.random`（実行のたびに勝者・実況が変動しうる。要件4.5）。
  * - `start()` は `fetchAll` で全 Character を取得し、2 件未満なら `canStart=false` のまま
  *   対戦を開始しない（要件4.8）。2 件以上なら `createTournament` を生成し、最初のペアを提示する。
- * - `advance()` は engine の `advance()` を呼んで現ペアの勝者を rng で自動判定し、
+ * - `advance()`【既存・保持】は engine の `advance()` を呼んで現ペアの勝者を rng で自動判定し、
  *   `engine.lastResult`（勝者・敗者 id）を名前に解決して {@link narrate} で実況を生成し、
  *   `currentCommentary` に反映する。engine の champion 確定時は `champion` を Character として反映する。
  * - 進行状態は in-memory のみ（engine インスタンスと React state）で永続化しない。ページ再読み込み /
  *   再起動で hook が再マウントされれば初期状態に戻る（要件4.9）。`reset()` で明示的に初期化できる。
  *
+ * イテレーション9（対戦を魅せる、要件17, 18）の拡張（既存 start/advance/reset の互換に配慮した非破壊拡張）:
+ * - 対戦フェーズ状態 {@link phase}（`'pair' | 'result' | 'champion'`）を持たせ、UI 進行を
+ *   「勝負！」（{@link resolveCurrentBattle}）→「次へ」（{@link next}）の 2 段階に分ける（要件17.1〜17.5）。
+ * - {@link resolveCurrentBattle} は内部で `engine.advance()` を呼び、現ペアの勝者を rng で自動判定・
+ *   実況生成し `phase='result'` へ。`engine.advance()` は「次ペア準備」まで進めるため、result 中に
+ *   勝者ハイライトの対象となる「今戦ったペア」を退避して {@link currentPairCharacters} に保持する。
+ * - {@link next} は `engine.champion` 確定なら `phase='champion'`、そうでなければ次ペアを提示し `phase='pair'`。
+ * - 表示用に id を Character へ解決した {@link bracket}（`ResolvedBracketMatch[]`）を公開する（要件18.1〜18.3）。
+ * - 既存の `advance()` は残す（後方互換）。UI 進行の 2 段階化は `resolveCurrentBattle` が
+ *   `advance()` を内部で呼ぶ形で吸収する（要件4 は非破壊）。
+ *
  * 参照: design.md「Hooks / View-State / useRankingBattle」「フロー3」、
- *       要件4.1, 4.2, 4.3, 4.4, 4.5, 4.8, 4.9
+ *       要件4.1〜4.9、17.1, 17.3, 17.4, 17.5、18.1, 18.2, 18.3
  */
 import { useCallback, useRef, useState } from 'react';
-import type { BattleOutcome, BattlePair, Character } from '../domain/types';
+import type {
+  BattleOutcome,
+  BattlePair,
+  BracketMatch,
+  Character,
+  ResolvedBracketMatch,
+} from '../domain/types';
 import {
   createTournament,
   type Rng,
@@ -36,6 +53,9 @@ import { narrate } from '../domain/BattleCommentator';
 import type { CharacterStore } from '../persistence/CharacterStore';
 import { defaultCharacterStore } from '../persistence/defaultStore';
 
+/** 対戦フェーズ。`'pair'`=ペア提示中 / `'result'`=結果発表中 / `'champion'`=優勝発表（要件17）。 */
+export type BattlePhase = 'pair' | 'result' | 'champion';
+
 /**
  * {@link useRankingBattle} の戻り値。
  */
@@ -43,13 +63,18 @@ export interface UseRankingBattleResult {
   /** 現在提示中の対戦ペア（Character の id の組）。未開始・champion 確定後は `null`。要件4.1 */
   currentPair: BattlePair | null;
   /**
-   * 現在提示中の対戦ペアの Character（写真・名前の表示用）。未開始・champion 確定後は `null`。
+   * 表示中の対戦ペアの Character（写真・名前の表示用）。
+   *
+   * - `phase==='pair'` のときは `currentPair` に対応する「これから戦うペア」を指す。
+   * - `phase==='result'` のときは `resolveCurrentBattle` を呼ぶ直前の「今戦ったペア」を指す
+   *   （`engine.advance()` 後に `engine.currentPair` は既に次ペアを指すため、UI が勝者を
+   *   `currentCommentary.winner`（id）と照合して勝者ハイライトできるよう、戦ったペアを退避して保持する）。
+   * - 未開始・champion 確定後は `null`。
    *
    * `currentPair` は id のみを保持するため、RankingBattleView がペアの 2 キャラの写真・名前を
-   * 表示するには id→Character の解決が必要になる。本 hook は既に `charactersByIdRef` に
-   * id→Character 索引を保持している（start 時に構築）ため、その索引で `currentPair` の
-   * left/right を解決した Character を最小限に公開する。design.md「Hooks / View-State /
-   * useRankingBattle」の定義（currentPair は id）を壊さず、表示用の派生値として追加する。要件4.1
+   * 表示するには id→Character の解決が必要になる。本 hook は `charactersByIdRef`（start 時に構築）で
+   * left/right を解決した Character を最小限に公開する。design.md の定義（currentPair は id）を壊さず、
+   * 表示用の派生値として追加する。要件4.1, 17.1, 17.2
    */
   currentPairCharacters: { left: Character; right: Character } | null;
   /** 直近の対戦の実況 + 勝敗結果（勝者・敗者は id、`commentary` は実況文）。未対戦時は `null`。要件4.2, 4.3 */
@@ -58,9 +83,38 @@ export interface UseRankingBattleResult {
   champion: Character | null;
   /** 対戦を開始できるか（Character が 2 件以上か）。要件4.8 */
   canStart: boolean;
+  /**
+   * 対戦フェーズ（イテレーション9、要件17）。
+   * - `'pair'`   : ペア提示中（初期・開始直後・「次へ」で次ペアへ進んだ後）。
+   * - `'result'` : 結果発表中（`resolveCurrentBattle` 実行後、勝者ハイライト＋実況）。
+   * - `'champion'`: 優勝発表（champion 確定後）。
+   * 未開始・2 件未満ガード時も `'pair'` のままでよい（UI は canStart 等で分岐する）。要件17.1〜17.4
+   */
+  phase: BattlePhase;
+  /**
+   * 勝ち上がりを可視化する表示用 bracket（`engine.bracket` の各 id を Character へ解決）。要件18.1〜18.3。
+   * `right`/`winner` が null の match はそのまま null。`start`/`resolveCurrentBattle`/`next`/`reset` の
+   * たびに最新の `engine.bracket` を反映する。未開始・初期化後は空配列。
+   */
+  bracket: ResolvedBracketMatch[];
   /** 対戦を開始し、最初のペアを提示する。2 件未満なら開始しない（要件4.8）。要件4.1 */
   start: () => Promise<void>;
-  /** 次の対戦へ進める。呼ぶたびに現ペアの勝者を rng で自動判定し実況を生成する。要件4.2〜4.4 */
+  /**
+   * 「勝負！」現ペアの勝者を rng で自動判定し結果発表フェーズへ（内部で `engine.advance()` を呼ぶ）。
+   * `phase==='pair'` かつ `currentPair!=null` のときのみ有効。実況を生成し `currentCommentary` に反映し、
+   * 勝者ハイライト用に「今戦ったペア」を保持しつつ `phase='result'` にする（要件17.1, 17.2, 4.2, 4.3）。
+   */
+  resolveCurrentBattle: () => void;
+  /**
+   * 「次へ」結果発表から次へ進める。`phase==='result'` のときのみ有効。
+   * `engine.champion` 確定なら `phase='champion'`、そうでなければ次ペアを提示し `phase='pair'` に戻す
+   * （要件17.3, 17.4, 4.4, 4.7）。
+   */
+  next: () => void;
+  /**
+   * 【既存・保持】次の対戦へ進める。呼ぶたびに現ペアの勝者を rng で自動判定し実況を生成する（要件4.2〜4.4）。
+   * イテレーション9では `resolveCurrentBattle` が内部でこの処理を用いるが、`advance()` 単体でも従来通り動く。
+   */
   advance: () => void;
   /** 進行状態を初期化する（非永続。要件4.9）。 */
   reset: () => void;
@@ -96,11 +150,46 @@ function resolveDisplayName(
 }
 
 /**
+ * engine の id ベース bracket（{@link BracketMatch}[]）を、id→Character 索引で解決して
+ * 表示用の {@link ResolvedBracketMatch}[] にする（要件18.1〜18.3）。
+ *
+ * `right`/`winner` が null の match はそのまま null にする。`left` が索引で解決できない
+ * （通常は起きない）match は表示できないためスキップする。
+ *
+ * @param bracket engine の id ベース bracket
+ * @param byId id → Character の索引
+ * @returns 表示用に解決した bracket
+ */
+function resolveBracket(
+  bracket: readonly BracketMatch[],
+  byId: Map<string, Character>,
+): ResolvedBracketMatch[] {
+  const resolved: ResolvedBracketMatch[] = [];
+  for (const match of bracket) {
+    const left = byId.get(match.left);
+    if (left == null) {
+      // left が解決できない match は表示不能のためスキップ（通常は全 id が索引にある）。
+      continue;
+    }
+    const right = match.right == null ? null : byId.get(match.right) ?? null;
+    const winner = match.winner == null ? null : byId.get(match.winner) ?? null;
+    resolved.push({
+      round: match.round,
+      left,
+      right,
+      winner,
+      bye: match.bye,
+    });
+  }
+  return resolved;
+}
+
+/**
  * ランキング対戦の開始・進行・初期化を提供する hook。
  *
  * @param store 永続化ストア（DI）。省略時は共有シングルトン {@link defaultCharacterStore}。
  * @param rng [0,1) の一様乱数生成器（DI）。省略時は `Math.random`。テストでは固定/シード rng を渡す。
- * @returns 対戦ペア・実況・champion・開始可否・開始/進行/初期化関数。
+ * @returns 対戦ペア・実況・champion・開始可否・フェーズ・bracket・開始/勝負/次へ/進行/初期化関数。
  */
 export function useRankingBattle(
   store: CharacterStore = defaultCharacterStore,
@@ -115,41 +204,59 @@ export function useRankingBattle(
     useState<BattleOutcome | null>(null);
   const [champion, setChampion] = useState<Character | null>(null);
   const [canStart, setCanStart] = useState<boolean>(false);
+  const [phase, setPhase] = useState<BattlePhase>('pair');
+  const [bracket, setBracket] = useState<ResolvedBracketMatch[]>([]);
 
   // 進行状態は in-memory のみで永続化しない（要件4.9）。
   // engine と id→Character 索引は再描画をまたいで保持するため ref に置く。
   const engineRef = useRef<TournamentEngine | null>(null);
   const charactersByIdRef = useRef<Map<string, Character>>(new Map());
 
+  /** engine の最新 bracket を Character へ解決して state に反映する（要件18.1〜18.3）。 */
+  const syncBracket = useCallback((engine: TournamentEngine): void => {
+    setBracket(resolveBracket(engine.bracket, charactersByIdRef.current));
+  }, []);
+
+  /**
+   * `currentPair` の id を Character に解決して表示用の派生値を反映する（要件4.1）。
+   * 両者が索引から解決できた場合のみ組を提示し、いずれか欠ける場合は null にする。
+   */
+  const applyPairCharacters = useCallback((pair: BattlePair | null): void => {
+    if (pair == null) {
+      setCurrentPairCharacters(null);
+      return;
+    }
+    const left = charactersByIdRef.current.get(pair.left);
+    const right = charactersByIdRef.current.get(pair.right);
+    setCurrentPairCharacters(
+      left != null && right != null ? { left, right } : null,
+    );
+  }, []);
+
   /**
    * 現在の engine 状態（currentPair / champion）を React state へ反映する。
    * champion 確定時は id を Character に解決して反映する（要件4.7）。
+   * 表示中ペア（currentPairCharacters）も現在の currentPair に合わせて更新する。
    */
-  const syncFromEngine = useCallback((engine: TournamentEngine): void => {
-    const pair = engine.currentPair;
-    setCurrentPair(pair);
-    // currentPair の id を Character に解決して表示用の派生値を反映する（要件4.1）。
-    // 両者が索引から解決できた場合のみ組を提示し、いずれか欠ける場合は null にする。
-    if (pair == null) {
-      setCurrentPairCharacters(null);
-    } else {
-      const left = charactersByIdRef.current.get(pair.left);
-      const right = charactersByIdRef.current.get(pair.right);
-      setCurrentPairCharacters(
-        left != null && right != null ? { left, right } : null,
-      );
-    }
-    const championId = engine.champion;
-    if (championId == null) {
-      setChampion(null);
-    } else {
-      setChampion(charactersByIdRef.current.get(championId) ?? null);
-    }
-  }, []);
+  const syncFromEngine = useCallback(
+    (engine: TournamentEngine): void => {
+      const pair = engine.currentPair;
+      setCurrentPair(pair);
+      applyPairCharacters(pair);
+      const championId = engine.champion;
+      if (championId == null) {
+        setChampion(null);
+      } else {
+        setChampion(charactersByIdRef.current.get(championId) ?? null);
+      }
+    },
+    [applyPairCharacters],
+  );
 
   /**
    * 対戦を開始する。全 Character を取得し、2 件未満なら開始しない（要件4.8）。
    * 2 件以上なら {@link createTournament} を生成し、最初のペアを提示する（要件4.1）。
+   * フェーズを `'pair'` に、bracket を最新（開始直後は空 or Bye 繰上げ分）に初期化する。
    */
   const start = useCallback(async (): Promise<void> => {
     let characters: Character[];
@@ -164,6 +271,8 @@ export function useRankingBattle(
       setCurrentCommentary(null);
       setChampion(null);
       setCanStart(false);
+      setPhase('pair');
+      setBracket([]);
       return;
     }
 
@@ -176,10 +285,12 @@ export function useRankingBattle(
       setCurrentCommentary(null);
       setChampion(null);
       setCanStart(false);
+      setPhase('pair');
+      setBracket([]);
       return;
     }
 
-    // id → Character 索引を構築（実況の名前解決・champion 解決に用いる）。
+    // id → Character 索引を構築（実況の名前解決・champion 解決・bracket 解決に用いる）。
     const byId = new Map<string, Character>();
     for (const character of characters) {
       byId.set(character.id, character);
@@ -194,50 +305,127 @@ export function useRankingBattle(
     engineRef.current = engine;
     setCanStart(true);
     setCurrentCommentary(null);
+    setPhase('pair');
     syncFromEngine(engine);
-  }, [store, rng, syncFromEngine]);
+    syncBracket(engine);
+  }, [store, rng, syncFromEngine, syncBracket]);
 
   /**
-   * 次の対戦へ進める。engine の `advance()` で現ペアの勝者を rng で自動判定し
-   * （要件4.2）、`lastResult`（勝者・敗者 id）を名前へ解決して {@link narrate} で実況を
-   * 生成し、`currentCommentary` に反映する（要件4.3）。勝者は次ラウンドへ進み、
-   * 次のペア or champion が確定する（要件4.4, 4.7）。
+   * 現ペアの勝者を rng で自動判定し実況を生成する共通処理（要件4.2, 4.3）。
+   * engine の `advance()` を呼び、`lastResult`（勝者・敗者 id）を名前へ解決して
+   * {@link narrate} で実況を生成し `currentCommentary` に反映する。engine の現在状態
+   * （次ペア / champion）と bracket も反映する。進行できない場合は `false` を返す。
+   *
+   * @param engine 進行中のトーナメントエンジン
+   * @returns 対戦を確定して進めたら `true`、進行できなかったら `false`
+   */
+  const runBattle = useCallback(
+    (engine: TournamentEngine): boolean => {
+      if (engine.currentPair === null) {
+        // 未開始 or 既に champion 確定済みなど、進行できない場合は何もしない。
+        return false;
+      }
+      engine.advance();
+      const result = engine.lastResult;
+      if (result != null) {
+        // 勝者・敗者 id を表示名へ解決して実況を生成する（要件4.3）。
+        const winnerName = resolveDisplayName(
+          result.winner,
+          charactersByIdRef.current,
+        );
+        const loserName = resolveDisplayName(
+          result.loser,
+          charactersByIdRef.current,
+        );
+        const commentary = narrate(
+          { winner: winnerName, loser: loserName },
+          rng,
+        );
+        // BattleOutcome の winner/loser は id を保持する（design.md の定義に従う）。
+        setCurrentCommentary({
+          winner: result.winner,
+          loser: result.loser,
+          commentary,
+        });
+      }
+      // engine の現在状態（次ペア / champion）と bracket を反映する（要件4.4, 4.7, 18.1）。
+      syncFromEngine(engine);
+      syncBracket(engine);
+      return true;
+    },
+    [rng, syncFromEngine, syncBracket],
+  );
+
+  /**
+   * 【既存・保持】次の対戦へ進める（要件4.2〜4.4）。engine の `advance()` を呼んで
+   * 現ペアの勝者を rng で自動判定し、実況を `currentCommentary` に反映する。
+   * 後方互換のため単体で従来通り使える（フェーズは変更しない）。
    */
   const advance = useCallback((): void => {
     const engine = engineRef.current;
-    if (engine == null || engine.currentPair === null) {
-      // 未開始 or 既に champion 確定済みなど、進行できない場合は何もしない。
+    if (engine == null) {
       return;
     }
+    runBattle(engine);
+  }, [runBattle]);
 
-    engine.advance();
-    const result = engine.lastResult;
-    if (result != null) {
-      // 勝者・敗者 id を表示名へ解決して実況を生成する（要件4.3）。
-      const winnerName = resolveDisplayName(
-        result.winner,
-        charactersByIdRef.current,
-      );
-      const loserName = resolveDisplayName(
-        result.loser,
-        charactersByIdRef.current,
-      );
-      const commentary = narrate({ winner: winnerName, loser: loserName }, rng);
-      // BattleOutcome の winner/loser は id を保持する（design.md の定義に従う）。
-      setCurrentCommentary({
-        winner: result.winner,
-        loser: result.loser,
-        commentary,
-      });
+  /**
+   * 「勝負！」現ペアの勝者を rng で自動判定し結果発表フェーズへ移す（要件17.1, 17.2, 4.2, 4.3）。
+   *
+   * `phase==='pair'` かつ現ペアがあるときのみ有効。`engine.advance()`（{@link runBattle} 経由）は
+   * 「次ペア準備」まで進めてしまうため、勝者ハイライトの対象となる「今戦ったペア」を
+   * 呼ぶ前に退避して {@link currentPairCharacters} に保持し、`phase='result'` にする。
+   * result 中は `currentPairCharacters`（今戦ったペア）と `currentCommentary.winner`（勝者 id）で
+   * UI が勝者側を強調表示できる。
+   */
+  const resolveCurrentBattle = useCallback((): void => {
+    const engine = engineRef.current;
+    if (engine == null || phase !== 'pair' || engine.currentPair === null) {
+      return;
     }
+    // 「今戦うペア」を退避（advance 後は engine.currentPair が次ペアを指すため）。
+    const foughtPair = engine.currentPair;
+    const advanced = runBattle(engine);
+    if (!advanced) {
+      return;
+    }
+    // 退避した「今戦ったペア」を result 表示用に上書き反映する（勝者ハイライト対象）。
+    applyPairCharacters(foughtPair);
+    // 提示中ペア（次に戦う id）は currentPair state として保持しつつ、表示は今戦ったペアに固定。
+    setCurrentPair(foughtPair);
+    setPhase('result');
+  }, [phase, runBattle, applyPairCharacters]);
 
-    // engine の現在状態（次ペア / champion）を反映する（要件4.4, 4.7）。
-    syncFromEngine(engine);
-  }, [rng, syncFromEngine]);
+  /**
+   * 「次へ」結果発表から次へ進める（要件17.3, 17.4, 4.4, 4.7）。
+   *
+   * `phase==='result'` のときのみ有効。`engine.champion` が確定していれば `champion` を
+   * 反映して `phase='champion'` にする。そうでなければ engine の次ペア（既に次を指している）を
+   * `currentPair`/`currentPairCharacters` に反映し `phase='pair'` に戻す。
+   */
+  const next = useCallback((): void => {
+    const engine = engineRef.current;
+    if (engine == null || phase !== 'result') {
+      return;
+    }
+    const championId = engine.champion;
+    if (championId != null) {
+      setChampion(charactersByIdRef.current.get(championId) ?? null);
+      setCurrentPair(null);
+      setCurrentPairCharacters(null);
+      setPhase('champion');
+      return;
+    }
+    // 次ペア（engine.currentPair は既に次を指す）を提示して pair フェーズへ戻す。
+    const pair = engine.currentPair;
+    setCurrentPair(pair);
+    applyPairCharacters(pair);
+    setPhase('pair');
+  }, [phase, applyPairCharacters]);
 
   /**
    * 進行状態を初期化する（非永続。要件4.9）。engine と索引を破棄し、
-   * 表示状態を初期値へ戻す。
+   * 表示状態を初期値へ戻す。フェーズは `'pair'`、bracket は空に初期化する。
    */
   const reset = useCallback((): void => {
     engineRef.current = null;
@@ -247,6 +435,8 @@ export function useRankingBattle(
     setCurrentCommentary(null);
     setChampion(null);
     setCanStart(false);
+    setPhase('pair');
+    setBracket([]);
   }, []);
 
   return {
@@ -255,7 +445,11 @@ export function useRankingBattle(
     currentCommentary,
     champion,
     canStart,
+    phase,
+    bracket,
     start,
+    resolveCurrentBattle,
+    next,
     advance,
     reset,
   };

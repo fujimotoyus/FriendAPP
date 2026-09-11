@@ -29,7 +29,7 @@
  * 要件4.1, 4.2, 4.4, 4.6, 4.7、Correctness Property 11, 12, 13
  */
 
-import type { BattlePair } from './types';
+import type { BattlePair, BracketMatch, TournamentBracket } from './types';
 
 /**
  * トーナメントエンジンの公開インターフェース。
@@ -47,6 +47,15 @@ export interface TournamentEngine {
   readonly champion: string | null;
   /** 直近の対戦で自動判定された勝者・敗者の id。まだ対戦がない場合は `null`。 */
   readonly lastResult: { winner: string; loser: string } | null;
+  /**
+   * 勝ち上がり履歴（Tournament_Bracket、要件18）。全ラウンドの対戦ペアと各対戦の勝者・
+   * 不戦勝（Bye）を勝ち上がり順に表す読み取り専用の構造。`advance()` が現ペアの勝敗を
+   * 確定した時点で当該 match（`bye: false`）を、不戦勝の繰り上げ時にその match
+   * （`bye: true`）を蓄積する。外部からの改変を防ぐため内部配列のコピーを返す。
+   * 追加的な読み取り専用情報であり、既存の `currentPair` / `champion` / `lastResult` /
+   * `advance()` のセマンティクスには影響しない（既存 Property 11〜13 は不変）。
+   */
+  readonly bracket: TournamentBracket;
   /**
    * 現ペアの勝者を rng で自動決定し、勝者を次ラウンドへ進め敗者を除外して
    * 次状態（次のペア / 次ラウンド / champion 確定）へ遷移する（要件4.2, 4.4）。
@@ -103,6 +112,11 @@ export function createTournament(
   let lastResult: { winner: string; loser: string } | null = null;
   // champion（勝ち残り 1 件）確定時に設定。
   let champion: string | null = null;
+  // 現在のラウンド番号（0 始まり）。次ラウンドのキューへ移行する瞬間にのみ +1 する。
+  // 各 match は「その対戦（不戦勝の繰り上げ）が実際に行われたラウンド」を round として記録する。
+  let round = 0;
+  // 勝ち上がり履歴（Tournament_Bracket、要件18）。advance() の勝敗確定と不戦勝の繰り上げで追記する。
+  const bracket: BracketMatch[] = [];
 
   /**
    * キュー・nextRound の状態から次に提示すべきペアを準備する。
@@ -117,6 +131,8 @@ export function createTournament(
     while (queue.length < 2) {
       if (queue.length === 1) {
         // 奇数の余り 1 件は不戦勝で次ラウンドへ繰り上げる（要件4.6）。
+        // 不戦勝も match として現ラウンド（round）に記録する（Tournament_Bracket、要件18）。
+        bracket.push({ round, left: queue[0], right: null, winner: queue[0], bye: true });
         nextRound.push(queue[0]);
         queue = [];
       }
@@ -128,9 +144,11 @@ export function createTournament(
         currentPair = null;
         return;
       }
-      // 次ラウンドへ移行: nextRound をキューへ、nextRound を空にする。
+      // 次ラウンドへ移行: nextRound をキューへ、nextRound を空にし、ラウンド番号を進める。
+      // この瞬間にのみ round を +1 することで、同一ラウンド内の対戦・不戦勝の round が揃う（要件18.2）。
       queue = nextRound;
       nextRound = [];
+      round += 1;
     }
     // キューに 2 件以上ある: 先頭 2 件で対戦ペアを構成する。
     currentPair = { left: queue[0], right: queue[1] };
@@ -150,6 +168,10 @@ export function createTournament(
     get lastResult(): { winner: string; loser: string } | null {
       return lastResult;
     },
+    get bracket(): TournamentBracket {
+      // 内部配列のコピーを返し、外部からの改変を防ぐ（読み取り専用の勝ち上がり履歴、要件18）。
+      return [...bracket];
+    },
     advance(): void {
       // 提示中のペアが無い（champion 確定済み等）場合は何もしない。
       if (currentPair === null) {
@@ -161,6 +183,8 @@ export function createTournament(
       const winner = leftWins ? left : right;
       const loser = leftWins ? right : left;
       lastResult = { winner, loser };
+      // 確定した対戦を現ラウンド（round）の match として bracket へ記録する（Tournament_Bracket、要件18）。
+      bracket.push({ round, left, right, winner, bye: false });
       // 勝者を次ラウンドへ進め、敗者は除外する（現ペアの 2 件をキュー先頭から取り除く）。
       nextRound.push(winner);
       queue = queue.slice(2);

@@ -24,6 +24,7 @@
 - **イテレーション6**: 登録項目の拡張（任意の「出会った日」を登録し詳細でのみ表示、パステルプリセットから選ぶ「イメージカラー」を登録しカードと詳細の写真枠の縁取りへ反映。旧データは既定値で補完し後方互換を維持）（要件14、要件15）
 - **イテレーション7**: 一覧の並び替えに「出会った日の新しい順」を追加（Sort_Orderに 'metOn' を追加。Met_On降順・未設定は後方・タイブレークはcreatedAt降順→id昇順。既存データ・機能に破壊的変更なし）（要件11.1、要件11.7）
 - **イテレーション8**: 今日の相棒に一言（Daily_Gachaのメッセージを相棒キャラ本人のセリフ風の一言に置き換え、同一暦日・同一相棒・同一 salt 内で固定＝その日固定の決定的選出。要件5.2・5.5と整合）（要件5の改定と要件16）
+- **イテレーション9**: 対戦を魅せる（試合ごとのリザルト表示・勝者ハイライト/ペア入場アニメ・優勝演出・勝ち上がりを可視化するトーナメント表。自動再生/効果音なし。TournamentEngine を勝ち上がり履歴の公開のため拡張）（要件17・要件18、要件4と整合）
 
 ## Glossary
 
@@ -49,6 +50,8 @@
 - **Image_Color（イメージカラー）**: Characterに紐づく属性で、大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン由来のパステルのプリセット色から選ぶ縁取り色。選択肢はプリセット5色と「なし（Image_Color_None）」で構成し、既定値は「なし」とする。CharacterCard（一覧カード）の枠および詳細画面の写真枠の縁取りへ反映する。プリセットの許容値以外・未設定・この属性を持たない既存Characterはいずれも「なし」として扱う（後方互換）
 - **Image_Color_None（イメージカラーなし）**: Image_Colorの既定値。縁取りを一切適用しない状態を表す
 - **Daily_Line（今日の一言）**: Daily_Gachaで選出された「今日の相棒」Characterに紐づけて表示する、当該相棒キャラ本人のセリフ風の短いメッセージ（最大50文字、Unicodeコードポイント数）。暦日（利用者の端末ローカルのCalendarDay）と当該相棒のid、および現在のsaltから決定的に選ばれ、同一暦日・同一相棒・同一saltでは再オープンしても同一の一言になる（要件5.2の「同一暦日は固定」の思想に整合する）。端末内で生成し、いかなる外部サーバーへも送信しない（要件3.8）
+- **Tournament_Bracket（トーナメント表）**: Ranking_Battleにおいて、全ラウンドの対戦ペアと各対戦の勝者・不戦勝（Bye）を勝ち上がり順に表す読み取り専用の構造。TournamentEngineが対戦の進行に応じて保持・公開し、RankingBattleViewが可視化する。表示（読み取り専用の可視化）のみに用い、対戦の判定結果やCharacter_Storeのデータを変更しない。いかなる外部サーバーへも送信しない（要件3.8）
+- **Battle_Result_Phase（試合結果発表フェーズ）**: Ranking_Battleにおいて、各対戦で勝者を演出（勝者ハイライト・Battle_Commentary）付きで発表し、利用者の「次へ」操作で次のBattle_Pairへ進む表示フェーズ。対戦は自動再生せず、利用者の操作でのみ進行する
 
 ## Requirements
 
@@ -291,3 +294,36 @@
 4. THE Chara_App SHALL Daily_Lineの長さを常に最大50文字（Unicodeコードポイント数）以下とする（要件5.5と整合）
 5. THE Chara_App SHALL Daily_Lineを端末内で生成し、いかなる外部サーバーへも送信しない（要件3.8と整合）
 6. WHERE 選出された相棒Characterの名前が空（空文字または空白文字のみ）である場合, THE Chara_App SHALL 名前を差し込まないテンプレートを用いてDaily_Lineを生成し、空でないDaily_Lineを表示する
+
+### 要件17: 試合ごとのリザルト表示と対戦の演出
+
+**ユーザーストーリー:** カップルとして、対戦を一戦ずつ結果発表付きで見せてほしい。そうすることで、二人でひと試合ごとに盛り上がりながらトーナメントを進められる。
+
+本要件は要件4を破壊せず、各対戦に結果発表フェーズ（Battle_Result_Phase）と演出を追加する非破壊拡張として整理する。要件4.2（rngによる自動判定）・要件4.6（不戦勝）・要件4.7（勝者1件で終了）は維持する。
+
+#### 受け入れ基準
+
+1. WHEN 現在のBattle_Pairが提示されている状態で利用者が「勝負」を実行する, THE Chara_App SHALL 当該対戦の勝者をランダム要素を含めてちょうど1件自動判定し（要件4.2と整合）、勝者を強調表示（勝者ハイライト）したBattle_Result_Phaseを表示する
+2. WHILE Battle_Result_Phaseを表示している間, THE Chara_App SHALL 当該対戦のBattle_Commentaryを表示する（要件4.3と整合）
+3. WHEN Battle_Result_Phaseで利用者が「次へ」を実行し、かつ現ラウンドで未対戦の勝ち残りが2件以上ある場合, THE Chara_App SHALL 次のBattle_Pairを提示する（要件4.4と整合）
+4. WHEN Battle_Result_Phaseで利用者が「次へ」を実行し、かつ勝ち残りが1件である場合, THE Chara_App SHALL 当該Characterを最も好きなキャラクターとして優勝発表を表示する（要件4.7と整合）
+5. THE Chara_App SHALL Ranking_Battleの進行を利用者の操作でのみ進め、対戦を自動再生しない
+6. THE Chara_App SHALL Ranking_Battleの進行および演出において効果音を用いない
+7. WHEN Battle_Pairの入場・勝者ハイライト・画面遷移を表示する, THE Chara_App SHALL 200ミリ秒以上500ミリ秒以下の視覚的トランジションまたはアニメーションを大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン経由で適用する（要件9.4と整合）
+8. IF 利用者の環境がモーション低減（prefers-reduced-motion: reduce）を要求している場合, THEN THE Chara_App SHALL 対戦の演出（勝者ハイライト・ペア入場・優勝演出）のトランジション/アニメーションを無効化または大幅に短縮して適用する（要件9.5と整合）
+9. WHEN 優勝が確定して優勝発表を表示する, THE Chara_App SHALL 勝者1件を大きく強調した演出（紙吹雪風の演出を含む）で表示する（要件4.7と整合）
+10. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面でRanking_Battleの各画面を表示する, THE Chara_App SHALL 横スクロールを発生させないレイアウトを維持する（要件7.6、要件9.7と整合）
+11. THE Chara_App SHALL Ranking_Battleの操作要素を最小44×44 CSSピクセルのタッチ領域で提供する（要件7.7、要件9.6と整合）
+
+### 要件18: 勝ち上がりを可視化するトーナメント表（Tournament_Bracket）
+
+**ユーザーストーリー:** カップルとして、誰が誰に勝って勝ち上がったのかを表で見たい。そうすることで、トーナメント全体の流れを二人で振り返って楽しめる。
+
+#### 受け入れ基準
+
+1. WHEN Ranking_Battleの対戦が進行する, THE Chara_App SHALL これまでに確定した各ラウンドの対戦ペアと各対戦の勝者・不戦勝（Bye）をTournament_Bracketとして可視化表示する
+2. THE Tournament_Bracket SHALL 対戦の進行と整合し、各対戦の勝者を次ラウンドの対戦者として示し、不戦勝（Bye）は対戦せず次ラウンドへ繰り上がった1件として示す（要件4.6と整合）
+3. WHEN 優勝が確定する, THE Chara_App SHALL Tournament_Bracketの最終到達点として勝者1件を示す（要件4.7と整合）
+4. THE Chara_App SHALL Tournament_Bracketを表示（読み取り専用の可視化）のみに用い、対戦の判定結果およびCharacter_Storeのデータを変更しない
+5. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面でTournament_Bracketを表示する, THE Chara_App SHALL 横スクロールを発生させないレイアウト（大きい場合は縦積みまたは折り返し等）でTournament_Bracketを表示する（要件7.6、要件9.7と整合）
+6. THE Chara_App SHALL Tournament_Bracketを含む一切のデータをいかなる外部サーバーへも送信しない（要件3.8と整合）

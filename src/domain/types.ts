@@ -147,6 +147,60 @@ export interface BattleOutcome {
 }
 
 /**
+ * トーナメント表（Tournament_Bracket、要件18）の 1 対戦（match）を表す読み取り専用レコード。
+ *
+ * TournamentEngine が対戦の進行に応じて id ベースで蓄積・公開する勝ち上がり履歴の要素。
+ * 通常の対戦（`bye: false`）は `left`/`right` の 2 件から rng で 1 件を勝者に確定し、
+ * 不戦勝（Bye、`bye: true`）は奇数の余り 1 件（`left`）が対戦せず次ラウンドへ繰り上がる
+ * （このとき `right === null` かつ `winner === left`）。表示（読み取り専用の可視化）
+ * のみに用い、対戦の判定結果や Character_Store のデータは変更しない。
+ *
+ * 参照: design.md「トーナメント表（Tournament_Bracket）」、要件18.1〜18.4, 4.6, 4.7
+ */
+export interface BracketMatch {
+  /** ラウンド番号（0 始まり）。初期ラウンドが 0、勝ち上がりで 1, 2, … と増加する。 */
+  round: number;
+  /** 対戦者 id（不戦勝の場合は繰り上がる 1 件）。 */
+  left: string;
+  /** 対戦相手 id。不戦勝（Bye）は `null`。 */
+  right: string | null;
+  /** 確定した勝者 id（不戦勝は `left` がそのまま winner）。 */
+  winner: string | null;
+  /** `true` のとき不戦勝（Bye）。 */
+  bye: boolean;
+}
+
+/**
+ * ラウンド順・各ラウンド内の対戦順に並んだ確定済み {@link BracketMatch} の列（要件18）。
+ *
+ * 各対戦の `winner`（および不戦勝の `left`）が次ラウンド（round+1）の対戦者として現れ、
+ * 最終的に bracket の頂点（最後に確定した勝者）が champion と一致する（要件18.2, 18.3）。
+ */
+export type TournamentBracket = BracketMatch[];
+
+/**
+ * 表示用に id を Character へ解決した bracket の match（hooks / UI で使用、要件18 の可視化用）。
+ *
+ * TournamentEngine が公開する id ベースの {@link BracketMatch} を、`useRankingBattle` が
+ * 取得済みの Character へ解決して公開する。`TournamentBracketView` がこれを受け取り、
+ * 名前/写真付きで勝ち上がりを可視化する（要件18.1〜18.3）。
+ *
+ * 参照: design.md「ResolvedBracketMatch」、要件18.1〜18.3
+ */
+export interface ResolvedBracketMatch {
+  /** ラウンド番号（0 始まり）。{@link BracketMatch.round} と同一。 */
+  round: number;
+  /** 対戦者 Character（不戦勝の場合は繰り上がる 1 件）。 */
+  left: Character;
+  /** 対戦相手 Character。不戦勝（Bye）は `null`。 */
+  right: Character | null;
+  /** 確定した勝者 Character（不戦勝は `left` がそのまま winner）。 */
+  winner: Character | null;
+  /** `true` のとき不戦勝（Bye）。 */
+  bye: boolean;
+}
+
+/**
  * 成功 / 失敗を型で表す判別可能ユニオン（例外の代替）。
  * ドメイン層（例: PhotoProcessor）の戻り値に用いる。
  *

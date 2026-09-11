@@ -16,6 +16,7 @@
 - **イテレーション6**: 登録項目の拡張（任意の「出会った日」＝ Met_On を詳細でのみ表示、パステルプリセットから選ぶ「イメージカラー」＝ Image_Color をカードと詳細の写真枠の縁取りへ反映。旧データは既定値で補完し後方互換を維持）（要件14, 15）
 - **イテレーション7**: 一覧の並び替えに「出会った日の新しい順」を追加（Sort_Order に 'metOn' を追加。Met_On 降順・未設定は後方・タイブレークは createdAt 降順→id 昇順。既存データ・機能に破壊的変更なし）（要件11.1, 11.7）
 - **イテレーション8**: 今日の相棒に一言（Daily_Gacha のメッセージを相棒キャラ本人のセリフ風の一言＝Daily_Line に置き換え。暦日＋相棒 id＋salt から決定的に選ぶその日固定の選出。50文字保証・名前空でも成立・外部送信なし。既存 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替え）（要件5 の改定と要件16）
+- **イテレーション9**: 対戦を魅せる（試合ごとのリザルト表示・勝者ハイライト/ペア入場アニメ・優勝の紙吹雪風演出・勝ち上がりを可視化するトーナメント表。自動再生/効果音/総評なし。`TournamentEngine` を勝ち上がり履歴 `bracket` の公開のため拡張（既存セマンティクス・Property 11〜13 は不変）。`useRankingBattle` を「勝負！」→「次へ」の2段階進行へ拡張）（要件17, 18、要件4 と整合）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -444,12 +445,50 @@
 - [ ] 40. Iteration 8 チェックポイント（今日の相棒に一言）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [ ] 41. ドメイン: TournamentEngine を勝ち上がり履歴（Tournament_Bracket）公開のため拡張する（要件18, 4.6, 4.7）
+  - `src/domain/types.ts` に `interface BracketMatch { round: number; left: string; right: string | null; winner: string | null; bye: boolean }` と `type TournamentBracket = BracketMatch[]` を追加する。表示用に id を Character へ解決した `interface ResolvedBracketMatch { round: number; left: Character; right: Character | null; winner: Character | null; bye: boolean }` も追加する（既存の型は破壊せず追記。design.md「Data Models」）
+  - `src/domain/TournamentEngine.ts` の `TournamentEngine` インターフェースに `readonly bracket: TournamentBracket` を追加する。`createTournament` の実装で、`advance()` が現ペアの勝者を確定した時点で `{ round, left, right, winner, bye: false }` を bracket へ追記し、奇数の余り 1 件を不戦勝で繰り上げる際に `{ round, left: 繰上げ id, right: null, winner: 繰上げ id, bye: true }` を追記する。ラウンド番号は各対戦が属するラウンドを表す。**既存の `currentPair` / `champion` / `lastResult` / `advance()` のセマンティクスおよび `createTournament` の仕様は不変**とし、bracket への追記のみを追加する（要件18.1, 18.2, 18.3, 4.6, 4.7）
+  - _Requirements: 18.1, 18.2, 18.3, 4.6, 4.7_
+
+  - [ ]* 41.1 トーナメント表の整合性のプロパティテスト
+    - **Property 24: トーナメント表は勝ち上がりと整合する**（2 件以上・任意の rng シード列で champion 確定まで進めた後、bracket が (a) 各 match の勝者妥当（bye は winner===left・right===null）、(b) あるラウンドの勝者集合＝次ラウンドの対戦者集合、(c) 頂点＝champion、(d) `advance()`（`lastResult`）系列と無矛盾、を満たす）
+    - **Validates: Requirements 4.6, 4.7, 18**
+    - `// Feature: chara-collection, Property 24` タグ・`numRuns: 100`。対象 `TournamentEngine`（rng 注入・bracket）。既存 Property 11〜13 のテストは不変で保持する
+    - _Requirements: 4.6, 4.7, 18.1, 18.2, 18.3_
+
+- [ ] 42. Hook: useRankingBattle を2段階進行と bracket 公開へ拡張する（要件17, 18, 4.2, 4.3, 4.4, 4.7）
+  - `src/hooks/useRankingBattle.ts` に対戦フェーズ状態 `phase: 'pair' | 'result' | 'champion'` を追加する。`resolveCurrentBattle()`（「勝負！」）は内部で `engine.advance()` を呼び、現ペアの勝者を rng で自動判定し `BattleCommentator.narrate` で実況を生成して `currentCommentary` に反映し `phase` を `'result'` にする（要件17.1, 17.2, 4.2, 4.3）。`next()`（「次へ」）は `engine.champion` 確定なら `phase` を `'champion'` に、そうでなければ次の `currentPair` を提示して `phase` を `'pair'` に戻す（要件17.3, 17.4, 4.4, 4.7）
+  - `engine.bracket`（id 列）の各 id を `fetchAll` 済みの Character へ解決した `ResolvedBracketMatch[]` を `bracket` として公開する（要件18.1, 18.2, 18.3）。既存の `start`/`advance`/`reset`・`canStart`（2 件未満ガード、要件4.8）・進行状態の非永続（要件4.9）は不変とし、UI 進行の2段階化は `resolveCurrentBattle` が `advance` を内部で呼ぶ形で吸収する（互換維持）
+  - _Requirements: 17.1, 17.3, 17.4, 17.5, 18.1, 18.2, 18.3, 4.2, 4.3, 4.4, 4.7_
+
+- [ ] 43. UI: RankingBattleView を試合ごとリザルト表示＋優勝演出に更新する（要件17, 4.7, 9.4, 9.5）
+  - `src/components/RankingBattleView.tsx` を `useRankingBattle` の `phase` に従って表示を切り替えるよう更新する。`'pair'` はペア 2 件と「勝負！」ボタン（`resolveCurrentBattle`）、`'result'` は勝者ハイライト＋実況（`currentCommentary`）と「次へ」ボタン（`next`）、`'champion'` は勝者 1 件を大きく強調した優勝発表（紙吹雪風演出）を表示する（要件17.1, 17.2, 17.3, 17.4, 17.9, 4.7）。対戦は自動再生せず利用者の操作でのみ進行し、効果音を用いない（要件17.5, 17.6）
+  - ペア入場・勝者ハイライト・優勝演出のトランジション/アニメーションは大人かわいいテーマのトークン（`--transition-*` 200〜500ms 等）経由で適用し、操作要素は最小 44×44 CSS px・横スクロールなしを維持する（要件17.7, 17.10, 17.11, 9.4, 9.6, 9.7）
+  - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.9, 4.7, 9.4_
+
+- [ ] 44. UI: TournamentBracketView（新規）で勝ち上がりを可視化する（要件18, 7.6, 7.7, 9.6, 9.7）
+  - `src/components/TournamentBracketView.tsx`（新規）を実装する。`useRankingBattle` の `bracket`（`ResolvedBracketMatch[]`）を受け取り、各ラウンドの対戦ペア・勝者・不戦勝（Bye）を勝ち上がり順に可視化する（要件18.1, 18.2, 18.3）。表示（読み取り専用）のみで対戦結果やストアを変更しない（要件18.4）。ビューポート幅 320〜430 CSS px でも横スクロールを発生させないレイアウト（縦積み/折り返し等）とし、操作要素は最小 44×44 CSS px を維持し、配色・角丸・影・余白は大人かわいいテーマのトークン経由で適用する（要件18.5, 17.10, 17.11, 7.6, 7.7, 9.6, 9.7）
+  - `RankingBattleView` に `TournamentBracketView` を配置し、対戦の進行に応じて表示を更新する
+  - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 7.6, 7.7, 9.6, 9.7_
+
+- [ ] 45. CSS: 勝者ハイライト・ペア入場・紙吹雪の演出をトークン経由で追加する（要件17, 9.4, 9.5）
+  - `src/styles/global.css` に、勝者ハイライト（発光/強調）・ペア入場（フェード/スライド）・優勝の紙吹雪風演出の `@keyframes` とトランジション/アニメーションを追加する。時間はトークン（`var(--transition-*)`、200〜500ms）で参照し、色/角丸/影/余白は `--color-*` / `--radius-*` / `--shadow-*` / `--space-*` 経由で適用する（要件17.7, 9.2, 9.4）
+  - `@media (prefers-reduced-motion: reduce)` で対戦演出（勝者ハイライト・入場・紙吹雪）のアニメーション/トランジションを無効化または大幅短縮する（既存トークンの reduced-motion 対応に整合、要件17.8, 9.5）。効果音は追加しない（要件17.6）
+  - _Requirements: 17.7, 17.8, 9.4, 9.5_
+
+  - [ ]* 45.1 対戦の進行フェーズ・遷移・ブラケット表示のユニットテスト
+    - `phase` が `pair`→`result`→`champion` の順に遷移すること、「勝負！」（`resolveCurrentBattle`）で結果発表フェーズ（勝者ハイライト・実況）が表示され、「次へ」（`next`）で勝ち残り2件以上なら次ペア・1件なら優勝発表へ進むこと、2 件未満ガード（要件4.8）が維持されること、`TournamentBracketView` が bracket（勝ち上がり）を表示することを例示テスト（React Testing Library）で確認する
+    - _Requirements: 17.1, 17.3, 17.4, 17.5, 18.1, 18.2, 18.3, 4.8_
+
+- [ ] 46. Iteration 9 チェックポイント（対戦を魅せる）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜23）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜24）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -482,7 +521,12 @@
     { "id": 21, "tasks": ["32.3", "34", "36"] },
     { "id": 22, "tasks": ["34.1", "36.1", "37.1"] },
     { "id": 23, "tasks": ["37.2", "38"] },
-    { "id": 24, "tasks": ["39"] }
+    { "id": 24, "tasks": ["39"] },
+    { "id": 25, "tasks": ["41", "45"] },
+    { "id": 26, "tasks": ["41.1", "42"] },
+    { "id": 27, "tasks": ["43"] },
+    { "id": 28, "tasks": ["44"] },
+    { "id": 29, "tasks": ["45.1"] }
   ]
 }
 ```

@@ -938,6 +938,132 @@ select {
 }
 
 /* ---------------------------------------------------------------------------
+ * RankingBattleView — 対戦演出 (要件17.7, 17.8, 9.4, 9.5)
+ * イテレーション9「対戦を魅せる」。ペア入場・勝者ハイライト・敗者トーンダウン・
+ * 優勝の紙吹雪・優勝発表の登場アニメーション。RankingBattleView(タスク43) が下記の
+ * クラス名を参照する。色/角丸/影/余白/トランジションは大人かわいいテーマのトークン
+ * 経由のみで参照し、ハードコードした色・角丸・影・余白を新規に増やさない（紙片の寸法・
+ * 回転角など純粋な寸法数値のみ許容）。横スクロールは発生させない (要件17.10 / 9.7)。
+ * ------------------------------------------------------------------------- */
+
+/* ペア入場: フェード＋わずかなスライド/スケールで登場 (duration = --transition-base)。 */
+@keyframes ranking-battle-contestant-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ranking-battle__contestant--enter {
+  animation: ranking-battle-contestant-enter var(--transition-base) ease-out both;
+}
+
+/* 勝者ハイライト: 発光/枠の強調/軽い拡大のパルス (duration はトークン範囲内)。
+   色は --color-primary、影は --shadow-raised、角丸は --radius-large を用いる。 */
+@keyframes ranking-battle-winner-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: var(--shadow-soft);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: var(--shadow-raised);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: var(--shadow-raised);
+  }
+}
+
+.ranking-battle__contestant--winner {
+  border-radius: var(--radius-large);
+  /* 透明ベース border で外形ずれを防ぎつつ勝者側を枠で強調する。 */
+  border: var(--image-color-border-width) solid var(--color-primary);
+  box-shadow: var(--shadow-raised);
+  animation: ranking-battle-winner-pulse var(--transition-slow) ease-in-out;
+}
+
+/* 敗者のトーンダウン(任意): 透明度を下げて勝者を引き立てる。遷移は --transition-base。 */
+.ranking-battle__contestant--loser {
+  opacity: 0.55;
+  transition: opacity var(--transition-base) ease-out;
+}
+
+/* 優勝発表の登場: スケールイン＋フェード (duration = --transition-slow, 500ms 以内)。 */
+@keyframes ranking-battle-champion-celebrate {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ranking-battle__champion--celebrate {
+  animation: ranking-battle-champion-celebrate var(--transition-slow) ease-out both;
+}
+
+/* 優勝の紙吹雪: 上から落下＋回転。コンテナは画面幅を超えず横スクロールを出さない。 */
+.ranking-battle__confetti {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  /* 紙片は装飾のためスクリーンリーダーからは無視される想定 (aria-hidden を JSX 側で付与)。 */
+}
+
+@keyframes ranking-battle-confetti-fall {
+  from {
+    opacity: 1;
+    transform: translateY(-10%) rotate(0deg);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(120vh) rotate(540deg);
+  }
+}
+
+.ranking-battle__confetti-piece {
+  position: absolute;
+  top: 0;
+  width: 0.5rem;
+  height: 0.75rem;
+  border-radius: var(--radius-small);
+  /* 既定色はテーマの主要アクセント。個々の紙片色は JSX 側で
+     --color-secondary / --color-accent / --image-color-* 等を上書きしてよい。 */
+  background-color: var(--color-primary);
+  /* 落下は装飾アニメーションのため 500ms を超えてよい（要件9.4 の対象外）。上品な速度に。 */
+  animation: ranking-battle-confetti-fall 2600ms linear both;
+}
+
+/* モーション低減環境では対戦演出のアニメーション/トランジションを無効化する (要件17.8, 9.5)。
+   tokens.css は --transition-* を 0ms にするが、keyframes の animation-duration や
+   紙吹雪のハードコード duration は別途無効化が必要なため、対戦演出クラスの animation を
+   明示的に none にする。紙吹雪は最終状態（透明）を保って残らないよう表示も消す。 */
+@media (prefers-reduced-motion: reduce) {
+  .ranking-battle__contestant--enter,
+  .ranking-battle__contestant--winner,
+  .ranking-battle__contestant--loser,
+  .ranking-battle__champion--celebrate,
+  .ranking-battle__confetti-piece {
+    animation: none;
+    transition: none;
+  }
+
+  .ranking-battle__confetti {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
  * NavigationBar — 画面下部に固定表示する共通タブナビゲーション (要件13)
  * 4 項目（図鑑 / 今日の相棒 / トーナメント / 新規登録）を横並びにし、各タブは
  * flex:1 で等分・折り返さず、320〜430px でも横スクロールを出さない (要件13.9 / 7.6)。
@@ -1037,4 +1163,101 @@ select {
  * （バー高さ＋セーフエリアぶん。要件13.6, 13.7 の表示と両立）。 */
 .app--with-nav {
   padding-bottom: calc(var(--space-xl) * 2 + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------------------------------------------------------------------------
+ * TournamentBracketView — 勝ち上がり（トーナメント表）の読み取り専用可視化 (要件18)
+ * ラウンドを縦積みにし、各対戦を縦方向に並べる。ブラケットは横長になりがちなため、
+ * 320〜430px でも横スクロールを出さないよう各行を width:100% で収め、親に overflow-x を
+ * 出さない (要件18.5, 9.7 / 7.6)。配色・角丸・影・余白は大人かわいいテーマのトークン経由
+ * (要件9)。操作要素は置かない（純粋表示。要件18.4）。
+ * ------------------------------------------------------------------------- */
+.tournament-bracket {
+  width: 100%;
+  max-width: 100%;
+  margin-top: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  /* 横スクロールを親に出さない (要件18.5)。縦方向はセクション全体のスクロールに委ねる。 */
+  overflow-x: hidden;
+}
+
+.tournament-bracket__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+/* 1 ラウンドぶんのセクション（縦積み）。 */
+.tournament-bracket__round {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.tournament-bracket__round-label {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.tournament-bracket__matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* 1 対戦（match）。名前中心・省スペースの行。横スクロールを出さないよう内容を折り返す。 */
+.tournament-bracket__match {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-soft);
+}
+
+/* 最終優勝者を含む match を軽く強調する（任意。winnerHighlightId 一致時）。 */
+.tournament-bracket__match--champion {
+  box-shadow: var(--shadow-raised);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.tournament-bracket__competitor {
+  color: var(--color-text-primary);
+  /* 長い名前でも折り返して横スクロールを出さない (要件18.5)。 */
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* 勝者側の強調（👑 とともに太字＋アクセント色）。 */
+.tournament-bracket__competitor--winner {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.tournament-bracket__crown {
+  margin-right: 2px;
+}
+
+.tournament-bracket__versus {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.tournament-bracket__bye {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
