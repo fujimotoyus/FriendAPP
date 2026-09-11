@@ -538,6 +538,26 @@
 - [ ] 54. Iteration 10 チェックポイント（対戦をもっと楽しく）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [ ] 55. UI: TournamentBracketView を接続線つき縦向きブラケット図へ作り替える（要件18, 7.6, 9.7, 9）
+  - `src/components/TournamentBracketView.tsx` の描画（JSX/クラス構造）を、現状の「ラウンドごとに対戦を縦積みしたリスト」から **接続線つきの縦向きブラケット図** へ作り替える。ラウンド（`round` 昇順）を上から下へ縦積みし、各対戦を「対戦カード（2者＋勝者強調・不戦勝は Bye 表記）」として表し、**各対戦の勝者を次ラウンド（下）の対戦へ接続線でつなぐ**構造にする（要件18.1, 18.2, 18.3, 18.7）
+  - 勝者ハイライト（`👑`・`--winner`）、不戦勝（Bye）表記、`winnerHighlightId`（最終優勝者）の軽い強調（`--champion`）を維持する。**読み取り専用**（操作要素を置かず対戦結果や Character_Store を変更しない）を守る（要件18.4）。`matches` が空のときは何も描画しない（`null` 返却）を維持する
+  - props（`matches: ResolvedBracketMatch[]`・`winnerHighlightId?: string | null`）は不変とする。データモデル・`useRankingBattle`・`TournamentEngine` は変更しない（表示強化のみ、Property 24 は不変）
+  - 接続線は CSS 罫線／擬似要素、または軽量な自前 SVG（追加ライブラリなし）で描く。実際のスタイル定義はタスク56で行う
+  - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.7, 7.6, 9.7_
+
+- [ ] 56. CSS: `.tournament-bracket*` を接続線つき縦向きブラケット図用に更新/追加する（要件18.5, 18.7, 9）
+  - `src/styles/global.css` の `.tournament-bracket*` を、接続線つき縦向きブラケット図用に更新/追加する。ラウンドを縦積みにし、対戦カード（背景 `--color-surface`、角丸 `--radius-medium`/`--radius-large`、影 `--shadow-soft`、余白 `--space-*`）として表示する。**勝者から次ラウンドへの接続線**は罫線／擬似要素（`::before`・`::after`）で描き、線色はトークン（`--color-border` / `--color-accent` 相当）経由で解決する（要件18.7, 9.1, 9.2）
+  - **横スクロールなし**を最優先とし、対戦カードは `width:100%`（または画面幅に収まる `max-width`）で配置し、長い名前は折り返す（`overflow-wrap` 等）。図が縦に長い場合は画面の縦スクロールで対応する。ビューポート幅 320〜430 CSS px でも図コンテナ・画面全体に横スクロールを出さない（要件18.5, 18.7, 7.6, 9.7）
+  - トランジションを用いる場合は `var(--transition-*)`（200〜500ms）経由とし、`@media (prefers-reduced-motion: reduce)` で無効化/短縮する（既存トークンの reduced-motion 対応に整合、要件9.4, 9.5）。効果音は追加しない
+  - _Requirements: 18.5, 18.7, 9.1, 9.2, 9.7_
+
+  - [ ]* 56.1 ブラケット図の縦向き表示・接続線・勝者/Bye/優勝強調のユニットテスト
+    - `TournamentBracketView` がラウンドを縦向きに縦積みで表示し、各対戦カードと勝者から次ラウンドへの接続線要素（可能ならクラス/要素の存在）が描画されること、勝者ハイライト（`--winner`/👑）・不戦勝（Bye）表記・`winnerHighlightId` 一致時の優勝強調（`--champion`）が出ること、`matches` が空のとき何も描画しないことを例示テスト（React Testing Library）で確認する。既存の bracket 表示テスト（`RankingBattleView.iteration10.test.tsx`・`RankingBattleView.test.tsx` 等）が引き続き通る範囲で追加する
+    - _Requirements: 18.1, 18.2, 18.3, 18.5, 18.7_
+
+- [ ] 57. Iteration 11 チェックポイント（トーナメント表を図に）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
@@ -586,7 +606,9 @@
     { "id": 31, "tasks": ["50.1", "50.2", "50.3", "51"] },
     { "id": 32, "tasks": ["52"] },
     { "id": 33, "tasks": ["53"] },
-    { "id": 34, "tasks": ["53.1"] }
+    { "id": 34, "tasks": ["53.1"] },
+    { "id": 35, "tasks": ["55", "56"] },
+    { "id": 36, "tasks": ["56.1"] }
   ]
 }
 ```

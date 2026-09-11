@@ -1223,10 +1223,13 @@ select {
 
 /* ---------------------------------------------------------------------------
  * TournamentBracketView — 勝ち上がり（トーナメント表）の読み取り専用可視化 (要件18)
- * ラウンドを縦積みにし、各対戦を縦方向に並べる。ブラケットは横長になりがちなため、
- * 320〜430px でも横スクロールを出さないよう各行を width:100% で収め、親に overflow-x を
- * 出さない (要件18.5, 9.7 / 7.6)。配色・角丸・影・余白は大人かわいいテーマのトークン経由
- * (要件9)。操作要素は置かない（純粋表示。要件18.4）。
+ * 接続線つきの縦向きブラケット図。ラウンド（round 昇順）を上から下へ縦積みし、各対戦を
+ * 「対戦カード」として中央寄せで並べ、ラウンド間を中央の縦コネクタ＋各カードから中央へ
+ * 伸びる短い罫線でつなぐ（勝者が次ラウンド＝下へ進む流れの視覚化。要件18.3, 18.7）。
+ * ブラケットは横長になりがちなため、320〜430px でも横スクロールを出さないよう各カードを
+ * width:100% で収め、親に overflow-x を出さない (要件18.5, 18.7, 9.7 / 7.6)。配色・角丸・影・
+ * 余白・接続線色は大人かわいいテーマのトークン経由 (要件9.1, 9.2)。操作要素は置かない
+ * （純粋表示。要件18.4）。
  * ------------------------------------------------------------------------- */
 .tournament-bracket {
   width: 100%;
@@ -1246,16 +1249,31 @@ select {
   text-align: center;
 }
 
-/* 1 ラウンドぶんのセクション（縦積み）。 */
-.tournament-bracket__round {
+/* ブラケット全体の流れ（ラウンドを上から下へ縦積み）。 */
+.tournament-bracket__flow {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  align-items: center;
+}
+
+/* 1 ラウンドぶんのブロック（縦積み）。中央寄せで対戦カードを並べる。 */
+.tournament-bracket__round {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: var(--space-sm);
 }
 
 .tournament-bracket__round-label {
   margin: 0;
+  align-self: center;
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
@@ -1264,36 +1282,81 @@ select {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-/* 1 対戦（match）。名前中心・省スペースの行。横スクロールを出さないよう内容を折り返す。 */
-.tournament-bracket__match {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-xs) var(--space-sm);
+  gap: var(--space-sm);
+}
+
+/* 1 対戦（match）＝対戦カードの外枠。中央コネクタへ向かう短い罫線をカード上下に描く。 */
+.tournament-bracket__match {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* カードから中央コネクタへ伸びる短い縦罫線（上端＝前ラウンドから、下端＝次ラウンドへ）。
+   罫線色はトークン (--color-border) 経由でハードコードしない (要件18.7, 9.1)。 */
+.tournament-bracket__match::before,
+.tournament-bracket__match::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 2px; /* 罫線の太さ（寸法数値は可） */
+  height: var(--space-sm);
+  background-color: var(--color-border);
+  transform: translateX(-50%);
+}
+
+.tournament-bracket__match::before {
+  bottom: 100%;
+}
+
+.tournament-bracket__match::after {
+  top: 100%;
+}
+
+/* 対戦カード本体。left / right（または Bye）を縦に並べる。 */
+.tournament-bracket__card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
   background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
   box-shadow: var(--shadow-soft);
+  text-align: center;
 }
 
 /* 最終優勝者を含む match を軽く強調する（任意。winnerHighlightId 一致時）。 */
-.tournament-bracket__match--champion {
+.tournament-bracket__match--champion .tournament-bracket__card {
   box-shadow: var(--shadow-raised);
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
+  border-color: var(--color-accent);
 }
 
 .tournament-bracket__competitor {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
   color: var(--color-text-primary);
-  /* 長い名前でも折り返して横スクロールを出さない (要件18.5)。 */
+}
+
+.tournament-bracket__competitor-name {
+  /* 長い名前でも折り返して横スクロールを出さない (要件18.5, 18.7)。 */
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -1316,4 +1379,14 @@ select {
 .tournament-bracket__bye {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
+}
+
+/* ラウンド間の中央縦コネクタ。前ラウンドの勝者が次ラウンド（下）の対戦へ進む流れを示す。
+   色はトークン (--color-accent) 経由。太さの寸法数値のみ許容 (要件18.7, 9.1)。 */
+.tournament-bracket__connector {
+  width: 2px;
+  height: var(--space-md);
+  margin: var(--space-xs) 0;
+  background-color: var(--color-accent);
+  border-radius: var(--radius-small);
 }
