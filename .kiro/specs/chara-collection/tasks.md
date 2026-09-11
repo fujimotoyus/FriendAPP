@@ -20,6 +20,7 @@
 - **イテレーション10**: 対戦をもっと楽しく（状況別実況・準優勝/ベスト4 表示・対戦のお題 Battle_Theme。`TournamentEngine` の勝敗判定は不変）（要件19, 20, 21、要件4/17/18 と整合）
 - **イテレーション11**: トーナメント表を図に（`TournamentBracketView` を接続線つき縦向きブラケット図へ表示強化。データ/ドメイン/エンジン変更なし）（要件18.7 の表示強化）
 - **イテレーション12**: お題に沿った実況（各試合の Battle_Commentary に、その回のお題 Battle_Theme の観点ワード＝Theme_Aspect を織り込む。状況別実況を維持しつつお題に沿った文面にする。`battleTheme` に `getBattleThemeAspect` を追加し既存8お題すべてに観点ワードを定義（未知ラベルは非空フォールバック）、`BattleCommentator.narrate` を末尾任意引数 `aspect?` で後方互換拡張、`useRankingBattle` が観点ワードを実況へ渡す。`TournamentEngine` の勝敗判定・`pickBattleTheme` シグネチャは不変、既存 Property 11〜14, 24, 25, 26, 27 を保持）（要件19.6、要件19/21 の拡張）
+- **イテレーション13**: 優勝見出しもお題連動（優勝発表 `phase === 'champion'` の見出しをその回のお題 Battle_Theme の観点ワード Theme_Aspect から「{観点}No.1 👑」形式で表示。お題未選択（空 theme）時は従来の「最も好きなキャラ 👑」にフォールバック。`battleTheme` に純粋関数 `buildChampionTitle(theme)` を追加し `getBattleThemeAspect` を利用、`RankingBattleView` の優勝見出しを差し替え、`useRankingBattle` の `theme` を使用。`TournamentEngine` の勝敗判定・`pickBattleTheme` / `getBattleThemeAspect` は不変、既存 Property 11〜14, 24, 25, 26, 27, 28 を保持）（要件20.6、要件20/21 の拡張）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -585,12 +586,33 @@
 - [ ] 61. Iteration 12 チェックポイント（お題に沿った実況）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [x] 62. ドメイン: `battleTheme` に優勝見出し導出 `buildChampionTitle` を追加する（要件20.6, 21, 19.6）
+  - `src/domain/battleTheme.ts` に `buildChampionTitle(theme: string): string` を追加する。`getBattleThemeAspect(theme)` で観点ワード（Theme_Aspect）を引き、「{aspect}No.1 👑」形式の優勝見出しを生成する（例: theme「かわいい選手権」→ aspect「かわいさ」→「かわいさNo.1 👑」）。`theme` が空文字（お題未選択・reset 後）のときは従来の既定見出し「最も好きなキャラ 👑」にフォールバックする。常に非空文字列を返し、見出しに冠 `👑` を含める純粋関数とする。`getBattleThemeAspect` は任意ラベルに非空フォールバックを返すため、非空 theme では常に観点ワードを含む見出しになる。`pickBattleTheme` / `getBattleThemeAspect` / `BATTLE_THEME_COUNT` は**戻り値・シグネチャを変えず不変**とする。`Math.random()` は使用せず外部送信も行わない（要件20.6, 3.8）
+  - _Requirements: 20.6, 21, 19.6_
+
+  - [x]* 62.1 優勝見出しはお題連動・常に非空のプロパティテスト
+    - **Property 29: 優勝見出しはお題に連動し常に非空**（任意の `theme` 文字列（既存8お題ラベル・対応未定義の任意ラベル・空文字を含む）について、`buildChampionTitle(theme)` は (a) 常に非空文字列を返す、(b) `theme` が空文字のとき既定見出し（「最も好きなキャラ」を含む）を返す、(c) `theme` が非空のとき `getBattleThemeAspect(theme)` が返す観点ワードを含む「{観点}No.1」形式の見出しを返す）
+    - **Validates: Requirements 20.6, 21, 19.6**
+    - `// Feature: chara-collection, Property 29` タグ・`numRuns: 100`。対象 `buildChampionTitle`（`getBattleThemeAspect` 利用）。既存 Property 27（`battleTheme.test.ts`）・Property 28（`battleThemeAspect.test.ts` 等）のテストは不変で保持する
+
+- [x] 63. UI: `RankingBattleView` の優勝見出しをお題連動（`buildChampionTitle`）に差し替える（要件20.6）
+  - `src/components/RankingBattleView.tsx` の優勝発表（`phase === 'champion'`）の見出し（現在「最も好きなキャラ 👑」固定）を `buildChampionTitle(theme)` の結果に差し替える（`useRankingBattle` が公開する `theme` を使用）。theme 非空なら「{観点}No.1 👑」、theme 空文字（お題未選択・reset 後）なら「最も好きなキャラ 👑」を表示する。既存の champion 表示（勝者1件の大きな強調・紙吹雪風演出）・準優勝/ベスト4 表示・実況・「もう一度対戦」等は**不変**とする。本コンポーネントはロジックを持たず、hook から受け取った `theme` を `buildChampionTitle` に渡した結果を描画するのみとする
+  - **既存テスト整合の注意**: 既存の `RankingBattleView.test.tsx` / `RankingBattleView.iteration10.test.tsx` が優勝発表を「最も好きなキャラ 👑」の文言で検出している場合、見出しがお題連動へ変わると当該検出が壊れうる。当該テストの見出し検出を、お題連動見出し（またはフォールバック見出し）へ整合させる（例: お題未選択のケースを作れない場合は `👑` を含む heading/region の存在確認へ緩めるか、`buildChampionTitle` のフォールバック文言に合わせる）。この整合は本タスクの実装時に行い、既存テストが引き続き通ることを確認する（要件20.6）
+  - _Requirements: 20.6_
+
+  - [x]* 63.1 優勝見出しがお題連動で表示されることの例示テスト（任意）
+    - `useRankingBattle` が `theme` を持つ場合、優勝発表画面（`phase === 'champion'`）の見出しに `buildChampionTitle(theme)` の結果＝お題連動見出しが現れることを、React Testing Library で rng を固定/シードして例示確認する。あわせて `buildChampionTitle('')` が既定見出し（「最も好きなキャラ」を含む）を返すことをドメイン直接で確認する。既存の優勝見出し検出テストがお題連動見出し（またはフォールバック見出し）へ整合して引き続き通ることを確認する（要件20.6）
+    - _Requirements: 20.6_
+
+- [x] 64. Iteration 13 チェックポイント（優勝見出しもお題連動）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜28）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜29）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -639,7 +661,10 @@
     { "id": 37, "tasks": ["58"] },
     { "id": 38, "tasks": ["59"] },
     { "id": 39, "tasks": ["59.1", "60"] },
-    { "id": 40, "tasks": ["60.1"] }
+    { "id": 40, "tasks": ["60.1"] },
+    { "id": 41, "tasks": ["62"] },
+    { "id": 42, "tasks": ["62.1", "63"] },
+    { "id": 43, "tasks": ["63.1"] }
   ]
 }
 ```

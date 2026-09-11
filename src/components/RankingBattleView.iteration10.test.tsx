@@ -61,12 +61,23 @@ function alwaysZeroRng(): number {
 }
 
 /**
- * 「勝負！→次へ」を champion 見出し（「最も好きなキャラ 👑」）が出るまで繰り返す。
+ * champion 見出しが表示されているか（お題連動、要件20.6）。優勝見出しは theme により
+ * 文言が変わる（例 'かわいさNo.1 👑'）ため、テキスト一致ではなく安定した className
+ * （.ranking-battle__champion-title）で検出する。
+ */
+function championTitlePresent(): boolean {
+  return (
+    document.querySelector('.ranking-battle__champion-title') != null
+  );
+}
+
+/**
+ * 「勝負！→次へ」を champion 見出し（お題連動・冠付き）が出るまで繰り返す。
  * 無限ループ防止のため反復回数に上限を設ける。
  */
 async function playUntilChampion(maxIterations = 20): Promise<void> {
   for (let i = 0; i < maxIterations; i++) {
-    if (screen.queryByText('最も好きなキャラ 👑') != null) {
+    if (championTitlePresent()) {
       return;
     }
     const fightButton = screen.queryByRole('button', { name: /勝負/ });
@@ -166,7 +177,8 @@ describe('RankingBattleView — 準優勝・ベスト4 の表示（要件20.1, 2
 
     await screen.findByRole('button', { name: /勝負/ });
     await playUntilChampion();
-    await screen.findByText('最も好きなキャラ 👑');
+    // 優勝見出し（お題連動、要件20.6）は冠付きの '…No.1 👑' 形で検出する。
+    await screen.findByText(/No\.1 👑/);
 
     // 準優勝（決勝の敗者）が表示される（要件20.1, 20.2）。
     const runnerUp = container.querySelector('.ranking-battle__runner-up');
@@ -197,7 +209,8 @@ describe('RankingBattleView — 準優勝・ベスト4 の表示（要件20.1, 2
 
     await screen.findByRole('button', { name: /勝負/ });
     await playUntilChampion();
-    await screen.findByText('最も好きなキャラ 👑');
+    // 優勝見出し（お題連動、要件20.6）は冠付きの '…No.1 👑' 形で検出する。
+    await screen.findByText(/No\.1 👑/);
 
     // 準優勝（決勝の敗者）が必ず 1 名表示される（要件20.1, 20.2）。
     const runnerUp = container.querySelector('.ranking-battle__runner-up');

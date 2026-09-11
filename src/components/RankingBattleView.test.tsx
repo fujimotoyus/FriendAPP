@@ -22,6 +22,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import type { Character, PhotoData } from '../domain/types';
 import { InMemoryCharacterStore } from '../persistence/InMemoryCharacterStore';
 import { RankingBattleView } from './RankingBattleView';
+import { buildChampionTitle, pickBattleTheme } from '../domain/battleTheme';
 
 /** テスト用のダミー写真データ（PhotoData）。表示の実体は jsdom では検証しない。 */
 function makePhoto(): PhotoData {
@@ -91,7 +92,7 @@ describe('RankingBattleView — フェーズ遷移 pair → result → champion�
       makeCharacter({ id: 'a', name: 'アルファ' }),
       makeCharacter({ id: 'b', name: 'ベータ' }),
     ]);
-    render(
+    const { container } = render(
       <RankingBattleView
         onBack={() => {}}
         onRegister={() => {}}
@@ -103,9 +104,13 @@ describe('RankingBattleView — フェーズ遷移 pair → result → champion�
     // pair: 開始後にまず「勝負！」ボタンが見える（要件17.1）。
     const fightButton = await screen.findByRole('button', { name: /勝負/ });
     expect(fightButton).toBeInTheDocument();
-    // まだ「次へ」も優勝発表も出ていない。
+    // まだ「次へ」も優勝発表（champion 見出し・冠付き）も出ていない。
+    // 優勝見出しはお題連動（要件20.6）で文言が変わるため、テキスト一致ではなく
+    // 安定した className（.ranking-battle__champion-title）で検出する。
     expect(screen.queryByRole('button', { name: /次へ/ })).toBeNull();
-    expect(screen.queryByText('最も好きなキャラ 👑')).toBeNull();
+    expect(
+      container.querySelector('.ranking-battle__champion-title'),
+    ).toBeNull();
 
     // 「勝負！」→ result: 実況（role=status）と「次へ」ボタンが見える（要件17.3）。
     fireEvent.click(fightButton);
@@ -113,9 +118,10 @@ describe('RankingBattleView — フェーズ遷移 pair → result → champion�
     expect(nextButton).toBeInTheDocument();
     expect(screen.getByRole('status')).toBeInTheDocument();
 
-    // 「次へ」→ champion: 2 件なら 1 試合で優勝が決まる（要件17.4）。
+    // 「次へ」→ champion: 2 件なら 1 試合で優勝が決まる（要件17.4）。優勝見出しはお題連動
+    // （要件20.6）: theme 非空（alwaysZeroRng → 'かわいい選手権'）なので '{観点}No.1 👑'。
     fireEvent.click(nextButton);
-    const championTitle = await screen.findByText('最も好きなキャラ 👑');
+    const championTitle = await screen.findByText(/No\.1 👑/);
     expect(championTitle).toBeInTheDocument();
     // 「もう一度対戦」ボタンが見える。
     expect(
@@ -190,9 +196,10 @@ describe('RankingBattleView — トーナメント表の表示（要件18.1〜18
       screen.getByRole('heading', { name: 'トーナメント表' }),
     ).toBeInTheDocument();
 
-    // 「次へ」で champion 確定。
+    // 「次へ」で champion 確定。優勝見出しはお題連動（要件20.6）のため文言一致ではなく
+    // 冠付き見出しの形（'…No.1 👑'）で検出する。
     fireEvent.click(screen.getByRole('button', { name: /次へ/ }));
-    await screen.findByText('最も好きなキャラ 👑');
+    await screen.findByText(/No\.1 👑/);
 
     // champion 名（勝者）を取得する。
     const championName = screen
@@ -213,7 +220,7 @@ describe('RankingBattleView — 自動再生しない（要件17.5）', () => {
       makeCharacter({ id: 'a', name: 'アルファ' }),
       makeCharacter({ id: 'b', name: 'ベータ' }),
     ]);
-    render(
+    const { container } = render(
       <RankingBattleView
         onBack={() => {}}
         onRegister={() => {}}
@@ -231,6 +238,50 @@ describe('RankingBattleView — 自動再生しない（要件17.5）', () => {
 
     expect(screen.getByRole('button', { name: /勝負/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /次へ/ })).toBeNull();
-    expect(screen.queryByText('最も好きなキャラ 👑')).toBeNull();
+    // 優勝見出し（お題連動、要件20.6）はまだ出ていない。安定した className で検出する。
+    expect(
+      container.querySelector('.ranking-battle__champion-title'),
+    ).toBeNull();
+  });
+});
+
+describe('RankingBattleView — 優勝見出しがお題連動（Champion_Title、要件20.6, task 63.1）', () => {
+  it('theme 非空で champion まで進めると見出しが buildChampionTitle(theme)（お題連動・No.1 👑 を含む）に一致する', async () => {
+    const store = new InMemoryCharacterStore([
+      makeCharacter({ id: 'a', name: 'アルファ' }),
+      makeCharacter({ id: 'b', name: 'ベータ' }),
+    ]);
+    const { container } = render(
+      <RankingBattleView
+        onBack={() => {}}
+        onRegister={() => {}}
+        store={store}
+        rng={alwaysZeroRng}
+      />,
+    );
+
+    // start のたびに hook は theme = pickBattleTheme(rng) を選ぶ。alwaysZeroRng（常に 0）を
+    // DI しているため theme は決定的に先頭お題になり、見出しはそのお題連動の文言になる。
+    const expectedTheme = pickBattleTheme(alwaysZeroRng);
+    const expectedTitle = buildChampionTitle(expectedTheme);
+
+    // pair → result → champion まで進める。
+    fireEvent.click(await screen.findByRole('button', { name: /勝負/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /次へ/ }));
+
+    // 優勝見出し（安定 className）を取得し、お題連動の期待文言に一致することを確認する。
+    await screen.findByText(/No\.1 👑/);
+    const titleEl = container.querySelector('.ranking-battle__champion-title');
+    expect(titleEl).not.toBeNull();
+    expect(titleEl?.textContent).toEqual(expectedTitle);
+    // お題連動の見出しは冠 '👑' と 'No.1' を含む。
+    expect(expectedTitle).toContain('No.1 👑');
+    expect(expectedTitle).not.toEqual('最も好きなキャラ 👑');
+  });
+
+  it('ドメイン: 空 theme のとき buildChampionTitle は従来の既定見出しにフォールバックする', () => {
+    // theme 未選択・reset 後（空文字）は従来どおり「最も好きなキャラ」を含む見出しになる。
+    expect(buildChampionTitle('')).toContain('最も好きなキャラ');
+    expect(buildChampionTitle('')).toEqual('最も好きなキャラ 👑');
   });
 });

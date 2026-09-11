@@ -13,6 +13,7 @@
  *                        他方に敗者トーンダウン（`--loser`）を付ける。実況テキストを表示。
  *                        操作は「次へ」（{@link UseRankingBattleResult.next}）。要件17.2, 17.3, 4.3
  * - `phase==='champion'`: champion を大きく強調（`--celebrate`）し、紙吹雪演出を描画。
+ *                         優勝見出しはお題連動（{@link buildChampionTitle}、要件20.6）。
  *                         操作は「もう一度対戦」。要件4.7, 17.4
  *
  * 本コンポーネントはロジックを持たず、hook から受け取った状態を描画するのみとする（勝者判定等は
@@ -25,12 +26,13 @@
  * - 準優勝（`runnerUp`, `ranking-battle__runner-up`）・ベスト4（`semifinalists`,
  *   `ranking-battle__semifinalists`）: champion 発表内に表示。null/空なら非表示（要件20.1〜20.3）。
  *
- * Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.9, 4.7, 9.4, 20.1, 20.2, 20.3, 21.1, 21.4, 21.5
+ * Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.9, 4.7, 9.4, 20.1, 20.2, 20.3, 20.6, 21.1, 21.4, 21.5
  */
 import { useEffect, useState } from 'react';
 import type { Character } from '../domain/types';
 import type { Rng } from '../domain/TournamentEngine';
 import { useRankingBattle } from '../hooks/useRankingBattle';
+import { buildChampionTitle } from '../domain/battleTheme';
 import type { CharacterStore } from '../persistence/CharacterStore';
 import { EmptyStateView } from './EmptyStateView';
 import { PastelButton } from './PastelButton';
@@ -299,7 +301,12 @@ export function RankingBattleView({
             ))}
           </div>
 
-          <p className="ranking-battle__champion-title">最も好きなキャラ 👑</p>
+          {/* 優勝見出し（Champion_Title、要件20.6）: お題（theme）から buildChampionTitle で導出する。
+              非空 theme → '{観点}No.1 👑'、空 theme（未開始/reset 後）→ '最も好きなキャラ 👑'。
+              ロジックは持たず hook の theme を純粋関数へ渡して描画するのみ。 */}
+          <p className="ranking-battle__champion-title">
+            {buildChampionTitle(theme)}
+          </p>
           <PhotoFrame
             photo={champion.photo}
             alt={displayNameOf(champion)}

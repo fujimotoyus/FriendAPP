@@ -11,6 +11,10 @@
     "59.1 お題の観点ワードを織り込んだ実況のプロパティテスト": {
       "status": "passed",
       "lastRunTimestamp": 1789110304748
+    },
+    "62.1 優勝見出しはお題連動・常に非空のプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1789111703735
     }
   },
   "executionHistory": {

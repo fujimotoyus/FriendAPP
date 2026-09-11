@@ -105,3 +105,31 @@ export function getBattleThemeAspect(theme: string): string {
   const aspect = THEME_ASPECTS[theme];
   return aspect && aspect.length > 0 ? aspect : DEFAULT_THEME_ASPECT;
 }
+
+/**
+ * お題未選択（空 theme）時に用いる従来の既定優勝見出し（非空・冠付き）。
+ */
+const DEFAULT_CHAMPION_TITLE = '最も好きなキャラ 👑';
+
+/**
+ * 優勝発表の見出し（Champion_Title）をお題（Battle_Theme）から導出する純粋関数（要件20.6, 21, 19.6）。
+ *
+ * `theme` が非空のときは `getBattleThemeAspect(theme)` で観点ワード（Theme_Aspect）を引き、
+ * 「{観点}No.1 👑」形式の見出しを返す（例: theme「かわいい選手権」→ aspect「かわいさ」→
+ * 「かわいさNo.1 👑」）。`theme` が空文字（お題未選択・reset 後）のときは従来の既定見出し
+ * 「最も好きなキャラ 👑」にフォールバックする。`getBattleThemeAspect` は任意ラベルに非空
+ * フォールバックを返すため、非空 theme では常に観点ワードを含む見出しになる。
+ *
+ * **常に非空文字列を返し、見出しに冠 `👑` を含める**。副作用なし・外部送信なし。
+ * `pickBattleTheme` / `getBattleThemeAspect` の挙動には一切影響しない。
+ *
+ * @param theme お題ラベル（`pickBattleTheme` の返り値など。空文字はお題未選択を表す）
+ * @returns 優勝見出し（非空文字列・`👑` を含む）
+ */
+export function buildChampionTitle(theme: string): string {
+  if (theme === '') {
+    return DEFAULT_CHAMPION_TITLE;
+  }
+  const aspect = getBattleThemeAspect(theme);
+  return `${aspect}No.1 👑`;
+}
