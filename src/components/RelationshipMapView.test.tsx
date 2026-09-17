@@ -63,7 +63,7 @@ describe('RelationshipMapView 関係表示（task 68.1 / 要件22.1）', () => {
 
   it('edges がある場合に関係（相手名・関係タグ）が表示される', async () => {
     // 新ルールでは 2 件以上あれば id 由来で必ず線が生成される（登録データ非依存）。
-    // 各線には 5 種の関係タグ（仲良し/ライバル/喧嘩中/気になる存在/相棒）のいずれかが付く。
+    // 各線には 10 種の関係タグ（仲良し/ライバル/喧嘩中/気になる存在/相棒/親友/尊敬している/ライバル兼友達/謎めいた存在/推し）のいずれかが付く。
     mockSeed = [
       makeCharacter({ id: 'a', name: 'アルファ', favoriteLevel: 5, imageColor: 'rose' }),
       makeCharacter({ id: 'b', name: 'ベータ', favoriteLevel: 5, imageColor: 'rose' }),
@@ -80,8 +80,8 @@ describe('RelationshipMapView 関係表示（task 68.1 / 要件22.1）', () => {
     expect(screen.getAllByText('アルファ').length).toBeGreaterThan(0);
     expect(screen.getAllByText('ベータ').length).toBeGreaterThan(0);
 
-    // 関係タグ（5 種のいずれか）が少なくとも 1 つ表示される（色だけに依存しないラベル併記）。
-    const tagLabels = ['仲良し', 'ライバル', '喧嘩中', '気になる存在', '相棒'];
+    // 関係タグ（10 種のいずれか）が少なくとも 1 つ表示される（色だけに依存しないラベル併記）。
+    const tagLabels = ['仲良し', 'ライバル', '喧嘩中', '気になる存在', '相棒', '親友', '尊敬している', 'ライバル兼友達', '謎めいた存在', '推し'];
     const shownTags = tagLabels.filter((label) => screen.queryAllByText(label).length > 0);
     expect(shownTags.length).toBeGreaterThan(0);
   });
@@ -103,13 +103,18 @@ describe('RelationshipMapView 関係表示（task 68.1 / 要件22.1）', () => {
       expect(labels.length).toBeGreaterThan(0);
     });
 
-    // 各バッジは 5 種の色分けクラスのいずれかを 1 つ持つ（色はトークン経由で CSS が解決）。
+    // 各バッジは 10 種の色分けクラスのいずれかを 1 つ持つ（色はトークン経由で CSS が解決）。
     const tagClasses = [
       'rel-tag--friend',
       'rel-tag--rival',
       'rel-tag--fighting',
       'rel-tag--crush',
       'rel-tag--buddy',
+      'rel-tag--bestfriend',
+      'rel-tag--admire',
+      'rel-tag--frenemy',
+      'rel-tag--mystery',
+      'rel-tag--oshi',
     ];
     for (const label of labels) {
       const matched = tagClasses.filter((cls) => label.classList.contains(cls));
@@ -126,11 +131,12 @@ describe('RelationshipMapView 関係表示（task 68.1 / 要件22.1）', () => {
     render(<RelationshipMapView />);
 
     // 各ノードの関係に、双方向の印象（アルファ→ベータ／ベータ→アルファ）が両方現れる。
+    // 新UIでは印象が span 分割されているため、body の textContent で確認する。
     await waitFor(() => {
-      expect(screen.queryAllByText(/アルファ→ベータ/).length).toBeGreaterThan(0);
+      expect(document.body.textContent).toMatch(/アルファ.*→.*ベータ/);
     });
-    expect(screen.queryAllByText(/アルファ→ベータ/).length).toBeGreaterThan(0);
-    expect(screen.queryAllByText(/ベータ→アルファ/).length).toBeGreaterThan(0);
+    expect(document.body.textContent).toMatch(/アルファ.*→.*ベータ/);
+    expect(document.body.textContent).toMatch(/ベータ.*→.*アルファ/);
   });
 });
 

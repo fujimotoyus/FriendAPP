@@ -47,6 +47,11 @@ const TAG_LABELS: Record<RelationshipTag, string> = {
   fighting: '喧嘩中',
   crush: '気になる存在',
   buddy: '相棒',
+  bestfriend: '親友',
+  admire: '尊敬している',
+  frenemy: 'ライバル兼友達',
+  mystery: '謎めいた存在',
+  oshi: '推し',
 };
 
 /**
@@ -54,7 +59,9 @@ const TAG_LABELS: Record<RelationshipTag, string> = {
  * 実際の色はすべて CSS 側（global.css の `.rel-tag--*`）でテーマトークン経由に解決し、
  * ここでは色値をハードコードせずクラス名の対応のみを持つ。色対応（design.md「表示ラベルと
  * 色トークン」）: friend=--color-primary / rival=--image-color-butter /
- * fighting=--color-text-secondary / crush=--image-color-lavender / buddy=--image-color-mint。
+ * fighting=--color-text-secondary / crush=--image-color-lavender / buddy=--image-color-mint /
+ * bestfriend=--image-color-sky / admire=--color-accent / frenemy=--image-color-rose /
+ * mystery=--color-secondary / oshi=--color-primary-hover。
  * 色だけに依存しないよう {@link TAG_LABELS} の日本語ラベルを必ず併記する（要件22.17 / 9.7）。
  */
 const TAG_CLASS: Record<RelationshipTag, string> = {
@@ -63,6 +70,11 @@ const TAG_CLASS: Record<RelationshipTag, string> = {
   fighting: 'rel-tag--fighting',
   crush: 'rel-tag--crush',
   buddy: 'rel-tag--buddy',
+  bestfriend: 'rel-tag--bestfriend',
+  admire: 'rel-tag--admire',
+  frenemy: 'rel-tag--frenemy',
+  mystery: 'rel-tag--mystery',
+  oshi: 'rel-tag--oshi',
 };
 
 /** Character の主表示テキスト（`deriveCardDisplay` の primary）を返す。 */
@@ -193,24 +205,32 @@ export function RelationshipMapView({ onBack }: RelationshipMapViewProps): JSX.E
                       key={relation.other.id}
                       className="relationship-map__relation"
                     >
-                      <span className="relationship-map__relation-other">
-                        {primaryNameOf(relation.other)}
-                      </span>
-                      <span
-                        className={`relationship-map__relation-label ${TAG_CLASS[relation.tag]}`}
-                      >
-                        {TAG_LABELS[relation.tag]}
-                      </span>
-                      <span className="relationship-map__relation-impressions">
-                        <span className="relationship-map__impression">
-                          {primaryNameOf(character)}→{primaryNameOf(relation.other)}:{' '}
-                          {relation.impressionToOther}
+                      {/* 1行目: 相手名 + タグバッジ（横並び） */}
+                      <div className="relationship-map__relation-header">
+                        <span className="relationship-map__relation-other">
+                          {primaryNameOf(relation.other)}
                         </span>
-                        <span className="relationship-map__impression">
-                          {primaryNameOf(relation.other)}→{primaryNameOf(character)}:{' '}
-                          {relation.impressionFromOther}
+                        <span
+                          className={`relationship-map__relation-label ${TAG_CLASS[relation.tag]}`}
+                        >
+                          {TAG_LABELS[relation.tag]}
                         </span>
-                      </span>
+                      </div>
+                      {/* 2行目以降: 向きあり印象（縦積み・インデント） */}
+                      <div className="relationship-map__relation-impressions">
+                        <p className="relationship-map__impression">
+                          <span className="relationship-map__impression-from">{primaryNameOf(character)}</span>
+                          <span className="relationship-map__impression-arrow"> → </span>
+                          <span className="relationship-map__impression-to">{primaryNameOf(relation.other)}</span>
+                          <span className="relationship-map__impression-text">: {relation.impressionToOther}</span>
+                        </p>
+                        <p className="relationship-map__impression">
+                          <span className="relationship-map__impression-from">{primaryNameOf(relation.other)}</span>
+                          <span className="relationship-map__impression-arrow"> → </span>
+                          <span className="relationship-map__impression-to">{primaryNameOf(character)}</span>
+                          <span className="relationship-map__impression-text">: {relation.impressionFromOther}</span>
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ul>

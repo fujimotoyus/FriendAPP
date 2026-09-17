@@ -1489,16 +1489,32 @@ select {
   gap: var(--space-sm);
 }
 
-/* 1 本の関係（相手名・ラベル・軸バッジ）。狭幅では折り返して横スクロールを出さない。 */
+/* 1 本の関係（相手名・ラベル・軸バッジ）。縦積みレイアウト（1行目: 相手名＋タグ、2行目以降: 印象）。 */
 .relationship-map__relation {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;  /* 横並び→縦積みに変更 */
   gap: var(--space-xs);
   padding: var(--space-sm);
   border-radius: var(--radius-medium);
   background-color: var(--color-background);
   transition: background-color var(--transition-fast) ease; /* 200〜500ms (要件9.4) */
+}
+
+/* 1行目: 相手名とタグバッジを横並びにする */
+.relationship-map__relation-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* 印象2行をインデント付きで縦積み */
+.relationship-map__relation-impressions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--space-sm);
+  border-left: 2px solid var(--color-border);
 }
 
 .relationship-map__relation-other {
@@ -1547,6 +1563,42 @@ select {
 .relationship-map__relation-label.rel-tag--buddy {
   background-color: var(--image-color-mint); /* ミント */
   color: var(--color-text-primary);
+}
+
+/* 新タグ5種の色クラス（要件22.18）。色はトークン経由・ハードコード禁止。 */
+.relationship-map__relation-label.rel-tag--bestfriend {
+  background-color: var(--image-color-sky); /* スカイブルー */
+  color: var(--color-text-primary);
+}
+
+.relationship-map__relation-label.rel-tag--admire {
+  background-color: var(--color-accent); /* ラベンダー（accent） */
+  color: var(--color-on-primary);
+}
+
+.relationship-map__relation-label.rel-tag--frenemy {
+  background-color: var(--image-color-rose); /* ローズ（少し暖か） */
+  color: var(--color-text-primary);
+}
+
+.relationship-map__relation-label.rel-tag--mystery {
+  background-color: var(--color-secondary); /* スモーキーミント（ミステリアス） */
+  color: var(--color-text-primary);
+}
+
+.relationship-map__relation-label.rel-tag--oshi {
+  background-color: var(--color-primary-hover); /* 濃いめのローズ（推し！） */
+  color: var(--color-on-primary);
+}
+
+/* 向きあり印象（<p> 向け調整）。 */
+.relationship-map__impression {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-base);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* 関係軸バッジ群（複数軸のときは複数個）。 */

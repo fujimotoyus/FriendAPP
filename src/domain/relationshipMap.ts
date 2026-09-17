@@ -13,7 +13,7 @@
  * 手順（すべて決定的・id のみ依存）:
  *   1. すべての無向ペア（i < j、id 昇順に正規化して a < b、a === b は作らない）について、
  *      以下を id から求める。
- *      - 関係タグ tag: `TAGS[fnv1a32(a + '\u0000' + b) mod 5]`（要件22.2, 22.3）。
+ *      - 関係タグ tag: `TAGS[fnv1a32(a + '\u0000' + b) mod TAGS.length]`（要件22.2, 22.3）。
  *      - 向きあり印象: `impressionAtoB = IMPRESSIONS[fnv1a32(a + '>' + b) mod len]`、
  *        `impressionBtoA = IMPRESSIONS[fnv1a32(b + '>' + a) mod len]`（要件22.4〜22.6）。
  *        a→b と b→a は入力が異なるため一般に別の一言になりうる。
@@ -38,15 +38,21 @@ import { fnv1a32 } from './DailyPickSelector';
 const MAX_DEGREE = 3;
 
 /**
- * 関係タグの固定順（`fnv1a32(a + '\u0000' + b) mod 5` のインデックスに対応）。要件22.2
+ * 関係タグの固定順（`fnv1a32(a + '\u0000' + b) mod TAGS.length` のインデックスに対応）。要件22.2
  * 順序を変えると既存の割り当てが変わるため、固定の並びを維持する。
+ * 既存5種（インデックス0〜4）の順序は絶対に変えない。
  */
 export const TAGS: readonly RelationshipTag[] = [
-  'friend',
-  'rival',
-  'fighting',
-  'crush',
-  'buddy',
+  'friend',      // 0: 仲良し
+  'rival',       // 1: ライバル
+  'fighting',    // 2: 喧嘩中
+  'crush',       // 3: 気になる存在
+  'buddy',       // 4: 相棒
+  'bestfriend',  // 5: 親友
+  'admire',      // 6: 尊敬している
+  'frenemy',     // 7: ライバル兼友達
+  'mystery',     // 8: 謎めいた存在
+  'oshi',        // 9: 推し
 ];
 
 /**
@@ -55,8 +61,10 @@ export const TAGS: readonly RelationshipTag[] = [
  * かわいい内輪ノリの非空の短文。名前を含まないため、名前が空の Character でも成立する。
  * `fnv1a32(from + '>' + to) mod IMPRESSIONS.length` で 1 つを決定的に選ぶ。
  * 順序を変えると既存の割り当てが変わるため、固定の並びを維持する。
+ * 既存12種（インデックス0〜11）の順序は絶対に変えない。
  */
 export const IMPRESSIONS: readonly string[] = [
+  // 既存12種（順序固定）
   'あこがれてる',
   'ちょっと気になる',
   'いつも一緒にいたい',
@@ -69,6 +77,19 @@ export const IMPRESSIONS: readonly string[] = [
   '一緒にいると楽しい',
   'そばにいたい',
   '内心すごいと思ってる',
+  // 追加12種
+  'なんでも話せる気がする',
+  'もっと知りたいと思う',
+  '負けたくないと思ってる',
+  'いると元気が出る',
+  'ちょっと意識しちゃう',
+  '大切にしたい',
+  'どこか放っておけない',
+  'ずっと一緒にいたい',
+  '不思議な魅力を感じる',
+  '勝手に仲間だと思ってる',
+  'ほっとする存在',
+  '刺激をもらってる',
 ];
 
 /**

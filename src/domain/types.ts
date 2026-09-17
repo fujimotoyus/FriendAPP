@@ -279,18 +279,33 @@ export type SortOrder = 'newest' | 'favorite' | 'name' | 'metOn';
  *
  * 各無向の線に付く関係の種類（5 種）。登録データ（`imageColor` / `metOn` /
  * `favoriteLevel`）には一切依存せず、無向ペア `{a, b}`（`a < b` に正規化）の id を
- * 連結した文字列の決定的ハッシュ（`fnv1a32`）を `mod 5` した結果で 1 つを選ぶ（要件22.3）。
+ * 連結した文字列の決定的ハッシュ（`fnv1a32`）を `mod TAGS.length` した結果で 1 つを選ぶ（要件22.3）。
  *
  * 表示ラベル（日本語）と表示色（テーマトークン）は UI/定数側で対応付ける（型は英語 enum）:
- * - `'friend'`   : 仲良し
- * - `'rival'`    : ライバル
- * - `'fighting'` : 喧嘩中
- * - `'crush'`    : 気になる存在
- * - `'buddy'`    : 相棒
+ * - `'friend'`    : 仲良し
+ * - `'rival'`     : ライバル
+ * - `'fighting'`  : 喧嘩中
+ * - `'crush'`     : 気になる存在
+ * - `'buddy'`     : 相棒
+ * - `'bestfriend'`: 親友
+ * - `'admire'`    : 尊敬している
+ * - `'frenemy'`   : ライバル兼友達
+ * - `'mystery'`   : 謎めいた存在
+ * - `'oshi'`      : 推し
  *
  * 参照: design.md「Data Models」「イテレーション14（キャラ相関図、要件22）」
  */
-export type RelationshipTag = 'friend' | 'rival' | 'fighting' | 'crush' | 'buddy';
+export type RelationshipTag =
+  | 'friend'
+  | 'rival'
+  | 'fighting'
+  | 'crush'
+  | 'buddy'
+  | 'bestfriend'
+  | 'admire'
+  | 'frenemy'
+  | 'mystery'
+  | 'oshi';
 
 /**
  * 関係の線（Relationship_Edge、要件22）。id ベースの無向の線。
