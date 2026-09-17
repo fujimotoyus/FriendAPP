@@ -15,6 +15,18 @@
     "62.1 優勝見出しはお題連動・常に非空のプロパティテスト": {
       "status": "passed",
       "lastRunTimestamp": 1789111703735
+    },
+    "66.1 相関図の決定性・要素妥当性・入力不変のプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1789658158456
+    },
+    "66.2 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）のプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1789658159383
+    },
+    "66.3 相関図の関係軸・スコア集約・ラベル判定のプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1789658160499
     }
   },
   "executionHistory": {
@@ -815,6 +827,353 @@
         "executionId": "0faca25d-fda7-4ba2-bbaf-6fd1718ee0eb",
         "chatSessionId": "sess_b5660c08-a3b8-4a30-b614-5f4338750d6b",
         "timestamp": 1788936995677
+      }
+    ],
+    "37.1 ドメイン `buildDailyLine` を実装し `buildDailyMessage` を置換/内部委譲する": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657589151
+      }
+    ],
+    "37. 今日の相棒の一言（Daily_Line）の決定的セリフ選択（要件16, 5.5）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657589332
+      }
+    ],
+    "37.2 今日の一言の決定的・非空・50文字以下のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657590498
+      }
+    ],
+    "38. useDailyGacha を新関数シグネチャへ更新する（要件16, 5.2, 5.3）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657591875
+      }
+    ],
+    "39. UI: DailyGachaView のメッセージ表示を吹き出し風セリフに更新する（要件16.1, 要件9）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657593879
+      }
+    ],
+    "40. Iteration 8 チェックポイント（今日の相棒に一言）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657594564
+      }
+    ],
+    "41.1 トーナメント表の整合性のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657601303
+      }
+    ],
+    "41. ドメイン: TournamentEngine を勝ち上がり履歴（Tournament_Bracket）公開のため拡張する（要件18, 4.6, 4.7）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657601534
+      }
+    ],
+    "42. Hook: useRankingBattle を2段階進行と bracket 公開へ拡張する（要件17, 18, 4.2, 4.3, 4.4, 4.7）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657604629
+      }
+    ],
+    "43. UI: RankingBattleView を試合ごとリザルト表示＋優勝演出に更新する（要件17, 4.7, 9.4, 9.5）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657606502
+      }
+    ],
+    "44. UI: TournamentBracketView（新規）で勝ち上がりを可視化する（要件18, 7.6, 7.7, 9.6, 9.7）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657608066
+      }
+    ],
+    "45.1 対戦の進行フェーズ・遷移・ブラケット表示のユニットテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657609355
+      }
+    ],
+    "45. CSS: 勝者ハイライト・ペア入場・紙吹雪の演出をトークン経由で追加する（要件17, 9.4, 9.5）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657609544
+      }
+    ],
+    "46. Iteration 9 チェックポイント（対戦を魅せる）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657612658
+      }
+    ],
+    "47. ドメイン: BattleCommentator を状況別（Battle_Situation）に拡張する（要件19, 4.3, 4.5）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657618885
+      }
+    ],
+    "48. ドメイン: deriveBattleSituation を実装する（要件19.1, 19.5）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657619744
+      }
+    ],
+    "49. ドメイン: deriveRanking（準優勝・ベスト4 導出）を実装する（要件20）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657621209
+      }
+    ],
+    "50.1 状況別実況の妥当性のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657622726
+      }
+    ],
+    "50. ドメイン: pickBattleTheme（お題選択）を実装する（要件21）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657622961
+      }
+    ],
+    "50.2 準優勝・ベスト4 導出の bracket 整合のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657624056
+      }
+    ],
+    "50.3 お題選択の非空・要素性・変動のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657625499
+      }
+    ],
+    "51. Hook: useRankingBattle にお題・状況別実況・準優勝/ベスト4 を追加する（要件19, 20, 21）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657628276
+      }
+    ],
+    "52. UI: RankingBattleView にお題表示・準優勝/ベスト4 表示を追加する（要件20, 21, 9）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657629666
+      }
+    ],
+    "53.1 お題表示・準優勝/ベスト4 表示のユニットテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657631181
+      }
+    ],
+    "53. CSS: お題バッジ・準優勝/ベスト4 表示のスタイルをトークン経由で追加する（要件21, 20, 9）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657631359
+      }
+    ],
+    "54. Iteration 10 チェックポイント（対戦をもっと楽しく）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657633651
+      }
+    ],
+    "56.1 ブラケット図の縦向き表示・接続線・勝者/Bye/優勝強調のユニットテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657640620
+      }
+    ],
+    "56. CSS: `.tournament-bracket*` を接続線つき縦向きブラケット図用に更新/追加する（要件18.5, 18.7, 9）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657640794
+      }
+    ],
+    "57. Iteration 11 チェックポイント（トーナメント表を図に）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657641979
+      }
+    ],
+    "55. UI: TournamentBracketView を接続線つき縦向きブラケット図へ作り替える（要件18, 7.6, 9.7, 9）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657643528
+      }
+    ],
+    "59.1 お題の観点ワードを織り込んだ実況のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657646862
+      }
+    ],
+    "59. ドメイン: `BattleCommentator.narrate` を観点ワード（aspect）織り込みに拡張する（要件19.6, 19.2, 19.3）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657647070
+      }
+    ],
+    "61. Iteration 12 チェックポイント（お題に沿った実況）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657647765
+      }
+    ],
+    "58. ドメイン: `battleTheme` にお題の観点ワード（Theme_Aspect）対応を追加する（要件19.6, 21）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657649065
+      }
+    ],
+    "60.1 実況にお題の観点が反映されうることのユニットテスト（任意）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657650495
+      }
+    ],
+    "60. Hook: `useRankingBattle` の実況生成でお題観点ワードを `narrate` へ渡す（要件19.6）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657650723
+      }
+    ],
+    "65. ドメイン型: キャラ相関図（Relationship_Map）用の型を追加する（要件22.1, 22.9, 22.13）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657681899
+      },
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657856054
+      }
+    ],
+    "66. ドメイン: 相関図生成の純粋関数 `buildRelationshipMap` を実装する（要件22.2〜22.13）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789657857168
+      },
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658220254
+      }
+    ],
+    "66.1 相関図の決定性・要素妥当性・入力不変のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658220077
+      }
+    ],
+    "66.2 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658221303
+      }
+    ],
+    "66.3 相関図の関係軸・スコア集約・ラベル判定のプロパティテスト": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658222279
+      }
+    ],
+    "67. Hook: 相関図の読み取り専用 view-state `useRelationshipMap` を実装する（要件22.14, 22.15, 22.16, 22.17）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658225121
+      },
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658417991
+      }
+    ],
+    "68. UI: `RelationshipMapView` を実装し `App`/`NavigationBar` に「相関図」導線を配線する（要件22.1, 22.14, 22.15, 22.16, 22.18, 22.19, 22.20, 22.21）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658419536
+      },
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658911278
+      }
+    ],
+    "68.1 相関図 UI・ナビゲーション導線のユニットテスト（任意）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658911060
+      }
+    ],
+    "69. CSS: 相関図のスタイルをトークン経由で追加する（要件22.19, 22.21, 9）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658912735
+      }
+    ],
+    "70. Iteration 14 チェックポイント（キャラ相関図）": [
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789658922923
+      },
+      {
+        "executionId": "33d98509-0706-4222-b2f0-95bd420d3c60",
+        "chatSessionId": "sess_9453de67-39a9-427b-babd-f2c8d911c5fa",
+        "timestamp": 1789659005971
       }
     ]
   }

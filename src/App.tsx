@@ -6,6 +6,7 @@ import { DailyGachaView } from './components/DailyGachaView';
 import { NavigationBar, type NavigationTarget } from './components/NavigationBar';
 import { RankingBattleView } from './components/RankingBattleView';
 import { RegistrationForm } from './components/RegistrationForm';
+import { RelationshipMapView } from './components/RelationshipMapView';
 import { defaultCharacterStore } from './persistence/defaultStore';
 
 /**
@@ -15,11 +16,12 @@ import { defaultCharacterStore } from './persistence/defaultStore';
  * - `detail`: キャラクター詳細（{@link CharacterDetailView}）
  * - `gacha`:  今日の一枚ガチャ（{@link DailyGachaView}）
  * - `battle`: ランキング対戦（{@link RankingBattleView}）
+ * - `relationship`: キャラ相関図（{@link RelationshipMapView}、要件22）
  *
  * 登録フォームは新規登録と編集を兼用する（design.md「RegistrationForm（登録 / 編集）」）。
  * `add` ビューで `editingCharacter` が非 null なら編集、null なら新規登録として扱う。
  */
-type View = 'list' | 'add' | 'detail' | 'gacha' | 'battle';
+type View = 'list' | 'add' | 'detail' | 'gacha' | 'battle' | 'relationship';
 
 /**
  * Application root. `useState` によるシンプルな画面遷移で 一覧 / 登録 / 詳細 /
@@ -72,6 +74,11 @@ export default function App(): JSX.Element {
     setView('battle');
   };
 
+  // キャラ相関図画面を開く（要件22.18）。
+  const goToRelationship = (): void => {
+    setView('relationship');
+  };
+
   // Navigation_Bar のタブ選択に応じて主要画面へ遷移する（要件13.2〜13.5）。
   // 'add' は編集状態を引き継がない新規登録（goToAdd が editingCharacter をクリアする。要件13.5）。
   const handleNavigate = (target: NavigationTarget): void => {
@@ -84,6 +91,9 @@ export default function App(): JSX.Element {
         break;
       case 'battle':
         goToBattle();
+        break;
+      case 'relationship':
+        goToRelationship();
         break;
       case 'add':
         goToAdd();
@@ -118,9 +128,13 @@ export default function App(): JSX.Element {
     setView('list');
   };
 
-  // Navigation_Bar は主要画面（list/gacha/battle）でのみ表示し、
-  // 詳細・登録/編集フォームでは表示しない（要件13.6, 13.7）。
-  const showNavigation = view === 'list' || view === 'gacha' || view === 'battle';
+  // Navigation_Bar は主要画面（list/gacha/battle/relationship）でのみ表示し、
+  // 詳細・登録/編集フォームでは表示しない（要件13.6, 13.7, 22.18）。
+  const showNavigation =
+    view === 'list' ||
+    view === 'gacha' ||
+    view === 'battle' ||
+    view === 'relationship';
 
   return (
     <div className={showNavigation ? 'app app--with-nav' : 'app'}>
@@ -156,6 +170,8 @@ export default function App(): JSX.Element {
       {view === 'battle' ? (
         <RankingBattleView onBack={goToList} onRegister={goToAdd} />
       ) : null}
+
+      {view === 'relationship' ? <RelationshipMapView onBack={goToList} /> : null}
 
       {showNavigation ? (
         <NavigationBar active={view} onNavigate={handleNavigate} />

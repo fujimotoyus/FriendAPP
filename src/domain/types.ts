@@ -273,3 +273,75 @@ export interface FieldError {
  * 参照: design.md「補助的な値型 / SortOrder」「sortCharacters」、要件11.2〜11.6
  */
 export type SortOrder = 'newest' | 'favorite' | 'name' | 'metOn';
+
+/**
+ * 関係軸（Relationship_Axis、要件22.2〜22.8）。
+ *
+ * 登録済み Character の既存フィールドから導出する 3 種の関係の種類。
+ *
+ * - `'same-color'`    : 同一 Image_Color（`'none'` 以外）でつながる。`'none'` どうしはつながない（要件22.2, 22.3）
+ * - `'same-period'`   : Met_On の年月（`YYYY-MM`）が一致してつながる。一方でも未設定なら作らない（要件22.4, 22.5）
+ * - `'same-favorite'` : Favorite_Level が同値でつながる（ラベルは 4 以上の同値=両想い級 / それ以外の同値=気になる存在、要件22.6〜22.8）
+ *
+ * 参照: design.md「Data Models」「イテレーション14（キャラ相関図、要件22）」
+ */
+export type RelationshipAxis = 'same-color' | 'same-period' | 'same-favorite';
+
+/**
+ * 関係エッジ（Relationship_Edge、要件22）。id ベースの無向スコア付きエッジ。
+ *
+ * `a` / `b` は結ぶ 2 件の {@link Character} の id で、常に `a < b`（id 昇順）に正規化する
+ * （自己ループなし、要件22.13）。同一の無向ペアに複数の軸が該当する場合は 1 本のエッジに
+ * 集約し、`axes` に該当軸集合（1 つ以上）、`score` に該当軸の基準スコアの合算、`label` に
+ * 軸優先順位で選ばれた代表ラベル（Relationship_Label）を保持する（要件22.9）。
+ * `buildRelationshipMap` が Character の内容（`imageColor` / `metOn` / `favoriteLevel`）のみから
+ * 決定的に生成する読み取り専用の値で、Character_Store のデータを一切変更しない（要件22.16）。
+ *
+ * 参照: design.md「Data Models」「イテレーション14」、要件22.1, 22.9, 22.13
+ */
+export interface RelationshipEdge {
+  /** 一方の Character の id（`a < b` に正規化）。要件22.13 */
+  a: string;
+  /** もう一方の Character の id（`a < b` に正規化）。要件22.13 */
+  b: string;
+  /** 該当した関係軸（1 つ以上）。要件22.9 */
+  axes: RelationshipAxis[];
+  /** 該当軸の基準スコアの合算。要件22.9 */
+  score: number;
+  /** 代表の関係ラベル（例「おそろいカラー」「同期」「両想い級」「気になる存在」）。要件22.9 */
+  label: string;
+}
+
+/**
+ * 相関図（Relationship_Map、要件22）。`buildRelationshipMap` の戻り値。
+ *
+ * 次数上限3・両端合意を満たす最終エッジの列を保持する。順序は決定的（`a` 昇順 → `b` 昇順）で、
+ * 同一の Character 集合からは常に同一の相関図を返す（要件22.12）。
+ *
+ * 参照: design.md「Data Models」「イテレーション14」、要件22.1, 22.9, 22.10〜22.13
+ */
+export interface RelationshipMap {
+  /** 次数上限3・両端合意を満たす最終エッジ。決定的順序（`a` 昇順 → `b` 昇順）。 */
+  edges: RelationshipEdge[];
+}
+
+/**
+ * 表示用に id を {@link Character} へ解決した関係エッジ（`useRelationshipMap` が公開）。
+ *
+ * {@link RelationshipEdge} の `a` / `b`（id）を対応する Character へ解決したもので、
+ * `RelationshipMapView` が名前/イメージカラー等付きで関係を可視化するために用いる（要件22 の可視化用）。
+ *
+ * 参照: design.md「Data Models」「RelationshipMapView」、要件22.1, 22.16
+ */
+export interface ResolvedRelationshipEdge {
+  /** 一方の Character（{@link RelationshipEdge.a} を解決）。 */
+  a: Character;
+  /** もう一方の Character（{@link RelationshipEdge.b} を解決）。 */
+  b: Character;
+  /** 該当した関係軸（1 つ以上）。要件22.9 */
+  axes: RelationshipAxis[];
+  /** 該当軸の基準スコアの合算。要件22.9 */
+  score: number;
+  /** 代表の関係ラベル。要件22.9 */
+  label: string;
+}

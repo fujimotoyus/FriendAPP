@@ -84,6 +84,19 @@
 - **既存テスト整合の注意**: 既存の `RankingBattleView.test.tsx` / `RankingBattleView.iteration10.test.tsx` は優勝発表を「最も好きなキャラ 👑」の文言で検出している可能性が高い。本イテレーションで見出しがお題連動に変わると当該検出が壊れうるため、実装時に「見出し検出をお題連動見出し（またはフォールバック見出し）に整合させる」（例: お題未選択のケースを作れない場合は `👑` を含む heading/region の存在確認へ緩めるか、`buildChampionTitle` のフォールバック文言に合わせる）。この整合はタスク実装時に行う前提とする。
 - **不変の制約の維持**: `TournamentEngine` の勝敗判定・終了性・不戦勝・bracket セマンティクス、`pickBattleTheme` / `getBattleThemeAspect` のシグネチャ・戻り値は不変（既存 Property 11〜14, 24, 25, 26, 27, 28 を保持）。優勝見出しを含む一切のデータを外部送信しない（要件20.6, 3.8）。見出し導出は Domain 層の純粋関数（`buildChampionTitle`）へ寄せ、property-based testing で検証する（新規 Correctness Property 29）。
 
+### イテレーション14（キャラ相関図、要件22）
+
+イテレーション14では、登録済み Character 同士の関係を登録内容からルールベースで自動生成し、新画面 **キャラ相関図（Relationship_Map）** で可視化する。既存機能・データモデルへの**破壊的でない拡張**として設計し、意思決定ロジック（関係生成）は Domain 層の純粋関数へ寄せ、UI は読み取り専用の可視化に徹する。要点は次のとおり。
+
+- **読み取り専用・端末内完結（要件22.16, 22.17, 3.8）**: 関係（Relationship_Edge）は `Character` の既存フィールド（`imageColor` / `metOn` / `favoriteLevel`）のみから導出し、`Character_Store` のデータおよび `Character` の内容を一切変更しない。関係生成・スコアリング・ラベル決定はすべて端末内の純粋関数で行い、いかなる外部サーバーへもデータ・導出結果を送信しない（外部 AI/送信なし）。
+- **ドメイン純粋関数への集約（PBT 対象）**: 関係生成の中核を純粋関数 `buildRelationshipMap(characters: readonly Character[]): RelationshipMap` として切り出す。決定的・純粋（副作用なし・入力を変更しない）で、同一の Character 集合からは常に同一の相関図（同一のエッジ集合・スコア・ラベル・表示順）を返す（要件22.12）。3 軸（`same-color` / `same-period` / `same-favorite`）の判定・スコアリング・軸集約・ラベル決定・次数上限（各ノード上位3本）・同点タイブレークまでを本関数で決定的に定義する。
+- **3 軸の関係生成ルール（要件22.2〜22.8）**: (1) **おそろいカラー（`same-color`）**: 2 件の `imageColor` が同一プリセット色（`'none'` 以外）のとき関係。`'none'` どうしはつながない（要件22.2, 22.3）。(2) **同期（`same-period`）**: 2 件の `metOn` の年月（`YYYY-MM`）が一致するとき関係。どちらか一方でも `metOn` 未設定なら作らない（要件22.4, 22.5）。(3) **お気に入り度が同値（`same-favorite`）**: 2 件の `favoriteLevel` が同値のとき関係。両者が 4 以上の同値なら軸ラベル「両想い級」、それ以外の同値なら「気になる存在」（要件22.6〜22.8）。
+- **無向ペアへの集約とスコアリング（要件22.9）**: 同一の無向ペア（`{a, b}`、`a < b` の id 昇順で正規化）に複数の軸が該当する場合は **1 本のエッジに集約** し、該当軸の基準スコアを **合算** する。基準スコアは軸ごとに決定的に定義する（後述「相関図の生成」）。代表ラベル（`label`）は決定的な軸優先順位に基づき 1 つ選ぶ。
+- **次数上限3と決定的タイブレーク（要件22.10, 22.11）**: 各ノード（Character）に接続するエッジは、スコアの高い順に **上位3本まで**に制限する。スコア同点でノードの次数上限を超える取捨が必要な場合は、決定的なタイブレーク規則で残すエッジを選ぶ。あるノードで採用されても相手ノードで上位3本から外れると、そのエッジは相互合意が崩れる可能性があるため、本設計では「ノード視点の上位3本」を両端で満たすエッジのみを最終エッジとして採用する方針（両端合意方式）とし、決定性を保つ（後述）。
+- **空状態（要件22.14, 22.15）**: `Character` が 0/1 件のときは関係を作れないため、2 件以上の登録が必要である旨の空状態を表示する。2 件以上あってもエッジが 1 本も生成されない場合は、関係が見つからなかった旨の空状態を表示する。
+- **UI 配線・レイアウト（要件22.18〜22.21, 7, 9）**: `useRelationshipMap`（`fetchAll` → `buildRelationshipMap` → id を Character へ解決して公開する読み取り専用 hook）と `RelationshipMapView`（追加ライブラリなしの軽量な自前描画。各 Character に紐づく「関係のある相手」を列挙するリストベースのカード表示で横スクロールを出さない）を追加し、`App.tsx` のビュー状態と `NavigationBar` へ導線を配線する。配色・角丸・影・余白はすべて大人かわいいテーマのトークン経由で適用し、横スクロールなし（320〜430 CSS px）・最小 44×44 CSS px タッチ領域・rem 追従・`prefers-reduced-motion` 尊重を満たす（トーナメント表 `TournamentBracketView` の横スクロールなし方針と整合）。
+- **不変の制約の維持**: `Character` 型・`Character_Store`・既存ドメイン関数は変更しない（相関図用の型と関数を追記するのみ）。既存 Property 1〜29 は不変で保持し、相関図の決定性・要素妥当性・次数上限・対称性・自己ループなし・軸/ラベル判定・読み取り専用性を新規 Correctness Property 30〜32 で検証する。
+
 ### 技術方針
 
 - **プラットフォーム**: Web（PWA）。iPhone Safari でホーム画面に追加し、スタンドアロン・ポートレートで起動する（要件7.1, 7.2）。オフラインファースト設計とする。
@@ -281,22 +294,40 @@ function CollectionView(): JSX.Element {
 - **準優勝・ベスト4 の表示（要件20）**: `phase === 'champion'` の優勝発表画面に、`useRankingBattle` が公開する `runnerUp: Character | null`（準優勝）と `semifinalists: Character[]`（ベスト4）を表示する。`runnerUp` が `null` の場合は準優勝行を表示せず、`semifinalists` が空の場合はベスト4行を表示しない（参加者が少なく定義できない順位は非表示、要件20.1, 20.2, 20.3）。表示はトークン経由・横スクロールなし・44×44 CSS px を維持する（要件9）。
 - **優勝見出しのお題連動（要件20.6、イテレーション13）**: `phase === 'champion'` の優勝見出しは、現在「最も好きなキャラ 👑」で固定だが、これを `buildChampionTitle(theme)` の結果に差し替える（`useRankingBattle` が公開する `theme` を使用）。theme 非空なら「{観点}No.1 👑」、theme 空文字（お題未選択・reset 後）なら従来の「最も好きなキャラ 👑」を表示する。champion 表示（勝者の大きな強調・紙吹雪風演出）・準優勝/ベスト4・実況・「もう一度対戦」等は不変で、見出し文言の具体化のみを行う（優勝者1件を表示する趣旨は不変、要件4.7）。本コンポーネントはロジックを持たず、hook から受け取った `theme` を `buildChampionTitle` に渡した結果を描画するのみとする。既存の優勝見出しを文言で検出している例示テスト（`RankingBattleView.test.tsx` 等）があれば、お題連動見出し（またはフォールバック見出し）へ整合させる（実装時、上記 Overview イテレーション13 の注意参照）。
 
-#### App（ルート・ビュー状態と NavigationBar 制御）
+#### RelationshipMapView（キャラ相関図。イテレーション14・新規、要件22）
 
-アプリのルートコンポーネント。現在のビュー状態 `view: 'list' | 'add' | 'detail' | 'gacha' | 'battle'`（および `detail`/`add` の対象 Character・編集フラグ）を保持し、対応する画面コンポーネントを描画する。共通の `NavigationBar` の表示可否と遷移を制御する。
+登録済み Character 同士の関係（Relationship_Edge）を、`useRelationshipMap` が公開する `edges: ResolvedRelationshipEdge[]` に基づき可視化する読み取り専用コンポーネント（要件22.1, 22.16）。**追加ライブラリを用いず軽量な自前描画**とし、**横スクロールを一切出さない**方針（`TournamentBracketView` と整合）で、各 Character（ノード）ごとに「関係のある相手」を列挙する**リストベースのカード表示**を基本とする。各ノードカードには当該 Character の名前（`deriveCardDisplay` の主表示相当）と、そのノードに接続する関係を相手 Character・関係ラベル（`label`）・関係軸（`axes`）付きで縦積みに列挙する。関係の線/バッジは CSS（トークン経由）で表現し、画面幅に収める（長い名前は折り返す）。
 
-- `NavigationBar` は主要画面（`view` が `'list'` / `'gacha'` / `'battle'`）でのみ表示し、`'detail'`（詳細）と `'add'`（新規登録・編集フォーム）では表示しない（要件13.6, 13.7）。
-- 遷移ハンドラ: `goToList()`→`'list'`（要件13.2）、`goToGacha()`→`'gacha'`（要件13.3）、`goToBattle()`→`'battle'`（要件13.4）、`goToAdd()`→編集状態を持たない新規登録フォーム（`'add'`、`editing` をクリア、要件13.5）。
-- アクティブタブは現在の `view`（`list`/`gacha`/`battle`）から導出して `NavigationBar` に渡す（要件13.6）。
+- **空状態（要件22.14, 22.15）**: `hasEnough === false`（Character が 0/1 件）のときは「関係を作るには 2 件以上の登録が必要」旨の空状態を `EmptyStateView` で表示する。2 件以上あっても `edges` が空のときは「関係が見つからなかった」旨の空状態を表示する。
+- **読み取り専用（要件22.16）**: 表示のみで対戦結果や Character_Store のデータを変更しない。操作要素を置く場合（例: 相手カードへの遷移）は最小 44×44 CSS px を維持する（要件22.20）。
+- **レイアウト・テーマ（要件22.19, 22.21, 7, 9）**: 配色・角丸・影・余白は大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で適用し、ビューポート幅 320〜430 CSS px でも横スクロールを発生させない。トランジションを用いる場合は `--transition-*`（200〜500ms）経由とし `@media (prefers-reduced-motion: reduce)` で無効化/短縮する（要件9.4, 9.5）。
 
 ```tsx
-type View = 'list' | 'add' | 'detail' | 'gacha' | 'battle';
+function RelationshipMapView(): JSX.Element {
+  const { loadState, characters, edges, hasEnough, reload } = useRelationshipMap();
+  // hasEnough=false → 「2件以上必要」空状態。edges 空 → 「関係なし」空状態。
+  // それ以外は各 Character ノードごとに、接続する edges を相手・label・axes 付きで縦積み表示（横スクロールなし）
+}
+```
+
+#### App（ルート・ビュー状態と NavigationBar 制御）
+
+アプリのルートコンポーネント。現在のビュー状態 `view: 'list' | 'add' | 'detail' | 'gacha' | 'battle' | 'relationship'`（および `detail`/`add` の対象 Character・編集フラグ）を保持し、対応する画面コンポーネントを描画する。共通の `NavigationBar` の表示可否と遷移を制御する。
+
+- `NavigationBar` は主要画面（`view` が `'list'` / `'gacha'` / `'battle'` / `'relationship'`）でのみ表示し、`'detail'`（詳細）と `'add'`（新規登録・編集フォーム）では表示しない（要件13.6, 13.7, 22.18）。
+- 遷移ハンドラ: `goToList()`→`'list'`（要件13.2）、`goToGacha()`→`'gacha'`（要件13.3）、`goToBattle()`→`'battle'`（要件13.4）、`goToAdd()`→編集状態を持たない新規登録フォーム（`'add'`、`editing` をクリア、要件13.5）、`goToRelationship()`→`'relationship'`（キャラ相関図、要件22.18）。
+- アクティブタブは現在の `view`（`list`/`gacha`/`battle`/`relationship`）から導出して `NavigationBar` に渡す（要件13.6）。
+- **イテレーション14（要件22.18）**: `'relationship'` ビューで `RelationshipMapView` を描画する。相関図への導線は `NavigationBar` へ「相関図」タブとして追加する（既存 4 タブに 1 つ追加）。導線の実現方法（タブ追加か主要画面内リンクか）は本設計ではナビゲーションタブ追加とする。
+
+```tsx
+type View = 'list' | 'add' | 'detail' | 'gacha' | 'battle' | 'relationship';
 
 function App(): JSX.Element {
   const [view, setView] = useState<View>('list');
-  const showNav = view === 'list' || view === 'gacha' || view === 'battle'; // 要件13.6, 13.7
-  // goToList/goToGacha/goToBattle/goToAdd を NavigationBar に渡す
+  const showNav = view === 'list' || view === 'gacha' || view === 'battle' || view === 'relationship'; // 要件13.6, 13.7, 22.18
+  // goToList/goToGacha/goToBattle/goToAdd/goToRelationship を NavigationBar に渡す
   // showNav が true のときのみ NavigationBar を描画し、現在の view をアクティブタブとして渡す
+  // view === 'relationship' のとき RelationshipMapView を描画する（要件22.18）
 }
 ```
 
@@ -309,7 +340,7 @@ function App(): JSX.Element {
 - `EmptyStateView`: 空状態表示（要件2.7, 5.6, 8.6）。
 - `PhotoFrame`: 角丸の写真表示枠。`PhotoData`（ArrayBuffer+MIME）を受け取り、表示時に Blob を生成して Object URL 化する。`onError` でプレースホルダー表示（要件2.4）。
 - `PhotoInput`: `<input type="file" accept="image/*" capture="environment">` をラップし、選択・キャンセル・ブロックを扱う（要件1.2, 1.11）。
-- `NavigationBar`: 画面下部に固定表示するタブ型の共通ナビゲーション。「図鑑」「今日の相棒」「トーナメント」「新規登録」の 4 項目を表示し、現在のビューに対応するタブをアクティブ表示する（要件13.1, 13.6）。各タブ項目は最小 44×44 CSS px のタッチ領域を持ち（要件13.8）、ビューポート幅 320〜430 CSS px の縦向きでも横スクロールを発生させずに 4 項目を配置する（要件13.9）。配色・角丸・トークンは大人かわいいテーマに整合させる（要件13.10, 要件9）。各タブは `App` が提供する遷移ハンドラ（`goToList` / `goToGacha` / `goToBattle` / `goToAdd`）を呼び出す（要件13.2〜13.5）。`goToAdd` は既存の編集状態を引き継がない新規登録用フォームを開く（要件13.5）。
+- `NavigationBar`: 画面下部に固定表示するタブ型の共通ナビゲーション。「図鑑」「今日の相棒」「トーナメント」「新規登録」の 4 項目を表示し、現在のビューに対応するタブをアクティブ表示する（要件13.1, 13.6）。各タブ項目は最小 44×44 CSS px のタッチ領域を持ち（要件13.8）、ビューポート幅 320〜430 CSS px の縦向きでも横スクロールを発生させずに全項目を配置する（要件13.9）。配色・角丸・トークンは大人かわいいテーマに整合させる（要件13.10, 要件9）。各タブは `App` が提供する遷移ハンドラ（`goToList` / `goToGacha` / `goToBattle` / `goToAdd`）を呼び出す（要件13.2〜13.5）。`goToAdd` は既存の編集状態を引き継がない新規登録用フォームを開く（要件13.5）。**イテレーション14（要件22.18）**: 相関図（Relationship_Map）への導線として「相関図」タブを追加し（`goToRelationship` を呼ぶ）、320〜430 CSS px の縦向きでも横スクロールなしを維持したまま項目を配置する（要件22.18, 22.19, 13.9）。既存 4 タブの遷移・表示制御は不変とする。
 
 ### Hooks / View-State（ViewModel 相当）
 
@@ -387,6 +418,20 @@ function useRankingBattle(): {
 //   得られた id を fetchAll 済みの Character へ解決して runnerUp（Character | null）・semifinalists（Character[]）として公開する（要件20.1, 20.2, 20.3）。
 //   bracket を読み取るのみで対戦結果・ストアを変更しない（要件20.4）。
 // 既存の戻り値・セマンティクス（start/advance/resolveCurrentBattle/next/reset/canStart/champion/currentPair/currentCommentary/phase/bracket）は保持し、追加のみとする。
+
+// キャラ相関図（要件22）— イテレーション14。読み取り専用の可視化用 view-state。
+function useRelationshipMap(): {
+  loadState: LoadState;                    // 読み込み状態（idle/loading/loaded/failed）
+  characters: Character[];                 // 取得済みの全 Character（ノード解決用）
+  edges: ResolvedRelationshipEdge[];       // 関係エッジ（id を Character へ解決済み、要件22.1）
+  hasEnough: boolean;                      // Character が 2 件以上か（1 件以下なら関係を作れない、要件22.14）
+  reload: () => Promise<void>;             // fetchAll → buildRelationshipMap → 解決
+};
+// reload(): fetchAll() で全 Character を取得し、buildRelationshipMap(characters) を呼んで id ベースの
+//   RelationshipEdge を得た後、各 id を取得済み Character へ解決して edges（ResolvedRelationshipEdge[]）を公開する。
+//   Character_Store の読み取りのみで一切変更しない（要件22.16）。導出は端末内の純粋関数のみで外部送信しない（要件22.17, 3.8）。
+//   Character が 0/1 件なら hasEnough=false かつ edges=[]（空状態は UI が表示、要件22.14）。2 件以上でも edges が空なら
+//   関係なしの空状態を UI が表示する（要件22.15）。読み込み失敗は failed 状態にする。
 ```
 
 ### Domain モジュール（純粋 TypeScript）
@@ -551,6 +596,27 @@ function getBattleThemeAspect(theme: string): string;
 //   pickBattleTheme / getBattleThemeAspect / BATTLE_THEME_COUNT は不変（本関数は別途見出しを組み立てる）。
 function buildChampionTitle(theme: string): string;
 
+// キャラ相関図の関係生成（Relationship_Map、要件22）— 純粋関数。イテレーション14で追加。
+//   登録済み Character 集合から、3 軸（same-color / same-period / same-favorite）で
+//   無向のスコア付きエッジ（RelationshipEdge）を決定的に生成する。副作用なし・入力を変更しない。
+//   手順（すべて決定的）:
+//   1. すべての無向ペア（i < j で id 昇順に正規化）について 3 軸を判定する。
+//      - same-color : a.imageColor === b.imageColor かつ 'none' でない（要件22.2, 22.3）
+//      - same-period: normalizeMetOn 済みの metOn がともに設定済み（undefined でない）かつ
+//                     年月（先頭 'YYYY-MM'）が一致（要件22.4, 22.5）
+//      - same-favorite: a.favoriteLevel === b.favoriteLevel（同値）。両者 >= 4 ならラベル「両想い級」、
+//                     それ以外の同値なら「気になる存在」（要件22.6, 22.7, 22.8）
+//   2. 該当軸が 1 つ以上あるペアを 1 本のエッジに集約し、該当軸の基準スコアを合算する（要件22.9）。
+//      基準スコア（決定的）: same-favorite(両想い級)=4, same-color=3, same-period=2, same-favorite(気になる存在)=1。
+//      代表ラベル（label）は軸優先順位（same-favorite(両想い級) > same-color > same-period >
+//      same-favorite(気になる存在)）で最上位の軸のラベルを採用する（要件22.9）。axes は判定順で保持する。
+//   3. 各ノード（Character）視点で、接続エッジをスコア降順（同点は相手 id 昇順）で並べ、上位3本を「採用候補」とする。
+//      両端のノードでともに上位3本（採用候補）に入るエッジのみを最終エッジとして採用する（両端合意方式）。
+//      これにより各ノードの次数は 3 以下になり（要件22.10）、取捨は決定的（スコア降順→相手 id 昇順、要件22.11, 22.12）。
+//   4. 自己ループ（i === j）は生成しない。エッジは常に相異なる 2 件を結ぶ無向関係（a < b で正規化、要件22.13）。
+//   返り値の edges は決定的な順序（a 昇順 → b 昇順）に整列して返す。
+function buildRelationshipMap(characters: readonly Character[]): RelationshipMap;
+
 // 画像検証・正規化（要件1.10, 8.2, 8.3）
 interface PhotoProcessor {
   // 対応 MIME(JPEG/PNG/WebP)判定、サイズ上限チェック、正常なら PhotoData(ArrayBuffer+MIME)を返す
@@ -707,6 +773,43 @@ type BattleSituation = 'favored' | 'upset' | 'even';
 interface RankingDerivation {
   runnerUp: string | null;
   semifinalists: string[];
+}
+
+// キャラ相関図（Relationship_Map、要件22）。イテレーション14で追加。
+// 登録済み Character の内容から導出する無向のスコア付き関係グラフの型。
+// buildRelationshipMap が id ベースで生成し、useRelationshipMap が Character へ解決して公開する。
+// 生成・表示は Character_Store のデータを一切変更しない読み取り専用（要件22.16）。
+
+// 関係軸（Relationship_Axis、要件22.2〜22.8）。
+//   'same-color'    : 同一 Image_Color（'none' 以外）でつながる（要件22.2, 22.3）
+//   'same-period'   : Met_On の年月（YYYY-MM）が一致してつながる（要件22.4, 22.5）
+//   'same-favorite' : Favorite_Level が同値でつながる（ラベルは 4 以上同値=両想い級/他=気になる存在、要件22.6〜22.8）
+type RelationshipAxis = 'same-color' | 'same-period' | 'same-favorite';
+
+// 関係エッジ（Relationship_Edge、要件22）。id ベースの無向エッジ。
+//   a / b は結ぶ 2 件の Character の id で、常に a < b（id 昇順）に正規化する（自己ループなし、要件22.13）。
+//   axes は該当した関係軸の集合、score は該当軸の基準スコアの合算（要件22.9）、
+//   label は軸優先順位で選ばれた代表ラベル（Relationship_Label、要件22.9）。
+interface RelationshipEdge {
+  a: string;                 // 一方の Character の id（a < b）
+  b: string;                 // もう一方の Character の id（a < b）
+  axes: RelationshipAxis[];  // 該当した関係軸（1 つ以上）
+  score: number;             // 該当軸の基準スコアの合算（要件22.9）
+  label: string;             // 代表の関係ラベル（例「おそろいカラー」「同期」「両想い級」「気になる存在」）
+}
+
+// buildRelationshipMap の戻り値。id ベースの相関図（要件22）。
+interface RelationshipMap {
+  edges: RelationshipEdge[]; // 次数上限3・両端合意を満たす最終エッジ。決定的順序（a 昇順→b 昇順）
+}
+
+// 表示用に id を Character へ解決した関係エッジ（useRelationshipMap が公開）。要件22 の可視化用。
+interface ResolvedRelationshipEdge {
+  a: Character;              // 一方の Character
+  b: Character;             // もう一方の Character
+  axes: RelationshipAxis[];
+  score: number;
+  label: string;
 }
 
 type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
@@ -1006,7 +1109,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 *プロパティとは、システムのすべての正当な実行にわたって成り立つべき特性や振る舞いのことであり、システムが何をすべきかについての形式的な言明である。プロパティは、人間が読める仕様と機械が検証可能な正当性保証との橋渡しとなる。*
 
-以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜16へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19、イテレーション6（要件14〜15）で追加した出会った日の正規化・イメージカラー正規化/縁取り導出・新フィールドを含む保存往復のプロパティは Property 20〜22、イテレーション8（要件16）で追加した今日の相棒の一言（Daily_Line）の決定的選出プロパティは Property 23 として末尾に追加している（既存 Property 1〜22 は保持）。イテレーション8では既存メッセージ生成 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替えるため、メッセージ長を検証する Property 16 の対象は `buildDailyLine`（相棒本人のセリフ風の一言）となるが、50文字以下の不変条件は維持される。Property 23 は決定性・非空を追加検証する点で Property 16（長さ）と相補的である。イテレーション9（要件17〜18）で追加した勝ち上がり履歴（Tournament_Bracket）の整合性プロパティは Property 24 として末尾に追加している（既存 Property 1〜23 は保持）。特に `TournamentEngine` に読み取り専用の `bracket` を追加する拡張は既存セマンティクスを変えないため、トーナメント自動終了・敗者除外・不戦勝を検証する **Property 11・12・13 は不変で保持**する。イテレーション10（要件19〜21）で追加した状況別実況・準優勝/ベスト4 導出・お題選択のプロパティは Property 25〜27 として末尾に追加している（既存 Property 1〜24 は保持）。イテレーション10では `TournamentEngine` の勝敗判定を一切変更しないため、**Property 11〜14, 24 は不変で保持**する。特に `BattleCommentator.narrate` は省略可能な `situation` 引数を追加する後方互換拡張であり、既存 **Property 14 は拡張後も維持**される。イテレーション12（要件19.6）で追加した「お題の観点ワード（Theme_Aspect）を織り込んだ実況」のプロパティは Property 28 として末尾に追加している（既存 Property 1〜27 は保持）。イテレーション12では `TournamentEngine` の勝敗判定・`pickBattleTheme` のシグネチャを一切変更せず、`narrate` は末尾に省略可能な `aspect` 引数を足す後方互換拡張であるため、**Property 11〜14, 24, 25, 26, 27 は不変で保持**する。イテレーション13（要件20.6）で追加した「優勝見出しはお題に連動し常に非空」のプロパティは Property 29 として末尾に追加している（既存 Property 1〜28 は保持）。イテレーション13では `TournamentEngine` の勝敗判定・`pickBattleTheme` / `getBattleThemeAspect` の既存挙動を一切変更せず、`buildChampionTitle` を追加するのみであるため、**Property 11〜14, 24, 25, 26, 27, 28 は不変で保持**する。
+以下は、Domain 層の純粋ロジック（バリデーション、決定的選出、トーナメント、永続化ラウンドトリップ、表示データ導出、並び替え、一覧カード表示モデル導出、お気に入り度表示モデル導出）に対する property-based testing の対象である。UI 見た目・テーマ配色・トランジション・ナビゲーションバーの表示制御・PWA 基盤・パフォーマンスなどは普遍量化できないため対象外とし、Testing Strategy で例示テスト・スモークテスト等により扱う。これらのプロパティはプラットフォーム非依存のドメイン性質であり、要件番号を要件1〜16へ対応付けている。イテレーション5（要件9〜13）で追加した並び替え・表示モデル導出のプロパティは Property 17〜19、イテレーション6（要件14〜15）で追加した出会った日の正規化・イメージカラー正規化/縁取り導出・新フィールドを含む保存往復のプロパティは Property 20〜22、イテレーション8（要件16）で追加した今日の相棒の一言（Daily_Line）の決定的選出プロパティは Property 23 として末尾に追加している（既存 Property 1〜22 は保持）。イテレーション8では既存メッセージ生成 `buildDailyMessage` を決定的セリフ選択 `buildDailyLine` へ作り替えるため、メッセージ長を検証する Property 16 の対象は `buildDailyLine`（相棒本人のセリフ風の一言）となるが、50文字以下の不変条件は維持される。Property 23 は決定性・非空を追加検証する点で Property 16（長さ）と相補的である。イテレーション9（要件17〜18）で追加した勝ち上がり履歴（Tournament_Bracket）の整合性プロパティは Property 24 として末尾に追加している（既存 Property 1〜23 は保持）。特に `TournamentEngine` に読み取り専用の `bracket` を追加する拡張は既存セマンティクスを変えないため、トーナメント自動終了・敗者除外・不戦勝を検証する **Property 11・12・13 は不変で保持**する。イテレーション10（要件19〜21）で追加した状況別実況・準優勝/ベスト4 導出・お題選択のプロパティは Property 25〜27 として末尾に追加している（既存 Property 1〜24 は保持）。イテレーション10では `TournamentEngine` の勝敗判定を一切変更しないため、**Property 11〜14, 24 は不変で保持**する。特に `BattleCommentator.narrate` は省略可能な `situation` 引数を追加する後方互換拡張であり、既存 **Property 14 は拡張後も維持**される。イテレーション12（要件19.6）で追加した「お題の観点ワード（Theme_Aspect）を織り込んだ実況」のプロパティは Property 28 として末尾に追加している（既存 Property 1〜27 は保持）。イテレーション12では `TournamentEngine` の勝敗判定・`pickBattleTheme` のシグネチャを一切変更せず、`narrate` は末尾に省略可能な `aspect` 引数を足す後方互換拡張であるため、**Property 11〜14, 24, 25, 26, 27 は不変で保持**する。イテレーション13（要件20.6）で追加した「優勝見出しはお題に連動し常に非空」のプロパティは Property 29 として末尾に追加している（既存 Property 1〜28 は保持）。イテレーション13では `TournamentEngine` の勝敗判定・`pickBattleTheme` / `getBattleThemeAspect` の既存挙動を一切変更せず、`buildChampionTitle` を追加するのみであるため、**Property 11〜14, 24, 25, 26, 27, 28 は不変で保持**する。イテレーション14（要件22）で追加したキャラ相関図（Relationship_Map）の関係生成（`buildRelationshipMap`）に対するプロパティは Property 30〜32 として末尾に追加している（既存 Property 1〜29 は保持）。イテレーション14では `Character` 型・`Character_Store`・既存ドメイン関数を一切変更せず、相関図用の型（`RelationshipEdge` 等）と純粋関数 `buildRelationshipMap` を追加するのみであるため、**既存 Property 1〜29 は不変で保持**する。相関図の関係生成は端末内の純粋関数のみで決定的に行い外部送信しない（要件22.17, 3.8）。UI の描画・テーマ・横スクロールなし・44×44 CSS px・ナビ導線・空状態メッセージ表示は普遍量化できないため対象外とし、Testing Strategy で例示テスト・スナップショット・CSS 検査により扱う。
 
 ### Property 1: フィールド文字数バリデーション
 
@@ -1182,6 +1285,24 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 **Validates: Requirements 20.6, 21, 19.6**
 
+### Property 30: 相関図は決定的で要素妥当・入力を変更しない
+
+*任意の* `Character` 集合について、`buildRelationshipMap(characters)` は次を満たす。(a) **決定性**: 同一の `Character` 集合に対して何度呼んでも常に同一の相関図（同一のエッジ集合・`axes`・`score`・`label`・エッジの並び順）を返し、入力の順序を並べ替えても（各 Character の内容が同じなら）同一の結果を返す。同点でノードの次数上限を超える取捨が必要な場合も、決定的なタイブレーク規則（スコア降順→相手 id 昇順）に従って一意に決まる（要件22.11, 22.12）。(b) **要素妥当性**: 返り値の各 `RelationshipEdge` の `a` と `b` はいずれも入力集合に存在する Character の id であり、`score >= 1`、`axes` は空でない、`label` は空でない（要件22.1, 22.9）。(c) **入力不変（読み取り専用）**: `buildRelationshipMap` は純粋関数であり、入力の `characters`（配列および各 Character オブジェクト）を一切変更しない（要件22.16）。(d) **小規模**: `Character` が 0 件または 1 件のときは `edges` が空である（要件22.14）。
+
+**Validates: Requirements 22.1, 22.9, 22.11, 22.12, 22.14, 22.16**
+
+### Property 31: 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）
+
+*任意の* `Character` 集合について、`buildRelationshipMap(characters)` が返す `edges` は次を満たす。(a) **次数上限3**: 各 Character（ノード）を端点に持つエッジの本数（次数）は 3 以下である（要件22.10）。(b) **無向対称・正規化**: 各エッジは `a < b`（id 昇順）に正規化されており、無向のペアとして重複しない（同一の無向ペアに対応するエッジは高々 1 本である。要件22.9, 22.13）。(c) **自己ループなし**: 各エッジについて `a !== b` であり、同一 Character どうしを結ぶエッジは存在しない（要件22.13）。
+
+**Validates: Requirements 22.10, 22.13**
+
+### Property 32: 相関図の関係軸・スコア集約・ラベルの判定は定義どおり
+
+*任意の* `Character` 集合について、`buildRelationshipMap(characters)` が返す各 `RelationshipEdge`（端点 `a`, `b` の Character を `ca`, `cb` とする）は、次の軸判定・集約・ラベル規則に従う。(a) **同一集合内の各軸メンバーシップ**: `axes` に `'same-color'` を含むのは `ca.imageColor === cb.imageColor` かつ当該色が `'none'` でないとき、`'same-period'` を含むのは `ca.metOn` と `cb.metOn` がともに設定済みで年月（`YYYY-MM`）が一致するとき、`'same-favorite'` を含むのは `ca.favoriteLevel === cb.favoriteLevel`（同値）のとき、に限られ、いずれの軸も該当しないペアにはエッジが存在しない（要件22.2, 22.3, 22.4, 22.5, 22.6）。(b) **スコア集約**: `score` は該当する各軸の基準スコア（`same-favorite`(両想い級)=4, `same-color`=3, `same-period`=2, `same-favorite`(気になる存在)=1）の合算に等しい（要件22.9）。(c) **代表ラベル**: `label` は該当軸のうち軸優先順位（`same-favorite`(両想い級) > `same-color` > `same-period` > `same-favorite`(気になる存在)）で最上位の軸に対応するラベルに等しく、`'same-favorite'` を含む場合の同値判定において `ca.favoriteLevel >= 4` かつ `cb.favoriteLevel >= 4` なら「両想い級」、それ以外の同値なら「気になる存在」である（要件22.7, 22.8, 22.9）。
+
+**Validates: Requirements 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9**
+
 ## Error Handling
 
 エラーハンドリング
@@ -1206,6 +1327,9 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 対戦中の再読み込み/再起動 | hooks | 進行状態を破棄し初期化（非永続） | 4.9 |
 | Met_On に不正形式/範囲外/未来日を入力 | Validator / normalizeMetOn（domain） | 当該値を保存せず metOn を未設定として扱う（要件14.4）。FieldError を返すか、サイレントに undefined へ正規化する方針のいずれかを取る（設計では正規化方針とし、FieldError は任意）| 14.4 |
 | ImageColor にプリセット許容値以外を指定 | Validator / 読み出し正規化（domain / persistence） | imageColor を 'none' に正規化して扱う | 15.4, 15.5 |
+| 相関図で Character が 0/1 件 | useRelationshipMap / hooks | 関係を作れないため「2件以上必要」の空状態を表示（読み取り専用、非破壊） | 22.14 |
+| 相関図で 2 件以上あるが関係が 0 件 | useRelationshipMap / hooks | 「関係が見つからなかった」空状態を表示（読み取り専用、非破壊） | 22.15 |
+| 相関図の Character_Store 読込失敗 | Store / useRelationshipMap | 失敗表示 + 再試行手段・保存済みデータ保持（要件2.9 と同様の非破壊） | 22.16, 2.9 |
 
 ## Testing Strategy
 
@@ -1214,7 +1338,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 ### 方針: ユニットテスト + プロパティテストの併用
 
 - **ユニットテスト（Vitest + React Testing Library）**: 具体例・エッジケース・エラー分岐・UI 分岐（空状態、ファイル選択キャンセル/ブロック、削除確認、写真読込失敗のプレースホルダー、対戦2件未満、対戦中リセット等）を検証する。
-- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜28）を、広い入力空間にわたって検証する。
+- **プロパティテスト（Vitest + fast-check）**: Domain 層の普遍的プロパティ（Correctness Properties の Property 1〜32）を、広い入力空間にわたって検証する。
 
 ### 実行環境の注記
 
@@ -1227,7 +1351,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - 各プロパティテストには、対応する設計プロパティを参照するコメントを付与する。タグ形式:
   `// Feature: chara-collection, Property {number}: {property_text}`
 - 各 Correctness Property は **単一の** プロパティテストで実装する。
-- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**、**`metOn` 入力（`YYYY-MM-DD` 妥当日・1900-01-01/当日/未来日/範囲外・不正形式・実在しない日付（例 2 月 30 日）・うるう年 2/29・空/undefined）と固定基準日 `today` の組（出会った日の正規化）**、**`ImageColor` の6プリセット値および許容値以外の任意文字列（イメージカラー正規化/縁取り導出）**、**`metOn`（妥当/undefined）・`imageColor`（6値）を含む `Character`（新フィールドを含む保存往復）**、**相棒 `{ id, name }`（`id` は任意文字列、`name` は空文字・空白のみ・絵文字/サロゲートペア・長文を含む任意）と `CalendarDay`・salt の組（今日の相棒の一言 Daily_Line の決定的選出。決定性・非空・50コードポイント以下を検証）**、**2 件以上（偶数/奇数、不戦勝を含む）の id 集合と任意の rng シード列の組（トーナメント表 Tournament_Bracket。champion 確定まで進めた後の bracket が勝者妥当・ラウンド間引き継ぎ整合・頂点＝champion・`advance()` 系列と無矛盾を満たすことを検証）**、**勝者/敗者の Favorite_Level の組（範囲内 1〜5・範囲外・非数値・同値を含む）と勝者/敗者名・rng・situation（favored/upset/even/省略）の組（状況別実況。deriveBattleSituation の分類と narrate の非空・勝者名含む・rng 変動を検証）**、**2 件以上（偶数/奇数・小規模 2/3 件・不戦勝を含む）の id 集合と任意の rng シード列の組（準優勝・ベスト4 導出 deriveRanking。runnerUp＝決勝敗者・semifinalists＝準決勝敗者集合・champion と相異なり重複なし・小規模で null/空を検証）**、**任意の rng（お題選択 pickBattleTheme。非空・お題集合の要素・rng で変動しうることを検証）**、**お題ラベル（既知の8お題および対応未定義の任意文字列）と勝者/敗者名・rng・situation（favored/upset/even/省略）・aspect（非空文字列。お題の観点ワード）の組（お題に沿った実況。getBattleThemeAspect の非空フォールバック・narrate の非空・勝者名含む・aspect 反映・rng 変動を検証）**、**`theme` 文字列（既知の8お題・対応未定義の任意ラベル・空文字を含む）（優勝見出しのお題連動。`buildChampionTitle` が常に非空、空文字は既定見出し（「最も好きなキャラ」を含む）、非空は観点ワードを含む「{観点}No.1」見出しを返すことを検証）**。
+- ジェネレータは以下を網羅する: 文字数の境界（0/50/51、0/500/501）、`favoriteLevel` の範囲内外および非整数、非対応 MIME・過大サイズの Blob/File、`CalendarDay` と salt の多様な組、2 件以上（偶数/奇数）のコレクションと**任意の rng シード列（トーナメント自動判定）**、勝者/敗者名の組と rng（実況生成）、**Character 集合と各 `SortOrder`（`'newest'`/`'favorite'`/`'name'`）の組（並び替え。同一 `favoriteLevel`・同一 `createdAt`・同一名・空名を含めタイブレークを踏む）**、**ニックネーム/名前の空（空文字・空白のみ）と非空のあらゆる組（カード表示モデル）**、**`favoriteLevel` の範囲内（1〜5）・範囲外・非整数・未設定（お気に入り度表示モデル）**、**`metOn` 入力（`YYYY-MM-DD` 妥当日・1900-01-01/当日/未来日/範囲外・不正形式・実在しない日付（例 2 月 30 日）・うるう年 2/29・空/undefined）と固定基準日 `today` の組（出会った日の正規化）**、**`ImageColor` の6プリセット値および許容値以外の任意文字列（イメージカラー正規化/縁取り導出）**、**`metOn`（妥当/undefined）・`imageColor`（6値）を含む `Character`（新フィールドを含む保存往復）**、**相棒 `{ id, name }`（`id` は任意文字列、`name` は空文字・空白のみ・絵文字/サロゲートペア・長文を含む任意）と `CalendarDay`・salt の組（今日の相棒の一言 Daily_Line の決定的選出。決定性・非空・50コードポイント以下を検証）**、**2 件以上（偶数/奇数、不戦勝を含む）の id 集合と任意の rng シード列の組（トーナメント表 Tournament_Bracket。champion 確定まで進めた後の bracket が勝者妥当・ラウンド間引き継ぎ整合・頂点＝champion・`advance()` 系列と無矛盾を満たすことを検証）**、**勝者/敗者の Favorite_Level の組（範囲内 1〜5・範囲外・非数値・同値を含む）と勝者/敗者名・rng・situation（favored/upset/even/省略）の組（状況別実況。deriveBattleSituation の分類と narrate の非空・勝者名含む・rng 変動を検証）**、**2 件以上（偶数/奇数・小規模 2/3 件・不戦勝を含む）の id 集合と任意の rng シード列の組（準優勝・ベスト4 導出 deriveRanking。runnerUp＝決勝敗者・semifinalists＝準決勝敗者集合・champion と相異なり重複なし・小規模で null/空を検証）**、**任意の rng（お題選択 pickBattleTheme。非空・お題集合の要素・rng で変動しうることを検証）**、**お題ラベル（既知の8お題および対応未定義の任意文字列）と勝者/敗者名・rng・situation（favored/upset/even/省略）・aspect（非空文字列。お題の観点ワード）の組（お題に沿った実況。getBattleThemeAspect の非空フォールバック・narrate の非空・勝者名含む・aspect 反映・rng 変動を検証）**、**`theme` 文字列（既知の8お題・対応未定義の任意ラベル・空文字を含む）（優勝見出しのお題連動。`buildChampionTitle` が常に非空、空文字は既定見出し（「最も好きなキャラ」を含む）、非空は観点ワードを含む「{観点}No.1」見出しを返すことを検証）**、**`Character` 集合（0/1/多数件、`imageColor` 各値（`'none'` を含む）、`metOn` 妥当/未設定・同一 `YYYY-MM`・異なる月、`favoriteLevel` 1〜5・同値・★4以上同値/★3以下同値、次数超過が起きる密な集合（同一 `imageColor`・同一 `favoriteLevel` が多数）、全く関係が生じない集合を含む）（キャラ相関図 `buildRelationshipMap`。決定性・要素妥当性・入力不変・次数上限3・無向対称・自己ループなし・軸/スコア集約/ラベルの判定妥当性を検証）**。
 - 乱数を用いる `TournamentEngine` と `BattleCommentator` は rng（`() => number`）を外部注入するため、テストでは固定/シード rng（例: 値の系列を返すスタブ）を渡して決定的に検証する。本番は `Math.random` を注入する。Tournament_Bracket（Property 24）、状況別実況（Property 25）、お題選択（Property 27）、お題に沿った実況（Property 28）も同一の rng 注入で検証する。準優勝・ベスト4 導出（Property 26）は rng 注入で champion まで進めた bracket を対象に検証する。
 
 ### プロパティ ↔ テスト対応
@@ -1263,6 +1387,9 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 27 | お題は非空・要素性・rng 変動 | `pickBattleTheme`（rng 注入） |
 | 28 | お題の観点ワードを織り込んだ実況（getBattleThemeAspect 非空・narrate 非空/勝者名含む・aspect 反映・rng 変動・後方互換） | `getBattleThemeAspect` / `BattleCommentator.narrate`（aspect 拡張・rng 注入） |
 | 29 | 優勝見出しはお題に連動し常に非空（空はフォールバック・非空は観点ワードを含む見出し） | `buildChampionTitle`（domain。`getBattleThemeAspect` 利用） |
+| 30 | 相関図は決定的・要素妥当・入力不変（並べ替え不変・0/1件は空・純粋） | `buildRelationshipMap`（domain） |
+| 31 | 相関図のグラフ不変条件（各ノード次数≤3・無向対称/正規化・自己ループなし） | `buildRelationshipMap`（domain） |
+| 32 | 相関図の軸/スコア集約/ラベルの判定妥当（same-color の none 除外・same-period の YYYY-MM 一致・same-favorite の同値と★4以上=両想い級/他=気になる存在・スコア合算・軸優先順位） | `buildRelationshipMap`（domain） |
 
 ### ユニットテスト（例示・エッジ・エラー分岐）
 
@@ -1285,6 +1412,7 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - （イテレーション10）対戦画面にお題（Battle_Theme）が表示されること（要件21.1）、`start` を複数回呼ぶとお題が変わりうること（複数テンプレートの存在を例示で確認、要件21.2）、優勝発表画面に準優勝が表示され、参加者数に応じてベスト4 が表示されること、参加者が少なく定義できない順位が表示されないこと（要件20.1, 20.2, 20.3）を例示テスト（React Testing Library）で確認する
 - （イテレーション12）実況にその回のお題の観点ワード（Theme_Aspect）が反映されうること（`getBattleThemeAspect(theme)` を `narrate` へ `aspect` として渡した場合、生成される実況にお題に沿った文面が現れうること）を、ドメイン直接（`getBattleThemeAspect` / `narrate`）または hook 経由で rng を固定/シードして例示テストで確認する（要件19.6）
 - （イテレーション13）優勝発表の見出しがお題連動で表示されること（`useRankingBattle` が `theme` を持つ場合、優勝画面の見出しに `buildChampionTitle(theme)` の結果＝お題連動見出しが現れること）を例示テストで確認する。あわせて、既存の優勝見出し検出（「最も好きなキャラ 👑」の文言）に依存するテストがあれば、お題連動見出し（またはフォールバック見出し）へ整合させ引き続き通ること、`buildChampionTitle` の空文字入力が既定見出し（「最も好きなキャラ」を含む）を返すことをドメイン直接で確認する（要件20.6）
+- （イテレーション14）`RelationshipMapView` が `Character` 0/1 件のとき「2件以上必要」空状態を表示すること（要件22.14）、2 件以上あるが関係が生じない集合で「関係が見つからなかった」空状態を表示すること（要件22.15）、関係があるとき各 Character ノードに相手・関係ラベル（`label`）・関係軸（`axes`）を列挙して表示すること（要件22.1）、`NavigationBar` に「相関図」タブが存在し選択で `App` の `view` が `'relationship'` へ遷移すること（要件22.18）を、例示テスト（React Testing Library）で確認する。相関図の関係集合・スコア・ラベル・次数上限の導出ロジック自体は Property 30〜32 で検証する
 
 ### PWA / UI / 非機能テストの考慮（スモーク・計測）
 
@@ -1294,8 +1422,9 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 - **並び順選択 UI / NavigationBar 表示制御**: 並び順の選択手段が存在すること（要件11.1）、各タブ選択で `App` の `view` が期待どおり遷移すること（`goToList`/`goToGacha`/`goToBattle`/`goToAdd`、要件13.2〜13.5）、`NavigationBar` が主要画面（list/gacha/battle）で表示され詳細・登録/編集フォームで非表示になること（要件13.6, 13.7）、アクティブタブが現在ビューに一致すること（要件13.6）、各タブが 44×44 px・320〜430 px 幅で横スクロールなし（要件13.8, 13.9）を、例示テスト（React Testing Library）とスナップショットで確認する。
 - **イメージカラー縁取りの見た目**: `imageColor` が `'none'` 以外のとき `CharacterCard` の枠・`CharacterDetailView` の写真枠に `--image-color-*` の縁取りがトークン経由で適用され、`'none'` では縁取りが出ないこと、角丸維持・横スクロールなし・44×44 CSS px タッチ領域維持（要件15.6〜15.10）は、スナップショット/例示テストと CSS 検査で確認する（縁取りの有無・参照トークンの導出ロジックは Property 22 で検証）。
 - **対戦演出・トーナメント表の見た目（イテレーション9、要件17, 18）**: 勝者ハイライト・ペア入場・優勝の紙吹雪風演出のトランジション/アニメーションがトークン経由（`--transition-*` が 200〜500ms、`prefers-reduced-motion: reduce` で 0/短縮）で適用されること（要件17.7, 17.8）、効果音を用いないこと（要件17.6）、`TournamentBracketView` が勝ち上がりを 320〜430 px 幅でも横スクロールなしで表示し操作要素が 44×44 px を維持すること（要件18.5, 17.10, 17.11）を、スナップショット/例示テストと CSS/トークン検査で確認する（bracket と勝ち上がり・champion の整合ロジックは Property 24 で検証）。**イテレーション11（トーナメント表を図に、要件18.7）**: `TournamentBracketView` が **接続線つきの縦向きブラケット図** として表示されること（ラウンドが縦積みで、各対戦カードが表示され、勝者から次ラウンドへの接続線要素が存在すること）、320〜430 px 幅でも図コンテナ・画面全体に横スクロールが出ないこと、勝者ハイライト（`--winner`/👑）・不戦勝（Bye）表記・優勝強調（`winnerHighlightId` 一致時の `--champion`）が引き続き出ること、`matches` が空のとき何も描画しないこと、既存の bracket 表示テスト（`RankingBattleView.iteration10.test.tsx` 等）が引き続き通ることを、スナップショット/例示テスト（React Testing Library）と CSS/トークン検査で確認する（描画は読み取り専用でデータ/エンジンを変更しないため PBT 対象は増やさない）。
-- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する。`metOn`・`imageColor` を含む一切のデータを外部送信しない（要件3.8, 14.12, 15.11）。今日の相棒の一言（Daily_Line）も端末内の純粋関数 `buildDailyLine` で生成し、外部サーバーへ送信しないことをコード検査で確認する（要件16.5, 3.8）。Tournament_Bracket を含む対戦の一切のデータも外部送信しないことをコード検査で確認する（要件18.6, 3.8）。対戦のお題（Battle_Theme）も端末内の純粋関数 `pickBattleTheme` で選び、外部送信しないことをコード検査で確認する（要件21.3, 3.8）。お題の観点ワード（Theme_Aspect）も端末内の純粋関数 `getBattleThemeAspect` で導出し、外部送信しないことをコード検査で確認する（要件19.6, 3.8）。優勝見出し（お題連動）も端末内の純粋関数 `buildChampionTitle` で導出し、外部送信しないことをコード検査で確認する（要件20.6, 3.8）。
+- **外部送信なし**: ネットワーク層が存在しない構成であることをコード検査/スモークで確認する。`metOn`・`imageColor` を含む一切のデータを外部送信しない（要件3.8, 14.12, 15.11）。今日の相棒の一言（Daily_Line）も端末内の純粋関数 `buildDailyLine` で生成し、外部サーバーへ送信しないことをコード検査で確認する（要件16.5, 3.8）。Tournament_Bracket を含む対戦の一切のデータも外部送信しないことをコード検査で確認する（要件18.6, 3.8）。対戦のお題（Battle_Theme）も端末内の純粋関数 `pickBattleTheme` で選び、外部送信しないことをコード検査で確認する（要件21.3, 3.8）。お題の観点ワード（Theme_Aspect）も端末内の純粋関数 `getBattleThemeAspect` で導出し、外部送信しないことをコード検査で確認する（要件19.6, 3.8）。優勝見出し（お題連動）も端末内の純粋関数 `buildChampionTitle` で導出し、外部送信しないことをコード検査で確認する（要件20.6, 3.8）。キャラ相関図（Relationship_Map）の関係も端末内の純粋関数 `buildRelationshipMap` で決定的に導出し、Relationship_Map およびその導出結果を含む一切のデータを外部サーバーへ送信しないことをコード検査で確認する（要件22.17, 3.8）。
 - **対戦のお題・準優勝/ベスト4 の見た目（イテレーション10、要件20, 21）**: お題（Battle_Theme）が対戦画面に表示され、320〜430 px 幅でも横スクロールなし・トークン経由の外観で表示されること（要件21.4, 21.5）、優勝発表画面に準優勝・ベスト4 がトークン経由・横スクロールなし・44×44 CSS px を維持して表示されること（要件20, 9）を、スナップショット/例示テストと CSS/トークン検査で確認する（お題選択・順位導出のロジックは Property 25〜27 で検証）。
+- **キャラ相関図の見た目（イテレーション14、要件22）**: `RelationshipMapView` が配色・角丸・影・余白を大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で適用し、ビューポート幅 320〜430 CSS px でも横スクロールを発生させず（リストベースの縦積み・長い名前は折り返し）、操作要素が最小 44×44 CSS px・rem 追従を維持すること（要件22.19, 22.20, 22.21, 7, 9）、`NavigationBar` に「相関図」タブを加えても 320〜430 CSS px で横スクロールなしを維持すること（要件22.18, 13.9）を、スナップショット/例示テストと CSS/トークン検査で確認する（関係集合・スコア・ラベル・次数上限の導出ロジックは Property 30〜32 で検証）。
 - **タイミング計測**: IndexedDB 永続化3秒以内（要件3.1）、ガチャ表示2秒以内（要件5.4）を計測（統合テスト）で確認する。
 
 ## Design Theme and Design System（大人かわいい / Adult_Cute_Theme）
@@ -1448,3 +1577,4 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 | 要件19（状況別の対戦実況。19.6 はお題観点ワードの織り込み） | `BattleCommentator.narrate`（省略可能な `situation` 引数を追加する後方互換拡張・状況別テンプレート群。**イテレーション12で末尾に省略可能な `aspect` を追加し観点ワード差し込み版テンプレートを追加、後方互換**）/ `deriveBattleSituation`（domain・勝者/敗者 Favorite_Level 比較→favored/upset/even）/ `getBattleThemeAspect`（domain・お題ラベル→観点ワード、未知ラベルは非空フォールバック、イテレーション12）/ `useRankingBattle`（状況導出して `narrate` へ渡す。**イテレーション12でお題 `theme` から観点ワードを導出し `narrate` へ `aspect` として渡す**）/ `RankingBattleView`（状況別・お題に沿った実況を描画）/ フロー3 / Property 25（分類妥当・非空・勝者名含む・rng 変動・勝率不変）・**Property 28（お題観点ワードの織り込み・getBattleThemeAspect 非空・aspect 反映・後方互換）**。既存 Property 14, 25 は拡張後も維持 |
 | 要件20（準優勝・ベスト4 の表示。20.6 は優勝見出しのお題連動） | `deriveRanking`（domain・`bracket`＋championId→runnerUp/semifinalists）/ `RankingDerivation` 型 / `useRankingBattle`（`runnerUp: Character \| null`・`semifinalists: Character[]` を Character 解決して公開）/ `RankingBattleView`（優勝発表画面に準優勝・ベスト4 を表示、定義不能な順位は非表示）/ Property 26（決勝敗者＝runnerUp・準決勝敗者＝semifinalists・重複なし・小規模で null/空・読み取り専用）/ `TournamentEngine` は変更なし（既存 Property 24 保持）。**イテレーション13で優勝見出しをお題連動（`buildChampionTitle(theme)`・お題未選択は「最も好きなキャラ 👑」フォールバック、`RankingBattleView` の champion 見出しを差し替え、エンジン不変、Property 29）** |
 | 要件21（対戦のお題 Battle_Theme。観点ワード Theme_Aspect を伴う） | `pickBattleTheme`（domain・rng でお題配列から1つ選ぶ純粋関数。**シグネチャ不変**）/ `getBattleThemeAspect`（domain・お題ラベル→観点ワード Theme_Aspect、既存8お題すべてに定義・未知ラベルは非空フォールバック、イテレーション12）/ `buildChampionTitle`（domain・お題ラベル→優勝見出し「{観点}No.1 👑」・空は「最も好きなキャラ 👑」、イテレーション13）/ `useRankingBattle`（`start` 時に選出し `theme: string` を公開。**イテレーション12で `theme` から観点ワードを導出して実況へ織り込む**）/ `RankingBattleView`（お題をトークン経由・横スクロールなしで表示。**イテレーション13で優勝見出しを `theme` から `buildChampionTitle` で導出**）/ Property 27（非空・要素性・rng 変動）・**Property 28（観点ワードを織り込んだ実況）**・**Property 29（優勝見出しはお題連動・非空）**/ 外部送信なしはコード検査（要件21.3, 19.6, 20.6, 3.8） |
+| 要件22（キャラ相関図 Relationship_Map。3軸のルールベース関係生成・次数上限3・決定的・読み取り専用） | `buildRelationshipMap`（domain・`Character` 集合から3軸（same-color/same-period/same-favorite）でスコア付き無向エッジを決定的生成・軸集約・ラベル決定・次数上限3・両端合意・入力不変）/ `RelationshipAxis`・`RelationshipEdge`・`RelationshipMap`・`ResolvedRelationshipEdge` 型 / `useRelationshipMap`（`fetchAll`→`buildRelationshipMap`→id を Character へ解決して公開・読み取り専用）/ `RelationshipMapView`（新規・追加ライブラリなしのリストベース自前描画・横スクロールなし・トークン経由・44×44 px・空状態）/ `App`（`'relationship'` ビュー・`goToRelationship`）/ `NavigationBar`（「相関図」タブ追加）/ Property 30（決定性・要素妥当・入力不変・0/1件空）・Property 31（次数上限3・無向対称・自己ループなし）・Property 32（軸/スコア集約/ラベル判定妥当）/ 空状態（22.14, 22.15）・ナビ導線（22.18）・レイアウト/テーマ（22.19〜22.21）は例示・スナップショット・CSS 検査 / 外部送信なしはコード検査（要件22.17, 3.8） |

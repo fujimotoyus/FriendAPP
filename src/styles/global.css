@@ -1390,3 +1390,155 @@ select {
   background-color: var(--color-accent);
   border-radius: var(--radius-small);
 }
+
+/* ---------------------------------------------------------------------------
+ * RelationshipMapView — キャラ相関図の読み取り専用可視化 (要件22)
+ * 各 Character（ノード）ごとに「関係のある相手」を相手名・関係ラベル・関係軸バッジ付きで
+ * 縦積みに列挙するリストベースのカード表示。追加ライブラリなしの軽量な自前描画で、
+ * 320〜430 CSS px でも横スクロールを一切出さない（各要素を width:100% で収め、長い名前は
+ * overflow-wrap で折り返す。要件22.20, 22.21 / 7.6, 9.7）。配色・角丸・影・余白・トランジションは
+ * すべて大人かわいいテーマのトークン経由 (要件22.19, 9.1, 9.2)。操作要素（再試行・戻る）は
+ * 44×44 CSS px（.touch-target / PastelButton）。読み取り専用・外部送信なし（要件22.16, 22.17）。
+ * ------------------------------------------------------------------------- */
+.relationship-map {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  /* 画面幅内に収め、横スクロールを出さない (要件22.21)。 */
+  overflow-x: hidden;
+}
+
+.relationship-map__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.relationship-map__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-primary);
+}
+
+/* 読み込み失敗の再試行導線（要件2.9）。保存済みデータは破棄しないトーン。 */
+.relationship-map__error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--radius-medium);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  color: var(--color-text-primary);
+}
+
+.relationship-map__loading {
+  margin: 0;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* ノード（Character）のリスト。縦積みで、横スクロールを出さない。 */
+.relationship-map__nodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 100%;
+}
+
+.relationship-map__node-item {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 1 ノードぶんのカード（.card の角丸大・柔らかい影を継承）。 */
+.relationship-map__node {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.relationship-map__node-name {
+  margin: 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  /* 長い名前でも枠内で折り返し、横スクロールを出さない (要件22.21)。 */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 当該ノードに接続する関係の列挙（縦積み）。 */
+.relationship-map__relations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* 1 本の関係（相手名・ラベル・軸バッジ）。狭幅では折り返して横スクロールを出さない。 */
+.relationship-map__relation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-radius: var(--radius-medium);
+  background-color: var(--color-background);
+  transition: background-color var(--transition-fast) ease; /* 200〜500ms (要件9.4) */
+}
+
+.relationship-map__relation-other {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 代表ラベル（両想い級 / おそろいカラー 等）。アクセント面で目立たせる。 */
+.relationship-map__relation-label {
+  font-size: var(--font-size-xs);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  white-space: nowrap;
+}
+
+/* 関係軸バッジ群（複数軸のときは複数個）。 */
+.relationship-map__relation-axes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* 各軸バッジ。色/記号のみに依存せず文字で意味を伝える (要件22.20 / 9.7)。 */
+.relationship-map__axis-badge {
+  font-size: var(--font-size-xs);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-small);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* prefers-reduced-motion 尊重: トランジションを無効化する (要件9.5, 22.19)。 */
+@media (prefers-reduced-motion: reduce) {
+  .relationship-map__relation {
+    transition: none;
+  }
+}

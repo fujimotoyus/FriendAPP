@@ -21,6 +21,7 @@
 - **イテレーション11**: トーナメント表を図に（`TournamentBracketView` を接続線つき縦向きブラケット図へ表示強化。データ/ドメイン/エンジン変更なし）（要件18.7 の表示強化）
 - **イテレーション12**: お題に沿った実況（各試合の Battle_Commentary に、その回のお題 Battle_Theme の観点ワード＝Theme_Aspect を織り込む。状況別実況を維持しつつお題に沿った文面にする。`battleTheme` に `getBattleThemeAspect` を追加し既存8お題すべてに観点ワードを定義（未知ラベルは非空フォールバック）、`BattleCommentator.narrate` を末尾任意引数 `aspect?` で後方互換拡張、`useRankingBattle` が観点ワードを実況へ渡す。`TournamentEngine` の勝敗判定・`pickBattleTheme` シグネチャは不変、既存 Property 11〜14, 24, 25, 26, 27 を保持）（要件19.6、要件19/21 の拡張）
 - **イテレーション13**: 優勝見出しもお題連動（優勝発表 `phase === 'champion'` の見出しをその回のお題 Battle_Theme の観点ワード Theme_Aspect から「{観点}No.1 👑」形式で表示。お題未選択（空 theme）時は従来の「最も好きなキャラ 👑」にフォールバック。`battleTheme` に純粋関数 `buildChampionTitle(theme)` を追加し `getBattleThemeAspect` を利用、`RankingBattleView` の優勝見出しを差し替え、`useRankingBattle` の `theme` を使用。`TournamentEngine` の勝敗判定・`pickBattleTheme` / `getBattleThemeAspect` は不変、既存 Property 11〜14, 24, 25, 26, 27, 28 を保持）（要件20.6、要件20/21 の拡張）
+- **イテレーション14**: キャラ相関図（登録済み Character 同士の関係を登録内容からルールベースで自動生成し、新画面 Relationship_Map でリストベースに可視化。3軸（same-color＝同一 Image_Color（'none' 除外）/same-period＝Met_On の年月一致/same-favorite＝Favorite_Level 同値、★4以上同値=「両想い級」/他=「気になる存在」）でスコア付き無向エッジ（RelationshipEdge）を決定的生成し、同一無向ペアは1本に集約してスコア合算・軸優先順位で代表ラベル決定、各ノードの次数を上位3本に制限（両端合意・スコア降順→相手 id 昇順でタイブレーク）。純粋関数 `buildRelationshipMap` で端末内・決定的に導出し外部送信しない。`useRelationshipMap`（読み取り専用）と `RelationshipMapView`（追加ライブラリなし・横スクロールなし・トークン経由・44×44 px・空状態）を追加し `App`/`NavigationBar` に「相関図」導線を配線。`Character` 型・`Character_Store`・既存ドメイン関数は変更せず、既存 Property 1〜29 を保持。新規 Property 30〜32）（要件22、要件3.8・7・9・14・15 と整合）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -427,163 +428,163 @@
     - CollectionView の並び順選択に 名前/お気に入り/出会った日 の3ボタンが左からこの順で存在し新しい順が無いこと、初期状態で名前が選択状態(aria-pressed=true)であること、useCollection の初期 sortOrder が name であることを検証する（要件11.1, 11.2）
     - _Requirements: 2.1, 11.1, 11.2_
 
-- [ ] 37. 今日の相棒の一言（Daily_Line）の決定的セリフ選択（要件16, 5.5）
-  - [ ] 37.1 ドメイン `buildDailyLine` を実装し `buildDailyMessage` を置換/内部委譲する
+- [x] 37. 今日の相棒の一言（Daily_Line）の決定的セリフ選択（要件16, 5.5）
+  - [x] 37.1 ドメイン `buildDailyLine` を実装し `buildDailyMessage` を置換/内部委譲する
     - `src/domain/dailyMessage.ts` に `buildDailyLine(input: { id: string; name: string }, day: CalendarDay, salt: number): string` を実装する。複数のセリフ風テンプレート集（相棒本人の一言として表現する文。名前差し込み用と名前なし用の双方を含む）を持ち、`DailyPickSelector` と同じ FNV-1a 系の決定的ハッシュ（`day` の year/month/day＋相棒 `id`＋`salt` を連結した文字列をハッシュ）でテンプレートを 1 つ選び、名前を差し込む。同一の `{ id, day, salt }` では常に同一の一言を返す（決定的、要件16.2）。名前が空（空文字・空白のみ）のときは名前を差し込まないテンプレートを用い、空でない一言を返す（要件16.6）。長さは常に最大50文字（Unicode コードポイント数、`MAX_MESSAGE_LENGTH`）以下を保証する（要件16.4, 5.5）。`Math.random()` は使用せず外部送信も行わない純粋関数とする（要件16.5, 3.8）
     - 既存 `buildDailyMessage(name)` は `buildDailyLine` へ作り替える（または `buildDailyLine` へ内部委譲する形で置換し、呼び出し側 `useDailyGacha` を新シグネチャへ差し替える）。既存の 50文字切り詰めユーティリティ（`codePointLength` / `truncateToCodePoints` / `MAX_MESSAGE_LENGTH`）は再利用する
     - _Requirements: 16.1, 16.2, 16.4, 16.6, 5.5_
 
-  - [ ]* 37.2 今日の一言の決定的・非空・50文字以下のプロパティテスト
+  - [x]* 37.2 今日の一言の決定的・非空・50文字以下のプロパティテスト
     - **Property 23: 今日の一言は決定的・要素妥当・50文字以下**（任意の相棒 `{ id, name }`（名前は空/空白/絵文字/長文を含む）・固定 `CalendarDay`・固定 salt に対し、`buildDailyLine` は (a) 何度呼んでも同一文字列＝決定的、(b) 長さ50コードポイント以下、(c) 空でない文字列を返す）
     - **Validates: Requirements 5.5, 16.1, 16.2, 16.4, 16.6**
     - `// Feature: chara-collection, Property 23` タグ・`numRuns: 100`。対象 `buildDailyLine`。既存 `dailyMessage.test.ts`（Property 16）は 50文字以下の検証を維持する（対象は `buildDailyLine`）
 
-- [ ] 38. useDailyGacha を新関数シグネチャへ更新する（要件16, 5.2, 5.3）
+- [x] 38. useDailyGacha を新関数シグネチャへ更新する（要件16, 5.2, 5.3）
   - `src/hooks/useDailyGacha.ts` の `selectWithSalt` 内で、`pick` により相棒を確定した後、その相棒の `id` と `name`・当日暦日（`today`）・現在の `salt` を `buildDailyLine({ id, name }, today, salt)` へ渡して `message` に反映する（従来の `buildDailyMessage(selected.name)` からの差し替え）。`loadToday`（同一暦日固定）・`reroll`（salt +1 再計算）の双方でこの一言が決定的に固定/更新される（要件16.2, 16.3, 5.2, 5.3）。既存の salt 管理・0件ガード・エラー処理は不変とする
   - _Requirements: 16.1, 16.2, 16.3, 5.2, 5.3_
 
-- [ ] 39. UI: DailyGachaView のメッセージ表示を吹き出し風セリフに更新する（要件16.1, 要件9）
+- [x] 39. UI: DailyGachaView のメッセージ表示を吹き出し風セリフに更新する（要件16.1, 要件9）
   - `src/components/DailyGachaView.tsx` の `message` 表示（`.daily-gacha__message`）を、相棒キャラ本人のセリフ風の一言として**吹き出し風**に表示するよう更新する（要件16.1）。見た目（背景・角丸・影・余白・吹き出しの尻尾等）は `src/styles/global.css`（または該当 CSS）で大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で適用し、最小 44×44 CSS px・横スクロールなし・rem 追従を維持する（要件9.1, 9.2, 9.6, 9.7）。本コンポーネントはロジックを持たず、hook から受け取った `message` を描画するのみとする
   - _Requirements: 16.1, 9.1, 9.2, 9.6, 9.7_
 
-- [ ] 40. Iteration 8 チェックポイント（今日の相棒に一言）
+- [x] 40. Iteration 8 チェックポイント（今日の相棒に一言）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
-- [ ] 41. ドメイン: TournamentEngine を勝ち上がり履歴（Tournament_Bracket）公開のため拡張する（要件18, 4.6, 4.7）
+- [x] 41. ドメイン: TournamentEngine を勝ち上がり履歴（Tournament_Bracket）公開のため拡張する（要件18, 4.6, 4.7）
   - `src/domain/types.ts` に `interface BracketMatch { round: number; left: string; right: string | null; winner: string | null; bye: boolean }` と `type TournamentBracket = BracketMatch[]` を追加する。表示用に id を Character へ解決した `interface ResolvedBracketMatch { round: number; left: Character; right: Character | null; winner: Character | null; bye: boolean }` も追加する（既存の型は破壊せず追記。design.md「Data Models」）
   - `src/domain/TournamentEngine.ts` の `TournamentEngine` インターフェースに `readonly bracket: TournamentBracket` を追加する。`createTournament` の実装で、`advance()` が現ペアの勝者を確定した時点で `{ round, left, right, winner, bye: false }` を bracket へ追記し、奇数の余り 1 件を不戦勝で繰り上げる際に `{ round, left: 繰上げ id, right: null, winner: 繰上げ id, bye: true }` を追記する。ラウンド番号は各対戦が属するラウンドを表す。**既存の `currentPair` / `champion` / `lastResult` / `advance()` のセマンティクスおよび `createTournament` の仕様は不変**とし、bracket への追記のみを追加する（要件18.1, 18.2, 18.3, 4.6, 4.7）
   - _Requirements: 18.1, 18.2, 18.3, 4.6, 4.7_
 
-  - [ ]* 41.1 トーナメント表の整合性のプロパティテスト
+  - [x]* 41.1 トーナメント表の整合性のプロパティテスト
     - **Property 24: トーナメント表は勝ち上がりと整合する**（2 件以上・任意の rng シード列で champion 確定まで進めた後、bracket が (a) 各 match の勝者妥当（bye は winner===left・right===null）、(b) あるラウンドの勝者集合＝次ラウンドの対戦者集合、(c) 頂点＝champion、(d) `advance()`（`lastResult`）系列と無矛盾、を満たす）
     - **Validates: Requirements 4.6, 4.7, 18**
     - `// Feature: chara-collection, Property 24` タグ・`numRuns: 100`。対象 `TournamentEngine`（rng 注入・bracket）。既存 Property 11〜13 のテストは不変で保持する
     - _Requirements: 4.6, 4.7, 18.1, 18.2, 18.3_
 
-- [ ] 42. Hook: useRankingBattle を2段階進行と bracket 公開へ拡張する（要件17, 18, 4.2, 4.3, 4.4, 4.7）
+- [x] 42. Hook: useRankingBattle を2段階進行と bracket 公開へ拡張する（要件17, 18, 4.2, 4.3, 4.4, 4.7）
   - `src/hooks/useRankingBattle.ts` に対戦フェーズ状態 `phase: 'pair' | 'result' | 'champion'` を追加する。`resolveCurrentBattle()`（「勝負！」）は内部で `engine.advance()` を呼び、現ペアの勝者を rng で自動判定し `BattleCommentator.narrate` で実況を生成して `currentCommentary` に反映し `phase` を `'result'` にする（要件17.1, 17.2, 4.2, 4.3）。`next()`（「次へ」）は `engine.champion` 確定なら `phase` を `'champion'` に、そうでなければ次の `currentPair` を提示して `phase` を `'pair'` に戻す（要件17.3, 17.4, 4.4, 4.7）
   - `engine.bracket`（id 列）の各 id を `fetchAll` 済みの Character へ解決した `ResolvedBracketMatch[]` を `bracket` として公開する（要件18.1, 18.2, 18.3）。既存の `start`/`advance`/`reset`・`canStart`（2 件未満ガード、要件4.8）・進行状態の非永続（要件4.9）は不変とし、UI 進行の2段階化は `resolveCurrentBattle` が `advance` を内部で呼ぶ形で吸収する（互換維持）
   - _Requirements: 17.1, 17.3, 17.4, 17.5, 18.1, 18.2, 18.3, 4.2, 4.3, 4.4, 4.7_
 
-- [ ] 43. UI: RankingBattleView を試合ごとリザルト表示＋優勝演出に更新する（要件17, 4.7, 9.4, 9.5）
+- [x] 43. UI: RankingBattleView を試合ごとリザルト表示＋優勝演出に更新する（要件17, 4.7, 9.4, 9.5）
   - `src/components/RankingBattleView.tsx` を `useRankingBattle` の `phase` に従って表示を切り替えるよう更新する。`'pair'` はペア 2 件と「勝負！」ボタン（`resolveCurrentBattle`）、`'result'` は勝者ハイライト＋実況（`currentCommentary`）と「次へ」ボタン（`next`）、`'champion'` は勝者 1 件を大きく強調した優勝発表（紙吹雪風演出）を表示する（要件17.1, 17.2, 17.3, 17.4, 17.9, 4.7）。対戦は自動再生せず利用者の操作でのみ進行し、効果音を用いない（要件17.5, 17.6）
   - ペア入場・勝者ハイライト・優勝演出のトランジション/アニメーションは大人かわいいテーマのトークン（`--transition-*` 200〜500ms 等）経由で適用し、操作要素は最小 44×44 CSS px・横スクロールなしを維持する（要件17.7, 17.10, 17.11, 9.4, 9.6, 9.7）
   - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.9, 4.7, 9.4_
 
-- [ ] 44. UI: TournamentBracketView（新規）で勝ち上がりを可視化する（要件18, 7.6, 7.7, 9.6, 9.7）
+- [x] 44. UI: TournamentBracketView（新規）で勝ち上がりを可視化する（要件18, 7.6, 7.7, 9.6, 9.7）
   - `src/components/TournamentBracketView.tsx`（新規）を実装する。`useRankingBattle` の `bracket`（`ResolvedBracketMatch[]`）を受け取り、各ラウンドの対戦ペア・勝者・不戦勝（Bye）を勝ち上がり順に可視化する（要件18.1, 18.2, 18.3）。表示（読み取り専用）のみで対戦結果やストアを変更しない（要件18.4）。ビューポート幅 320〜430 CSS px でも横スクロールを発生させないレイアウト（縦積み/折り返し等）とし、操作要素は最小 44×44 CSS px を維持し、配色・角丸・影・余白は大人かわいいテーマのトークン経由で適用する（要件18.5, 17.10, 17.11, 7.6, 7.7, 9.6, 9.7）
   - `RankingBattleView` に `TournamentBracketView` を配置し、対戦の進行に応じて表示を更新する
   - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 7.6, 7.7, 9.6, 9.7_
 
-- [ ] 45. CSS: 勝者ハイライト・ペア入場・紙吹雪の演出をトークン経由で追加する（要件17, 9.4, 9.5）
+- [x] 45. CSS: 勝者ハイライト・ペア入場・紙吹雪の演出をトークン経由で追加する（要件17, 9.4, 9.5）
   - `src/styles/global.css` に、勝者ハイライト（発光/強調）・ペア入場（フェード/スライド）・優勝の紙吹雪風演出の `@keyframes` とトランジション/アニメーションを追加する。時間はトークン（`var(--transition-*)`、200〜500ms）で参照し、色/角丸/影/余白は `--color-*` / `--radius-*` / `--shadow-*` / `--space-*` 経由で適用する（要件17.7, 9.2, 9.4）
   - `@media (prefers-reduced-motion: reduce)` で対戦演出（勝者ハイライト・入場・紙吹雪）のアニメーション/トランジションを無効化または大幅短縮する（既存トークンの reduced-motion 対応に整合、要件17.8, 9.5）。効果音は追加しない（要件17.6）
   - _Requirements: 17.7, 17.8, 9.4, 9.5_
 
-  - [ ]* 45.1 対戦の進行フェーズ・遷移・ブラケット表示のユニットテスト
+  - [x]* 45.1 対戦の進行フェーズ・遷移・ブラケット表示のユニットテスト
     - `phase` が `pair`→`result`→`champion` の順に遷移すること、「勝負！」（`resolveCurrentBattle`）で結果発表フェーズ（勝者ハイライト・実況）が表示され、「次へ」（`next`）で勝ち残り2件以上なら次ペア・1件なら優勝発表へ進むこと、2 件未満ガード（要件4.8）が維持されること、`TournamentBracketView` が bracket（勝ち上がり）を表示することを例示テスト（React Testing Library）で確認する
     - _Requirements: 17.1, 17.3, 17.4, 17.5, 18.1, 18.2, 18.3, 4.8_
 
-- [ ] 46. Iteration 9 チェックポイント（対戦を魅せる）
+- [x] 46. Iteration 9 チェックポイント（対戦を魅せる）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
-- [ ] 47. ドメイン: BattleCommentator を状況別（Battle_Situation）に拡張する（要件19, 4.3, 4.5）
+- [x] 47. ドメイン: BattleCommentator を状況別（Battle_Situation）に拡張する（要件19, 4.3, 4.5）
   - `src/domain/types.ts` に `type BattleSituation = 'favored' | 'upset' | 'even'` を追加する（既存の型は破壊せず追記。design.md「Data Models」）
   - `src/domain/BattleCommentator.ts` の `narrate` を `narrate(pair: { winner: string; loser: string }, rng: () => number, situation?: BattleSituation): string` へ拡張する。状況別（favored/upset/even）の実況テンプレート群を持ち、`situation` が渡されたら当該状況のテンプレート集から rng で 1 つ選ぶ。`situation` 省略時は従来相当の汎用テンプレートを用いる（**後方互換**：既存呼び出し `narrate(pair, rng)` が壊れないこと）。各状況にテンプレートは複数存在し、いずれの状況でも非空で勝者名を含む文字列を返す（既存 Property 14 を維持、要件19.2, 19.3）。純粋関数・rng 外部注入・副作用なしを維持する
   - _Requirements: 19.1, 19.2, 19.3, 4.3, 4.5_
 
-- [ ] 48. ドメイン: deriveBattleSituation を実装する（要件19.1, 19.5）
+- [x] 48. ドメイン: deriveBattleSituation を実装する（要件19.1, 19.5）
   - `src/domain/BattleCommentator.ts`（または `src/domain` の適所）に `deriveBattleSituation(winnerFavoriteLevel: number, loserFavoriteLevel: number): BattleSituation` を実装する。`winner > loser` → `'favored'`、`winner < loser` → `'upset'`、等値または比較不能（非数値等）→ `'even'` を返す純粋関数。勝敗判定には影響しない（要件19.4）
   - _Requirements: 19.1, 19.5_
 
-- [ ] 49. ドメイン: deriveRanking（準優勝・ベスト4 導出）を実装する（要件20）
+- [x] 49. ドメイン: deriveRanking（準優勝・ベスト4 導出）を実装する（要件20）
   - `src/domain/TournamentEngine.ts`（または `src/domain` の適所）に `deriveRanking(bracket: TournamentBracket, championId: string): { runnerUp: string | null; semifinalists: string[] }` を実装する。準優勝 = `championId` が勝者として現れる最終ラウンドの対戦（決勝）の敗者（存在しなければ `null`）、ベスト4 = 最終ラウンドの1つ前のラウンド（準決勝）の各対戦の敗者集合（不戦勝の match は敗者なし、定義できない小規模トーナメントは空配列）。`runnerUp`・`semifinalists` の各要素は `championId` と異なり相互に重複しない（要件20.5）。`bracket` を変更しない純粋関数とする（要件20.4）。`TournamentEngine` の勝敗判定・既存セマンティクスは一切変更しない
   - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
 
-- [ ] 50. ドメイン: pickBattleTheme（お題選択）を実装する（要件21）
+- [x] 50. ドメイン: pickBattleTheme（お題選択）を実装する（要件21）
   - `src/domain` に `pickBattleTheme(rng: () => number): string` を実装する。お題テンプレート配列（例「かわいい選手権」「たよれる度No.1決定戦」「今いちばん会いたい子は？」等の短い文言、複数）を持ち、rng で 1 つ選んで返す純粋関数。常に非空文字列（お題配列の要素）を返す。毎回ランダム（決定的固定はしない、要件21.2）。`Math.random()` は使用せず rng を外部注入し、外部送信も行わない（要件21.3, 3.8）
   - _Requirements: 21.1, 21.2, 21.3_
 
-  - [ ]* 50.1 状況別実況の妥当性のプロパティテスト
+  - [x]* 50.1 状況別実況の妥当性のプロパティテスト
     - **Property 25: 状況別実況は妥当で状況を反映しつつ勝率に影響しない**（任意の勝者/敗者名・rng・`situation`（favored/upset/even/省略）について、`deriveBattleSituation` が Favorite_Level 比較で状況を正しく分類し、`narrate` は非空で勝者名を含む文字列を返し、各状況にテンプレートが複数存在し rng で変動しうる。`situation` は実況選択のみに用い勝敗判定に影響しない）
     - **Validates: Requirements 19, 4.3, 4.5**
     - `// Feature: chara-collection, Property 25` タグ・`numRuns: 100`。対象 `deriveBattleSituation` / `BattleCommentator.narrate`（rng 注入）。既存 `BattleCommentator` の Property 14 テストは不変で保持する
 
-  - [ ]* 50.2 準優勝・ベスト4 導出の bracket 整合のプロパティテスト
+  - [x]* 50.2 準優勝・ベスト4 導出の bracket 整合のプロパティテスト
     - **Property 26: 準優勝・ベスト4 の導出は bracket と整合する**（2 件以上の id 集合・任意の rng シード列で champion 確定まで進めた bracket と championId について、`deriveRanking` の `runnerUp` は決勝＝最終ラウンドの敗者（存在すれば）に一致し、`semifinalists` は準決勝＝最終ラウンドの1つ前のラウンドの敗者集合に一致し、いずれも champion と相異なり重複しない。小規模で定義できない順位は `null`/空。`bracket` を変更しない）
     - **Validates: Requirements 20, 18.4, 4.7**
     - `// Feature: chara-collection, Property 26` タグ・`numRuns: 100`。対象 `deriveRanking`（rng 注入で進めた `TournamentEngine.bracket`）。生成器は 2/3 件など小規模・偶数/奇数・不戦勝を含める。既存 Property 24 のテストは不変で保持する
 
-  - [ ]* 50.3 お題選択の非空・要素性・変動のプロパティテスト
+  - [x]* 50.3 お題選択の非空・要素性・変動のプロパティテスト
     - **Property 27: 対戦のお題は非空でお題集合の要素であり rng で変動しうる**（任意の rng について `pickBattleTheme` は非空文字列（お題集合の要素）を返し、rng を変えると複数の異なるお題が生じうる）
     - **Validates: Requirements 21**
     - `// Feature: chara-collection, Property 27` タグ・`numRuns: 100`。対象 `pickBattleTheme`（rng 注入）
 
-- [ ] 51. Hook: useRankingBattle にお題・状況別実況・準優勝/ベスト4 を追加する（要件19, 20, 21）
+- [x] 51. Hook: useRankingBattle にお題・状況別実況・準優勝/ベスト4 を追加する（要件19, 20, 21）
   - `src/hooks/useRankingBattle.ts` に `theme: string` を追加し、`start()` 時に `pickBattleTheme(rng)` でお題を選んで公開する（毎回変わりうる、既存の `start` セマンティクスは不変。要件21.1, 21.2）
   - `resolveCurrentBattle()`（および既存 `advance` の実況生成）で、`engine.lastResult` の勝者・敗者を Character へ解決し、`deriveBattleSituation(winner.favoriteLevel, loser.favoriteLevel)` で状況を導出して `BattleCommentator.narrate(names, rng, situation)` へ渡し `currentCommentary` に反映する（要件19.1, 19.2, 19.3）。勝敗判定は不変（要件19.4）
   - `engine.champion` 確定時に `deriveRanking(engine.bracket, championId)` を計算し、得られた id を `fetchAll` 済みの Character へ解決した `runnerUp: Character | null`・`semifinalists: Character[]` を公開する（定義不能な順位は `null`/空、要件20.1, 20.2, 20.3, 20.4）
   - 既存の戻り値・セマンティクス（`start`/`advance`/`resolveCurrentBattle`/`next`/`reset`/`canStart`/`champion`/`currentPair`/`currentCommentary`/`phase`/`bracket`）は保持し、追加のみとする
   - _Requirements: 19.1, 19.2, 19.3, 20.1, 20.2, 20.3, 20.4, 21.1, 21.2_
 
-- [ ] 52. UI: RankingBattleView にお題表示・準優勝/ベスト4 表示を追加する（要件20, 21, 9）
+- [x] 52. UI: RankingBattleView にお題表示・準優勝/ベスト4 表示を追加する（要件20, 21, 9）
   - `src/components/RankingBattleView.tsx` に `useRankingBattle` の `theme` を対戦画面上部等に表示する（お題バッジ、要件21.1）。表示はトークン経由（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）で適用し、横スクロールなし・44×44 CSS px・rem 追従を維持する（要件21.4, 21.5, 9）
   - `phase === 'champion'` の優勝発表画面に、`runnerUp`（準優勝、`null` なら非表示）と `semifinalists`（ベスト4、空なら非表示）を追加表示する（要件20.1, 20.2, 20.3）。表示はトークン経由・横スクロールなし・44×44 CSS px を維持する（要件9）。状況別実況は hook から受け取った `currentCommentary` を描画するのみとする（本コンポーネントは状況導出ロジックを持たない、要件19.2）
   - _Requirements: 20.1, 20.2, 20.3, 21.1, 21.4, 21.5, 9.1, 9.2, 9.6, 9.7_
 
-- [ ] 53. CSS: お題バッジ・準優勝/ベスト4 表示のスタイルをトークン経由で追加する（要件21, 20, 9）
+- [x] 53. CSS: お題バッジ・準優勝/ベスト4 表示のスタイルをトークン経由で追加する（要件21, 20, 9）
   - `src/styles/global.css`（または該当 CSS）に、お題バッジ（Battle_Theme）と準優勝・ベスト4 表示のスタイルを、大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で追加する。横スクロールなし・44×44 CSS px・rem 追従を維持し、既存トークンの `prefers-reduced-motion` 対応に整合させる（要件21.5, 20, 9.1, 9.2, 9.6, 9.7）
   - _Requirements: 21.5, 20.1, 9.1, 9.2, 9.6, 9.7_
 
-  - [ ]* 53.1 お題表示・準優勝/ベスト4 表示のユニットテスト
+  - [x]* 53.1 お題表示・準優勝/ベスト4 表示のユニットテスト
     - 対戦画面にお題（Battle_Theme）が表示されること（要件21.1）、`start` を複数回呼ぶとお題が変わりうること（複数テンプレートの存在を例示で確認、要件21.2）、優勝発表画面（`phase === 'champion'`）に準優勝が表示され、参加者数に応じてベスト4 が表示されること、参加者が少なく定義できない順位が表示されないこと（要件20.1, 20.2, 20.3）を例示テスト（React Testing Library）で検証する。状況別実況が状況（favored/upset/even）に応じて出し分けられること（rng を固定/シードして決定的に確認、要件19.2）も併せて検証する
     - _Requirements: 19.2, 20.1, 20.2, 20.3, 21.1, 21.2_
 
-- [ ] 54. Iteration 10 チェックポイント（対戦をもっと楽しく）
+- [x] 54. Iteration 10 チェックポイント（対戦をもっと楽しく）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
-- [ ] 55. UI: TournamentBracketView を接続線つき縦向きブラケット図へ作り替える（要件18, 7.6, 9.7, 9）
+- [x] 55. UI: TournamentBracketView を接続線つき縦向きブラケット図へ作り替える（要件18, 7.6, 9.7, 9）
   - `src/components/TournamentBracketView.tsx` の描画（JSX/クラス構造）を、現状の「ラウンドごとに対戦を縦積みしたリスト」から **接続線つきの縦向きブラケット図** へ作り替える。ラウンド（`round` 昇順）を上から下へ縦積みし、各対戦を「対戦カード（2者＋勝者強調・不戦勝は Bye 表記）」として表し、**各対戦の勝者を次ラウンド（下）の対戦へ接続線でつなぐ**構造にする（要件18.1, 18.2, 18.3, 18.7）
   - 勝者ハイライト（`👑`・`--winner`）、不戦勝（Bye）表記、`winnerHighlightId`（最終優勝者）の軽い強調（`--champion`）を維持する。**読み取り専用**（操作要素を置かず対戦結果や Character_Store を変更しない）を守る（要件18.4）。`matches` が空のときは何も描画しない（`null` 返却）を維持する
   - props（`matches: ResolvedBracketMatch[]`・`winnerHighlightId?: string | null`）は不変とする。データモデル・`useRankingBattle`・`TournamentEngine` は変更しない（表示強化のみ、Property 24 は不変）
   - 接続線は CSS 罫線／擬似要素、または軽量な自前 SVG（追加ライブラリなし）で描く。実際のスタイル定義はタスク56で行う
   - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.7, 7.6, 9.7_
 
-- [ ] 56. CSS: `.tournament-bracket*` を接続線つき縦向きブラケット図用に更新/追加する（要件18.5, 18.7, 9）
+- [x] 56. CSS: `.tournament-bracket*` を接続線つき縦向きブラケット図用に更新/追加する（要件18.5, 18.7, 9）
   - `src/styles/global.css` の `.tournament-bracket*` を、接続線つき縦向きブラケット図用に更新/追加する。ラウンドを縦積みにし、対戦カード（背景 `--color-surface`、角丸 `--radius-medium`/`--radius-large`、影 `--shadow-soft`、余白 `--space-*`）として表示する。**勝者から次ラウンドへの接続線**は罫線／擬似要素（`::before`・`::after`）で描き、線色はトークン（`--color-border` / `--color-accent` 相当）経由で解決する（要件18.7, 9.1, 9.2）
   - **横スクロールなし**を最優先とし、対戦カードは `width:100%`（または画面幅に収まる `max-width`）で配置し、長い名前は折り返す（`overflow-wrap` 等）。図が縦に長い場合は画面の縦スクロールで対応する。ビューポート幅 320〜430 CSS px でも図コンテナ・画面全体に横スクロールを出さない（要件18.5, 18.7, 7.6, 9.7）
   - トランジションを用いる場合は `var(--transition-*)`（200〜500ms）経由とし、`@media (prefers-reduced-motion: reduce)` で無効化/短縮する（既存トークンの reduced-motion 対応に整合、要件9.4, 9.5）。効果音は追加しない
   - _Requirements: 18.5, 18.7, 9.1, 9.2, 9.7_
 
-  - [ ]* 56.1 ブラケット図の縦向き表示・接続線・勝者/Bye/優勝強調のユニットテスト
+  - [x]* 56.1 ブラケット図の縦向き表示・接続線・勝者/Bye/優勝強調のユニットテスト
     - `TournamentBracketView` がラウンドを縦向きに縦積みで表示し、各対戦カードと勝者から次ラウンドへの接続線要素（可能ならクラス/要素の存在）が描画されること、勝者ハイライト（`--winner`/👑）・不戦勝（Bye）表記・`winnerHighlightId` 一致時の優勝強調（`--champion`）が出ること、`matches` が空のとき何も描画しないことを例示テスト（React Testing Library）で確認する。既存の bracket 表示テスト（`RankingBattleView.iteration10.test.tsx`・`RankingBattleView.test.tsx` 等）が引き続き通る範囲で追加する
     - _Requirements: 18.1, 18.2, 18.3, 18.5, 18.7_
 
-- [ ] 57. Iteration 11 チェックポイント（トーナメント表を図に）
+- [x] 57. Iteration 11 チェックポイント（トーナメント表を図に）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
-- [ ] 58. ドメイン: `battleTheme` にお題の観点ワード（Theme_Aspect）対応を追加する（要件19.6, 21）
+- [x] 58. ドメイン: `battleTheme` にお題の観点ワード（Theme_Aspect）対応を追加する（要件19.6, 21）
   - `src/domain/battleTheme.ts` に `getBattleThemeAspect(theme: string): string` を追加する。お題ラベル→観点ワードの対応を持ち、既存8お題すべてに観点ワードを定義する（例「かわいい選手権」→「かわいさ」、「たよれる度No.1決定戦」→「頼れる度」、「今いちばん会いたい子は？」→「会いたい度」、「キュンとくるのは誰だ！？」→「キュン度」、「癒やしオーラ王者決定戦」→「癒やし度」、「いっしょにいたい子グランプリ」→「いっしょにいたい度」、「ときめきトーナメント」→「ときめき度」、「推し度ナンバーワン決定戦」→「推し度」等）。対応が未定義の任意のラベルには汎用の非空フォールバック（例「魅力」）を返す。常に非空文字列を返す純粋関数とする。`pickBattleTheme` / `BATTLE_THEME_COUNT` は**戻り値・シグネチャを変えず不変**とする。`Math.random()` は使用せず外部送信も行わない（要件19.6, 3.8）
   - _Requirements: 19.6, 21_
 
-- [ ] 59. ドメイン: `BattleCommentator.narrate` を観点ワード（aspect）織り込みに拡張する（要件19.6, 19.2, 19.3）
+- [x] 59. ドメイン: `BattleCommentator.narrate` を観点ワード（aspect）織り込みに拡張する（要件19.6, 19.2, 19.3）
   - `src/domain/BattleCommentator.ts` の `narrate` を `narrate(pair: { winner: string; loser: string }, rng: () => number, situation?: BattleSituation, aspect?: string): string` へ**末尾に任意引数を足す**形で拡張する。各状況（favored/upset/even）につき観点ワード差し込み版の実況テンプレート群を追加し、`aspect` が渡されたら当該状況（省略時は汎用/従来相当の扱い）の観点ワード入りテンプレート集から rng で 1 つ選び、お題に沿った文面（例 favored: 「{aspect}で{winner}が{loser}を圧倒！」）を生成する。`aspect` 省略時は従来どおり（既存呼び出し `narrate(pair, rng)` / `narrate(pair, rng, situation)` を壊さない**後方互換**）。各状況・各テンプレートは複数存在し、いずれも非空で勝者名を含む文字列を返す（既存 Property 25 を維持、要件19.6, 19.2, 19.3）。純粋関数・rng 外部注入・副作用なしを維持する
   - _Requirements: 19.6, 19.2, 19.3_
 
-  - [ ]* 59.1 お題の観点ワードを織り込んだ実況のプロパティテスト
+  - [x]* 59.1 お題の観点ワードを織り込んだ実況のプロパティテスト
     - **Property 28: お題の観点ワードを織り込んだ実況**（任意の勝者/敗者名・rng・`situation`（favored/upset/even/省略）・`aspect`（非空文字列）について、(a) `getBattleThemeAspect` は既存8お題および対応未定義の任意ラベルにも非空の観点ワードを返す、(b) `narrate(pair, rng, situation, aspect)` は非空で勝者名を含む文字列を返す、(c) `aspect` を指定すると観点を織り込んだ文面を生成しうる（aspect を含むテンプレートが存在し反映される）、(d) rng を変えると同一入力でも複数の異なる文面が生じうる、(e) `aspect` 省略は既存挙動（Property 25）を保ち勝敗判定に影響しない）
     - **Validates: Requirements 19.6, 21**
     - `// Feature: chara-collection, Property 28` タグ・`numRuns: 100`。対象 `getBattleThemeAspect` / `BattleCommentator.narrate`（aspect 拡張・rng 注入）。既存 Property 25（`BattleCommentator.situation.test.ts` 等）・Property 27（`battleTheme.test.ts`）のテストは不変で保持する
 
-- [ ] 60. Hook: `useRankingBattle` の実況生成でお題観点ワードを `narrate` へ渡す（要件19.6）
+- [x] 60. Hook: `useRankingBattle` の実況生成でお題観点ワードを `narrate` へ渡す（要件19.6）
   - `src/hooks/useRankingBattle.ts` の実況生成箇所（`runBattle`）で、その回のお題（既に保持している `theme`）から `getBattleThemeAspect(theme)` で観点ワード（Theme_Aspect）を導出し、`narrate(names, rng, situation, aspect)` へ渡してお題に沿った状況別実況を生成する。既存の戻り値・セマンティクス（`start`/`advance`/`resolveCurrentBattle`/`next`/`reset`/`theme`/`currentCommentary`/`phase`/`bracket` 等）は不変とし、`narrate` への引数追加のみを行う。勝敗判定は不変（要件19.4）
   - _Requirements: 19.6_
 
-  - [ ]* 60.1 実況にお題の観点が反映されうることのユニットテスト（任意）
+  - [x]* 60.1 実況にお題の観点が反映されうることのユニットテスト（任意）
     - `getBattleThemeAspect(theme)` を `narrate` へ `aspect` として渡すと、生成される実況にお題に沿った観点の文面が現れうることを、ドメイン直接（`getBattleThemeAspect` / `narrate`）または `useRankingBattle` 経由で rng を固定/シードして例示テストで確認する（要件19.6）。既存の対戦実況・お題表示テストは不変で保持する
     - _Requirements: 19.6_
 
-- [ ] 61. Iteration 12 チェックポイント（お題に沿った実況）
+- [x] 61. Iteration 12 チェックポイント（お題に沿った実況）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
 - [x] 62. ドメイン: `battleTheme` に優勝見出し導出 `buildChampionTitle` を追加する（要件20.6, 21, 19.6）
@@ -607,12 +608,65 @@
 - [x] 64. Iteration 13 チェックポイント（優勝見出しもお題連動）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [x] 65. ドメイン型: キャラ相関図（Relationship_Map）用の型を追加する（要件22.1, 22.9, 22.13）
+  - `src/domain/types.ts` に相関図用の型を**追記のみ**で追加する（既存の `Character` 型・`ImageColor`・`SortOrder` など既存型は破壊せず不変とする）。追加する型は次のとおり（design.md「Data Models」イテレーション14節に厳密に一致させる）:
+    - `RelationshipAxis = 'same-color' | 'same-period' | 'same-favorite'`（関係軸。same-color=同一 Image_Color（'none' 以外）/same-period=Met_On の年月（YYYY-MM）一致/same-favorite=Favorite_Level 同値、要件22.2〜22.8）
+    - `RelationshipEdge { a: string; b: string; axes: RelationshipAxis[]; score: number; label: string }`（id ベースの無向エッジ。`a`/`b` は結ぶ 2 件の Character の id で常に `a < b`（id 昇順）に正規化、`axes` は該当軸集合（1 つ以上）、`score` は該当軸の基準スコア合算、`label` は軸優先順位で選ばれた代表ラベル、要件22.9, 22.13）
+    - `ResolvedRelationshipEdge { a: Character; b: Character; axes: RelationshipAxis[]; score: number; label: string }`（表示用に id を Character へ解決したエッジ。`useRelationshipMap` が公開、要件22.1）
+    - `RelationshipMap { edges: RelationshipEdge[] }`（`buildRelationshipMap` の戻り値。次数上限3・両端合意を満たす最終エッジを決定的順序（a 昇順→b 昇順）で保持）
+  - _Requirements: 22.1, 22.9, 22.13_
+
+- [x] 66. ドメイン: 相関図生成の純粋関数 `buildRelationshipMap` を実装する（要件22.2〜22.13）
+  - `src/domain` に新規ファイル（例 `src/domain/relationshipMap.ts`）を作成し、`buildRelationshipMap(characters: readonly Character[]): RelationshipMap` を実装する。決定的・純粋（副作用なし・入力の配列および各 Character オブジェクトを一切変更しない）とする。手順はすべて決定的に定義する（design.md「Data Models」`buildRelationshipMap` 節・イテレーション14節に厳密に一致させる）:
+    - **3 軸判定（要件22.2〜22.8）**: すべての無向ペア（`i < j`、id 昇順に正規化）について、(1) `same-color`＝両者の `imageColor` が同一プリセット色で当該色が `'none'` でないとき（`'none'` どうしはつながない、要件22.2, 22.3）、(2) `same-period`＝両者の `metOn` がともに設定済みで年月（`YYYY-MM`）が一致するとき（一方でも未設定なら不可、要件22.4, 22.5）、(3) `same-favorite`＝両者の `favoriteLevel` が同値のとき（要件22.6）。
+    - **スコア・ラベル（要件22.7〜22.9）**: 基準スコアは `same-favorite`(両想い級／両者 `favoriteLevel >= 4` の同値)=4, `same-color`=3, `same-period`=2, `same-favorite`(気になる存在／上記以外の同値)=1。同一無向ペアに複数軸が該当したら **1 本のエッジに集約** し `score` を合算する（要件22.9）。代表 `label` は軸優先順位 `same-favorite`(両想い級) > `same-color` > `same-period` > `same-favorite`(気になる存在) で最上位軸のラベル（例「両想い級」「おそろいカラー」「同期」「気になる存在」）とする（要件22.7, 22.8, 22.9）。
+    - **次数上限3・両端合意・タイブレーク（要件22.10, 22.11）**: 各ノードに接続するエッジをスコア降順→相手 id 昇順のタイブレークで上位3本に制限し、両端ノードの上位3本を同時に満たすエッジのみを最終採用する（両端合意方式）。
+    - **正規化・自己ループなし・順序（要件22.12, 22.13）**: エッジは常に `a < b`（id 昇順）で自己ループ（`a === b`）を作らず、返り値 `edges` は決定的順序（`a` 昇順→`b` 昇順）で整列する。`characters` が 0/1 件のとき `edges` は空とする（要件22.14）。
+    - `Math.random()` は使用せず外部送信も行わない（端末内・決定的、要件22.16, 22.17, 3.8）。`Character` 型・`Character_Store`・既存ドメイン関数は変更しない（相関図用の関数を追記するのみ、要件22.16）。
+  - _Requirements: 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9, 22.10, 22.11, 22.12, 22.13, 22.16, 22.17_
+
+  - [x]* 66.1 相関図の決定性・要素妥当性・入力不変のプロパティテスト
+    - **Property 30: 相関図は決定的で要素妥当・入力を変更しない**（任意の `Character` 集合について、(a) 決定性: 同一集合に何度呼んでも同一の相関図（同一エッジ集合・`axes`・`score`・`label`・並び順）を返し、入力順を並べ替えても内容が同じなら同一結果、同点の取捨も決定的タイブレーク（スコア降順→相手 id 昇順）で一意、(b) 要素妥当性: 各 `RelationshipEdge` の `a`/`b` は入力集合に存在する Character の id、`score >= 1`、`axes` は空でない、`label` は空でない、(c) 入力不変: 入力の `characters`（配列・各 Character オブジェクト）を一切変更しない、(d) 小規模: 0/1 件のとき `edges` は空）
+    - **Validates: Requirements 22.1, 22.9, 22.11, 22.12, 22.14, 22.16**
+    - `// Feature: chara-collection, Property 30` タグ・`numRuns: 100`。対象 `buildRelationshipMap`
+
+  - [x]* 66.2 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）のプロパティテスト
+    - **Property 31: 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）**（任意の `Character` 集合について、`buildRelationshipMap` が返す `edges` は、(a) 次数上限3: 各 Character を端点に持つエッジ本数（次数）は 3 以下、(b) 無向対称・正規化: 各エッジは `a < b`（id 昇順）に正規化され同一無向ペアに対応するエッジは高々 1 本、(c) 自己ループなし: 各エッジで `a !== b`。両端合意により両端ノードの上位3本を満たすエッジのみが採用される）
+    - **Validates: Requirements 22.10, 22.13**
+    - `// Feature: chara-collection, Property 31` タグ・`numRuns: 100`。対象 `buildRelationshipMap`
+
+  - [x]* 66.3 相関図の関係軸・スコア集約・ラベル判定のプロパティテスト
+    - **Property 32: 相関図の関係軸・スコア集約・ラベルの判定は定義どおり**（任意の `Character` 集合について、返る各 `RelationshipEdge`（端点の Character を `ca`/`cb` とする）は、(a) 軸メンバーシップ: `'same-color'` を含むのは `ca.imageColor === cb.imageColor` かつ当該色が `'none'` でないとき、`'same-period'` を含むのは両者の `metOn` がともに設定済みで年月（`YYYY-MM`）一致のとき、`'same-favorite'` を含むのは `ca.favoriteLevel === cb.favoriteLevel` のとき、に限られ、いずれも該当しないペアにエッジは存在しない、(b) スコア集約: `score` は該当軸の基準スコア（same-favorite(両想い級)=4, same-color=3, same-period=2, same-favorite(気になる存在)=1）の合算、(c) 代表ラベル: `label` は軸優先順位（same-favorite(両想い級) > same-color > same-period > same-favorite(気になる存在)）で最上位軸のラベルに等しく、`same-favorite` の同値で両者 `favoriteLevel >= 4` なら「両想い級」・それ以外の同値なら「気になる存在」）。あわせて **読み取り専用**（入力配列・各要素を変更しない）ことを確認する
+    - **Validates: Requirements 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9**
+    - `// Feature: chara-collection, Property 32` タグ・`numRuns: 100`。対象 `buildRelationshipMap`
+
+- [x] 67. Hook: 相関図の読み取り専用 view-state `useRelationshipMap` を実装する（要件22.14, 22.15, 22.16, 22.17）
+  - `src/hooks/useRelationshipMap.ts` を新規作成し、読み取り専用の view-state を公開する。`reload()` で `fetchAll()`（`Character_Store`）から全 Character を取得し、`buildRelationshipMap(characters)` で id ベースの `RelationshipEdge` を得たのち、各 id を取得済み Character へ解決して `edges: ResolvedRelationshipEdge[]` を公開する。公開する状態は design.md「Hooks」節に一致させる: `loadState: LoadState`（idle/loading/loaded/failed）、`characters: Character[]`、`edges: ResolvedRelationshipEdge[]`、`hasEnough: boolean`（Character が 2 件以上か。1 件以下なら関係を作れない、要件22.14）、`reload: () => Promise<void>`。`Character_Store` の読み取りのみで一切変更せず（要件22.16）、導出は端末内の純粋関数のみで外部送信しない（要件22.17, 3.8）。Character が 0/1 件なら `hasEnough=false` かつ `edges=[]`、2 件以上でも edges が空なら `edges=[]`（空状態表示は UI 側、要件22.14, 22.15）
+  - _Requirements: 22.14, 22.15, 22.16, 22.17_
+
+- [x] 68. UI: `RelationshipMapView` を実装し `App`/`NavigationBar` に「相関図」導線を配線する（要件22.1, 22.14, 22.15, 22.16, 22.18, 22.19, 22.20, 22.21）
+  - `src/components/RelationshipMapView.tsx` を新規作成する。`useRelationshipMap` の `{ loadState, characters, edges, hasEnough, reload }` を用い、**追加ライブラリなしの軽量な自前描画**・**横スクロールを一切出さない**方針で、各 Character（ノード）ごとに接続する関係を相手 Character・関係ラベル（`label`）・関係軸（`axes`）付きで縦積みに列挙する**リストベースのカード表示**を描画する（要件22.1, 22.16, 22.20）。ロジックは持たず hook から受け取ったデータを描画するのみとする。空状態: `hasEnough === false`（Character 0/1 件）のときは「関係を作るには 2 件以上の登録が必要」旨の空状態を `EmptyStateView` で、2 件以上でも `edges` が空のときは「関係が見つからなかった」旨の空状態を表示する（要件22.14, 22.15）。
+  - `src/App.tsx` に `'relationship'` ビュー状態を追加し、`view === 'relationship'` のとき `RelationshipMapView` を描画する。`NavigationBar` の `goToRelationship()` で `'relationship'` へ遷移し、アクティブタブを現在の `view`（`list`/`gacha`/`battle`/`relationship`）から導出する（要件22.18, 13.6）。
+  - `src/components/NavigationBar.tsx` に「相関図」タブを追加し（既存 4 タブに 1 つ追加、`goToRelationship` を呼ぶ）、320〜430 CSS px の縦向きでも横スクロールなしを維持し、最小 44×44 CSS px タッチ領域・rem 追従を満たす（要件22.18, 22.19, 22.21, 13.9）。既存 4 タブの遷移・表示制御は不変とする。色/角丸/影/余白は大人かわいいテーマのトークン経由で適用する（要件22.19, 9）。外部送信は行わない（要件22.17, 3.8）
+  - _Requirements: 22.1, 22.14, 22.15, 22.16, 22.18, 22.19, 22.20, 22.21_
+
+  - [x]* 68.1 相関図 UI・ナビゲーション導線のユニットテスト（任意）
+    - React Testing Library で、(a) 相関図が `edges` の関係（相手・ラベル・軸）を表示すること、(b) Character 0/1 件時に「2 件以上必要」旨の空状態、2 件以上でも関係 0 件時に「関係が見つからなかった」旨の空状態を表示すること、(c) `NavigationBar` に「相関図」タブがあり `goToRelationship` で `view` が `'relationship'` へ遷移し `RelationshipMapView` が描画されること、を例示確認する。既存のナビゲーション・各画面テストは不変で保持する（要件22.14, 22.15, 22.18）
+    - _Requirements: 22.14, 22.15, 22.18_
+
+- [x] 69. CSS: 相関図のスタイルをトークン経由で追加する（要件22.19, 22.21, 9）
+  - `src/styles/global.css` に `.relationship-map*` 等のクラスを追加する。配色・角丸・影・余白・トランジションはすべて大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*` / `--transition-*`）経由で適用する。横スクロールを一切出さない（320〜430 CSS px でノードカード・関係リストを画面幅に収め、長い名前は折り返す）。トランジションは `--transition-*`（200〜500ms）経由とし、`@media (prefers-reduced-motion: reduce)` で無効化/短縮する。最小 44×44 CSS px タッチ領域・rem 追従を満たす（要件22.19, 22.21, 9.1, 9.2, 9.4, 9.5, 9.6, 9.7）
+  - _Requirements: 22.19, 22.21, 9.1, 9.2, 9.4, 9.5, 9.6, 9.7_
+
+- [x] 70. Iteration 14 チェックポイント（キャラ相関図）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
 - 各タスクは特定の要件条項および設計プロパティを参照し、トレーサビリティを確保する。
 - チェックポイントは各イテレーションの末尾に置き、`vite build` / `vitest run` による Windows 上での増分検証を保証する。
-- プロパティテスト（Property 1〜29）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
+- プロパティテスト（Property 1〜32）は fast-check で普遍的性質を検証し、ユニットテストは具体例・エッジ・UI/エラー分岐を検証する（相補的）。
 - ドメインロジックは純粋 TypeScript として React / IndexedDB / File API から独立させ、テスト容易性を確保する。
 - 外部サーバー送信は行わない（ネットワーク層なし、要件3.8）。
 
@@ -664,7 +718,12 @@
     { "id": 40, "tasks": ["60.1"] },
     { "id": 41, "tasks": ["62"] },
     { "id": 42, "tasks": ["62.1", "63"] },
-    { "id": 43, "tasks": ["63.1"] }
+    { "id": 43, "tasks": ["63.1"] },
+    { "id": 44, "tasks": ["65"] },
+    { "id": 45, "tasks": ["66"] },
+    { "id": 46, "tasks": ["66.1", "66.2", "66.3", "67"] },
+    { "id": 47, "tasks": ["68"] },
+    { "id": 48, "tasks": ["68.1", "69"] }
   ]
 }
 ```

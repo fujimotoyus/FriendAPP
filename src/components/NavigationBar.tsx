@@ -1,27 +1,27 @@
 /**
  * NavigationBar — 画面下部に固定表示する共通タブナビゲーション（要件13）。
  *
- * 「図鑑」「今日の相棒」「トーナメント」「新規登録」の 4 項目を提供し、それぞれ
- * Collection_View / Daily_Gacha / Ranking_Battle / Registration_Form（新規登録）への
- * 到達手段になる（要件13.1〜13.5）。現在表示中の画面に対応するタブを選択状態として
+ * 「図鑑」「今日の相棒」「トーナメント」「相関図」「新規登録」の 5 項目を提供し、それぞれ
+ * Collection_View / Daily_Gacha / Ranking_Battle / Relationship_Map / Registration_Form（新規登録）
+ * への到達手段になる（要件13.1〜13.5, 22.18）。現在表示中の画面に対応するタブを選択状態として
  * 視覚的に区別する（`aria-current="page"`。要件13.6）。新規登録タブはアクション導線の
  * ため選択状態を持たない。
  *
  * 各タブは最小 44×44 CSS px のタッチ領域を持ち（要件13.8 / 7.7）、ビューポート
- * 320〜430 px の縦向きでも横スクロールを発生させずに 4 項目が収まる（各タブ flex:1・
- * 折り返さない・ラベル小さめ。要件13.9 / 7.6）。大人かわいいテーマのトークン（色/角丸/
- * 影/余白/トランジション）に整合した外観を持つ（要件13.10 / 要件9）。
+ * 320〜430 px の縦向きでも横スクロールを発生させずに 5 項目が収まる（各タブ flex:1・
+ * 折り返さない・ラベル小さめ。要件13.9 / 7.6 / 22.19, 22.21）。大人かわいいテーマの
+ * トークン（色/角丸/影/余白/トランジション）に整合した外観を持つ（要件13.10 / 要件9）。
  *
  * 本コンポーネントは表示と操作受け取りのみを担い、画面遷移の責務は App が持つ。
  *
- * Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.8, 13.9, 13.10
+ * Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.8, 13.9, 13.10, 22.18, 22.19, 22.21
  */
 
 /** Navigation_Bar が選択状態として区別できる主要画面。 */
-export type NavigationActive = 'list' | 'gacha' | 'battle';
+export type NavigationActive = 'list' | 'gacha' | 'battle' | 'relationship';
 
 /** タブ選択で通知する遷移先。新規登録（'add'）は選択状態を持たないアクション導線。 */
-export type NavigationTarget = 'list' | 'gacha' | 'battle' | 'add';
+export type NavigationTarget = 'list' | 'gacha' | 'battle' | 'relationship' | 'add';
 
 export interface NavigationBarProps {
   /** 現在表示中の主要画面。対応するタブを選択状態にする（要件13.6）。 */
@@ -41,6 +41,7 @@ const NAVIGATION_ITEMS: readonly NavigationItem[] = [
   { target: 'list', label: '図鑑', icon: '📖' },
   { target: 'gacha', label: '今日の相棒', icon: '💛' },
   { target: 'battle', label: 'トーナメント', icon: '🏆' },
+  { target: 'relationship', label: '相関図', icon: '🔗' },
   { target: 'add', label: '新規登録', icon: '➕' },
 ];
 
