@@ -29,7 +29,7 @@
 - **イテレーション11**: トーナメント表を図に（TournamentBracketView を接続線つきの縦向きブラケット図へ強化。勝ち上がりを線でつなぎ視覚化。横スクロールなし・読み取り専用・トークン経由。データ/エンジン変更なし）（要件18 の表示強化、要件7.6/9.7 と整合）
 - **イテレーション12**: お題に沿った実況（各試合の Battle_Commentary に、その回のお題 Battle_Theme の観点ワード（Theme_Aspect、例「かわいさ」「頼れる度」）を織り込む。状況別実況（favored/upset/even）を維持しつつお題に沿った文面にする。観点ワードは端末内で導出し外部送信しない。TournamentEngine の勝敗判定は不変、`pickBattleTheme` シグネチャ不変、`narrate` は末尾任意引数で後方互換）（要件19・要件21 の拡張）
 - **イテレーション13**: 優勝見出しもお題連動（優勝発表の見出しをその回のお題 Battle_Theme の観点ワード Theme_Aspect から「{観点}No.1」形式で表示。お題未選択時は従来の「最も好きなキャラ」にフォールバック。純粋関数 `buildChampionTitle(theme)` で端末内導出し外部送信しない。エンジン変更なし）（要件20・要件21 の拡張）
-- **イテレーション14**: キャラ相関図（Character 同士の関係を登録内容からルールベースで自動生成し、新画面 Relationship_Map として図で表示。関係は3軸（おそろいカラー＝同一 Image_Color、同期＝Met_On の年月一致、お気に入り度が同値＝Favorite_Level 一致）でスコア付き無向エッジ（Relationship_Edge）として生成し、各ノードの次数を上位3本に制限する。同一入力から常に同一の図になる決定的生成で、端末内の純粋関数のみで導出し外部送信しない。Character_Store を変更しない読み取り専用の可視化。0/1件時・関係0件時の空状態を持つ）（要件22、要件3.8・要件7・要件9・要件14・要件15 と整合）
+- **イテレーション14**: キャラ相関図（Character 同士の関係を新画面 Relationship_Map として図で表示。関係は登録データの内容（Image_Color・Met_On・Favorite_Level）に依存せず、Character の id（および全 Character の id 集合）から決定的に割り当てる。各無向の線（Relationship_Edge）には5種類の関係タグ（Relationship_Tag: 仲良し／ライバル／喧嘩中／気になる存在／相棒）から id 由来のハッシュで1つを決定的に選び、種類ごとに色を変えてテーマトークン経由で表示する。さらに各線には向きあり印象（Impression、A→B と B→A で別々に決定的に選ぶ短い一言）を持たせる。各 Character につながる相手は最大3人（決定的なタイブレークで上位3本）に制限する。同一の id 集合から常に同一の図になる決定的生成で、端末内の純粋関数のみで導出し外部送信しない。Character_Store を変更しない読み取り専用の可視化。0/1件時・関係0件時の空状態を持つ）（要件22、要件3.8・要件7・要件9 と整合）
 
 ## Glossary
 
@@ -60,11 +60,10 @@
 - **Battle_Theme（対戦のお題）**: Ranking_Battleを開始するたびにChara_Appがランダム要素を含めて1つ選ぶ短いテーマ文言（例「かわいい選手権」「たよれる度No.1決定戦」「今いちばん会いたい子は？」等）。対戦画面に表示し、Battle_Commentaryにも軽く反映しうる。端末内で選び、いかなる外部サーバーへも送信しない（要件3.8）。開始のたびに変わりうる（決定的固定ではない）。各お題は観点ワード（Theme_Aspect、例「かわいさ」「頼れる度」）を伴い、Battle_Commentaryに織り込まれる（要件19.6）
 - **Theme_Aspect（お題の観点ワード）**: 各Battle_Themeに対応する短い観点を表す非空の語（例「かわいい選手権」→「かわいさ」、「たよれる度No.1決定戦」→「頼れる度」、「今いちばん会いたい子は？」→「会いたい度」、「癒やしオーラ王者決定戦」→「癒やし度」等）。Battle_Themeのラベルから端末内で決定的に導出し、Battle_Commentaryへ織り込んで対戦をお題に沿った実況にする。既知の全お題に観点ワードを定義し、対応が未定義のラベルには汎用の非空フォールバック（例「魅力」）を用いる。端末内で導出し、いかなる外部サーバーへも送信しない（要件3.8）
 - **Battle_Situation（対戦の状況区分）**: 各Battle_Pairの勝敗が決まったときに、勝者と敗者のFavorite_Levelの比較から導く区分。勝者のFavorite_Levelが敗者より高ければ `favored`（順当）、低ければ `upset`（番狂わせ）、両者が同値または比較不能であれば `even`（互角）とする。Battle_Commentaryの出し分けにのみ用い、勝敗の判定（要件4.2の自動判定・勝率50/50）には一切影響しない
-- **Relationship_Map（相関図）**: 登録済みCharacter同士の関係（Relationship_Edge）を、登録内容からルールベースで自動生成して図として表示する新画面。関係の生成は端末内の純粋関数で決定的に行い（外部AI/送信なし、要件3.8）、Character_Storeのデータを一切変更しない読み取り専用の可視化である。ビューポート幅320〜430 CSSピクセルの縦向き画面でも横スクロールを発生させず、操作要素は最小44×44 CSSピクセルのタッチ領域を持ち、配色・角丸・影・余白は大人かわいいテーマ（Adult_Cute_Theme）のトークン経由で適用する（要件7, 9と整合）。追加ライブラリを用いず軽量な自前描画（各Characterに紐づく「関係のある相手」を列挙するリストベースのカード表示）で実現する
-- **Relationship_Edge（関係エッジ）**: Relationship_Mapにおける2件のCharacterを結ぶ無向の関係。該当する関係軸（Relationship_Axis）の集合・関係の強さを表すスコア（Relationship_Score）・代表となる関係ラベル（Relationship_Label）を持つ。同一の無向ペア（2件のCharacter）に複数の関係軸が該当する場合は1本のエッジに集約し、該当軸のスコアを合算する。自己ループ（同一Characterどうし）は作らない
-- **Relationship_Axis（関係軸）**: Relationship_Edgeを生成する判定軸。次の3種で構成する。(1) おそろいカラー（`same-color`）: 2件のImage_Colorが同一プリセット色のとき関係を作る。ただしImage_Color_None（`'none'`）どうしは関係を作らない。(2) 同期（`same-period`）: 2件のMet_Onが同じ年月（`YYYY-MM`の一致）のとき関係を作る。どちらか一方でもMet_Onが未設定なら関係を作らない。(3) お気に入り度が同値（`same-favorite`）: 2件のFavorite_Levelが同値のとき関係を作る。両者がFavorite_Level 4以上の同値なら関係ラベルを「両想い級」、それ以外の同値なら「気になる存在」とする
-- **Relationship_Score（関係スコア）**: 各Relationship_Edgeの強さを表す非負の数値。該当する関係軸ごとに定めた基準スコアを合算して求める。ノードの次数制限（1件あたり接続エッジ上位3本まで）やエッジ表示順の決定に用いる。同一入力からは常に同一のスコアになる（決定的）
-- **Relationship_Label（関係ラベル）**: 各Relationship_Edgeの代表的な関係の呼称（例「おそろいカラー」「同期」「両想い級」「気になる存在」）。同一の無向ペアに複数の関係軸が該当する場合は、決定的に定めた軸の優先順位に従って代表ラベルを1つ選ぶ
+- **Relationship_Map（相関図）**: 登録済みCharacter同士の関係（Relationship_Edge）を図として表示する新画面。関係の割り当ては登録データの内容（Image_Color・Met_On・Favorite_Level）に依存せず、Characterのid（および全Characterのid集合）から端末内の純粋関数で決定的に行う（外部AI/送信なし、要件3.8）。同一のid集合からは常に同一の相関図になる（決定的）。Character_StoreのデータおよびCharacterの内容を一切変更しない読み取り専用の可視化である。ビューポート幅320〜430 CSSピクセルの縦向き画面でも横スクロールを発生させず、操作要素は最小44×44 CSSピクセルのタッチ領域を持ち、配色・角丸・影・余白は大人かわいいテーマ（Adult_Cute_Theme）のトークン経由で適用する（要件7, 9と整合）。追加ライブラリを用いず軽量な自前描画（各Characterに紐づく「関係のある相手」を列挙するリストベースのカード表示）で実現する
+- **Relationship_Edge（関係の線）**: Relationship_Mapにおける2件のCharacterを結ぶ無向の線。1本の線につき関係タグ（Relationship_Tag）を1つと、向きを持つ2つの印象（Impression）＝A→BとB→Aの一言を持つ。同一の無向ペア（2件のCharacter）を結ぶ線は高々1本であり、自己ループ（同一Characterどうし）は作らない。線をつなぐ相手・関係タグ・向きあり印象はすべてCharacterのidから決定的に定まり、登録データの内容には依存しない
+- **Relationship_Tag（関係タグ）**: 1本のRelationship_Edgeに付く関係の種類。次の5種類のいずれか1つを、無向ペア{a,b}（id昇順a<bに正規化）のid連結文字列から導く決定的なハッシュで選ぶ。種類は「仲良し」「ライバル」「喧嘩中」「気になる存在」「相棒」。表示時は種類ごとに色を変え、色はすべて大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン経由で適用し、色値をハードコードしない（要件9と整合）。関係タグの選択はImage_Color・Met_On・Favorite_Levelを一切用いない
+- **Impression（印象）**: 1本のRelationship_Edgeに乗る、向きを持つ短い一言。各有向ペア(from→to)について、`from.id`と`to.id`を連結した文字列の決定的なハッシュで、アプリが用意した短い印象テンプレート集から1つ選ぶ。A→BとB→Aは入力文字列が異なるため一般に異なる一言になりうる。印象テンプレートはかわいい内輪ノリの非空の短文であり、Characterの名前が空でも成立する表現とする。選択は登録データの内容に依存せずidのみに依存し、同一のfrom→toからは常に同一の一言になる（決定的）
 
 ## Requirements
 
@@ -386,30 +385,27 @@
 
 ### 要件22: キャラ相関図（Relationship_Map）
 
-**ユーザーストーリー:** カップルとして、登録したキャラ同士の関係を相関図で眺めたい。そうすることで、おそろいの色や出会った時期、お気に入り度の近さから、二人のコレクションのつながりを楽しく振り返れる。
+**ユーザーストーリー:** カップルとして、登録したキャラ同士の関係をアプリがいい感じに決めてくれる相関図で眺めたい。そうすることで、キャラどうしの「仲良し」「ライバル」といった関係や、お互いをどう思っているかの一言を、二人で読んでわいわい楽しめる。
 
-本要件は既存機能を破壊せず、登録済みCharacterの内容（Image_Color・Met_On・Favorite_Level）から関係（Relationship_Edge）を端末内の純粋関数で決定的に導出し、新画面Relationship_Mapで可視化する非破壊拡張として整理する。関係の生成・表示はCharacter_StoreのデータおよびCharacterの内容を一切変更しない読み取り専用の可視化であり、いかなる外部サーバーへもデータ・導出結果を送信しない（要件3.8と整合）。
+本要件は既存機能を破壊せず、登録済みCharacterのid（および全Characterのid集合）から関係（Relationship_Edge）を端末内の純粋関数で決定的に割り当て、新画面Relationship_Mapで可視化する非破壊拡張として整理する。関係の割り当ては登録データの内容（Image_Color・Met_On・Favorite_Level）に一切依存せず、Characterのidのみから、各線の関係タグ（Relationship_Tag、5種類）と向きを持つ印象（Impression、A→BとB→Aの一言）を決定的に導く。関係の生成・表示はCharacter_StoreのデータおよびCharacterの内容を一切変更しない読み取り専用の可視化であり、いかなる外部サーバーへもデータ・導出結果を送信しない（要件3.8と整合）。
 
 #### 受け入れ基準
 
-1. WHEN 利用者がRelationship_Mapを開く, THE Chara_App SHALL Character_Storeに保存された全Characterの登録内容からRelationship_Edgeを生成し、Character同士の関係を図として表示する
-2. WHERE 2件のCharacterがいずれもImage_Color_None以外の同一のImage_Colorを持つ場合, THE Chara_App SHALL 当該2件の間におそろいカラー（same-color）軸のRelationship_Edgeを生成する
-3. IF 2件のCharacterのImage_ColorがいずれもImage_Color_Noneである場合, THEN THE Chara_App SHALL 当該2件の間におそろいカラー（same-color）軸のRelationship_Edgeを生成しない
-4. WHERE 2件のCharacterがいずれもMet_Onを設定しており、かつ両者のMet_Onの年月（YYYY-MM）が一致する場合, THE Chara_App SHALL 当該2件の間に同期（same-period）軸のRelationship_Edgeを生成する
-5. IF 2件のCharacterのうち少なくとも一方のMet_Onが未設定である場合, THEN THE Chara_App SHALL 当該2件の間に同期（same-period）軸のRelationship_Edgeを生成しない
-6. WHERE 2件のCharacterのFavorite_Levelが同値である場合, THE Chara_App SHALL 当該2件の間にお気に入り度が同値（same-favorite）軸のRelationship_Edgeを生成する
-7. WHERE same-favorite軸のRelationship_Edgeにおいて2件のCharacterのFavorite_Levelがいずれも4以上の同値である場合, THE Chara_App SHALL 当該軸の関係ラベルを「両想い級」とする
-8. WHERE same-favorite軸のRelationship_Edgeにおいて2件のCharacterのFavorite_Levelが同値かつ少なくとも一方が4未満である場合, THE Chara_App SHALL 当該軸の関係ラベルを「気になる存在」とする
-9. WHERE 同一の無向ペア（2件のCharacter）に複数のRelationship_Axisが該当する場合, THE Chara_App SHALL 当該ペアを1本のRelationship_Edgeに集約し、該当する各軸のRelationship_Scoreを合算したスコアと、決定的に定めた軸の優先順位に基づく代表のRelationship_Labelを当該Relationship_Edgeに保持する
-10. THE Chara_App SHALL 各CharacterノードについてRelationship_Scoreの高い順に上位3本までのRelationship_Edgeのみを当該ノードの関係として表示し、当該上限を超えるRelationship_Edgeを当該ノードの関係から除外する
-11. WHEN Relationship_Scoreが同値でノードの次数上限を超える取捨が必要な場合, THE Chara_App SHALL 決定的なタイブレーク規則（相手Characterのidの昇順を含む）で残すRelationship_Edgeを選び、除外するRelationship_Edgeを決定する
-12. THE Chara_App SHALL 同一のCharacter集合に対して常に同一のRelationship_Map（決定的な関係集合・スコア・ラベル・表示順）を生成する
-13. THE Chara_App SHALL いずれのRelationship_Edgeも相異なる2件のCharacterを結ぶ無向の関係として生成し、同一Characterどうしの自己ループを生成しない
-14. IF Character_Storeに保存されたCharacterが0件または1件である場合, THEN THE Chara_App SHALL Relationship_Edgeを生成せず、関係を作るには2件以上の登録が必要である旨の空状態メッセージを表示する
-15. IF 2件以上のCharacterが存在するがいずれの2件の間にもRelationship_Edgeが生成されない場合, THEN THE Chara_App SHALL 関係が見つからなかった旨の空状態メッセージを表示する
-16. THE Chara_App SHALL Relationship_MapのRelationship_Edge生成をCharacter_Storeに保存されたデータの読み取りのみに用い、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
-17. THE Chara_App SHALL Relationship_Mapおよびその関係の導出結果を含む一切のデータをいかなる外部サーバーへも送信しない
-18. THE Chara_App SHALL Navigation_Barまたは主要画面からRelationship_Mapへ到達する導線を提供する
-19. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面でRelationship_Mapを表示する, THE Chara_App SHALL 横スクロールを発生させないレイアウトでRelationship_Mapを表示する（要件7.6、要件9.7と整合）
-20. THE Chara_App SHALL Relationship_Mapの操作要素を最小44×44 CSSピクセルのタッチ領域で提供する（要件7.7、要件9.6と整合）
-21. THE Chara_App SHALL Relationship_Mapの配色・角丸・影・余白を大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン経由で適用して表示する（要件9と整合）
+1. WHEN 利用者がRelationship_Mapを開く, THE Chara_App SHALL Character_Storeに保存された全CharacterのidからRelationship_Edgeを生成し、Character同士の関係を図として表示する
+2. THE Chara_App SHALL 各Relationship_Edgeの関係タグ（Relationship_Tag）を、当該無向ペア{a,b}（id昇順a<bに正規化）のidを連結した文字列から導く決定的なハッシュに基づき、5種類（仲良し・ライバル・喧嘩中・気になる存在・相棒）のうち1つに定める
+3. THE Chara_App SHALL Relationship_Edgeの関係タグ・線・向きあり印象の割り当てを、Characterの登録データの内容（Image_Color・Met_On・Favorite_Level）に依存させず、Characterのidのみから決定する
+4. THE Chara_App SHALL 各Relationship_Edgeに向きを持つ2つの印象（Impression）を持たせ、A→Bの印象とB→Aの印象を、それぞれ有向ペア(from→to)の`from.id`と`to.id`を連結した文字列から導く決定的なハッシュに基づき、印象テンプレート集から1つずつ選ぶ
+5. THE Chara_App SHALL いずれのImpressionも印象テンプレート集の要素である非空の文字列として生成する
+6. THE Chara_App SHALL 各Relationship_Edgeについて、A→BとB→Aで異なる入力文字列（`a.id`+`b.id`の順序）に基づいて印象を選び、両者が一般に異なりうる向きあり印象として保持する
+7. THE Chara_App SHALL 各Characterノードについて当該ノードにつながる相手（Relationship_Edge）を決定的なつながりスコアの高い順に最大3本まで表示し、当該上限を超えるRelationship_Edgeを当該ノードの関係から除外する
+8. WHEN つながりスコアが同値でノードの次数上限を超える取捨が必要な場合, THE Chara_App SHALL 決定的なタイブレーク規則（相手Characterのidの昇順を含む）で残すRelationship_Edgeを選び、除外するRelationship_Edgeを決定する
+9. THE Chara_App SHALL 同一のCharacterのid集合に対して常に同一のRelationship_Map（決定的な線の集合・関係タグ・向きあり印象・表示順）を生成する
+10. THE Chara_App SHALL いずれのRelationship_Edgeも相異なる2件のCharacterを結ぶ無向の線として生成し、同一の無向ペアを結ぶ線を高々1本とし、同一Characterどうしの自己ループを生成しない
+11. IF Character_Storeに保存されたCharacterが0件または1件である場合, THEN THE Chara_App SHALL Relationship_Edgeを生成せず、関係を作るには2件以上の登録が必要である旨の空状態メッセージを表示する
+12. IF 2件以上のCharacterが存在するがいずれの2件の間にもRelationship_Edgeが生成されない場合, THEN THE Chara_App SHALL 関係が見つからなかった旨の空状態メッセージを表示する
+13. THE Chara_App SHALL Relationship_MapのRelationship_Edge生成をCharacter_Storeに保存されたデータの読み取りのみに用い、Character_Storeに保存されたデータおよびCharacterの内容を変更しない
+14. THE Chara_App SHALL Relationship_Mapおよびその関係の導出結果を含む一切のデータをいかなる外部サーバーへも送信しない
+15. THE Chara_App SHALL Navigation_Barまたは主要画面からRelationship_Mapへ到達する導線を提供する
+16. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面でRelationship_Mapを表示する, THE Chara_App SHALL 横スクロールを発生させないレイアウトでRelationship_Mapを表示する（要件7.6、要件9.7と整合）
+17. THE Chara_App SHALL Relationship_Mapの操作要素を最小44×44 CSSピクセルのタッチ領域で提供する（要件7.7、要件9.6と整合）
+18. THE Chara_App SHALL Relationship_Mapの配色・角丸・影・余白を大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン経由で適用して表示し、関係タグ（Relationship_Tag）を種類ごとに異なる色で、いずれもテーマトークン経由（色値をハードコードしない）で表示する（要件9と整合）

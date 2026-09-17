@@ -98,9 +98,10 @@ export function useRelationshipMap(
         resolved.push({
           a: ca,
           b: cb,
-          axes: edge.axes,
+          tag: edge.tag,
+          impressionAtoB: edge.impressionAtoB,
+          impressionBtoA: edge.impressionBtoA,
           score: edge.score,
-          label: edge.label,
         });
       }
 

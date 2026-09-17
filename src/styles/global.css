@@ -1508,7 +1508,8 @@ select {
   word-break: break-word;
 }
 
-/* 代表ラベル（両想い級 / おそろいカラー 等）。アクセント面で目立たせる。 */
+/* 関係タグバッジ（仲良し / ライバル 等）。種類ごとの色は下の .rel-tag--* で上書きする。
+ * ベースは形状・余白・折り返し方針のみを定め、色はすべてトークン経由（要件22.18 / 9.1）。 */
 .relationship-map__relation-label {
   font-size: var(--font-size-xs);
   padding: 2px var(--space-sm);
@@ -1516,6 +1517,36 @@ select {
   background-color: var(--color-primary);
   color: var(--color-on-primary);
   white-space: nowrap;
+}
+
+/* 関係タグ 5 種の色分け（要件22.18）。背景色・文字色はすべて大人かわいいテーマの
+ * トークン経由で解決し、色値をハードコードしない。色だけに依存させないため、バッジには
+ * 日本語ラベル（仲良し等）を必ず併記する（要件22.17 / 9.7）。濃い背景（friend）には明色文字
+ * （--color-on-primary）、淡い背景（rival/crush/buddy）には本文色（--color-text-primary）を
+ * 使ってコントラストを確保する。 */
+.relationship-map__relation-label.rel-tag--friend {
+  background-color: var(--color-primary); /* ローズ/ピンク */
+  color: var(--color-on-primary);
+}
+
+.relationship-map__relation-label.rel-tag--rival {
+  background-color: var(--image-color-butter); /* 暖色・オレンジ寄り */
+  color: var(--color-text-primary);
+}
+
+.relationship-map__relation-label.rel-tag--fighting {
+  background-color: var(--color-text-secondary); /* グレー */
+  color: var(--color-on-primary);
+}
+
+.relationship-map__relation-label.rel-tag--crush {
+  background-color: var(--image-color-lavender); /* ラベンダー */
+  color: var(--color-text-primary);
+}
+
+.relationship-map__relation-label.rel-tag--buddy {
+  background-color: var(--image-color-mint); /* ミント */
+  color: var(--color-text-primary);
 }
 
 /* 関係軸バッジ群（複数軸のときは複数個）。 */

@@ -1,134 +1,110 @@
 /**
  * relationshipMap — キャラ相関図（Relationship_Map）の関係生成（純粋 TypeScript）
  *
- * 登録済み Character 集合から、既存フィールド（`imageColor` / `metOn` / `favoriteLevel`）
- * のみを用いて 3 軸（`same-color` / `same-period` / `same-favorite`）の無向スコア付き
- * エッジ（Relationship_Edge）を **決定的** に生成する。副作用を持たず、入力の `characters`
- * 配列および各 Character オブジェクトを一切変更しない読み取り専用の純粋関数。
- * `Math.random()` は用いず、外部サーバーへの送信も行わない（端末内完結・要件22.16, 22.17, 3.8）。
+ * 登録済み Character 集合から、各 Character の **id（および id 集合）のみ** を用いて
+ * 無向の線（Relationship_Edge）を **決定的** に生成する。登録データの内容
+ * （`imageColor` / `metOn` / `favoriteLevel`）には一切依存しない（要件22.3）。
+ * 副作用を持たず、入力の `characters` 配列および各 Character オブジェクトを一切変更しない
+ * 読み取り専用の純粋関数。`Math.random()` は用いず、外部サーバーへの送信も行わない
+ * （端末内完結・要件22.13, 22.14, 3.8）。
  *
- * 手順（すべて決定的）:
- *   1. すべての無向ペア（i < j で id 昇順に正規化 = a < b）について 3 軸を判定する。
- *      - same-color   : ca.imageColor === cb.imageColor かつ 'none' でない（要件22.2, 22.3）
- *      - same-period  : ca/cb の metOn がともに設定済み（undefined でない）かつ
- *                       年月（先頭 'YYYY-MM'）が一致（要件22.4, 22.5）
- *      - same-favorite: ca.favoriteLevel === cb.favoriteLevel（同値）。両者 >= 4 なら
- *                       ラベル「両想い級」、それ以外の同値なら「気になる存在」（要件22.6〜22.8）
- *   2. 該当軸が 1 つ以上あるペアを 1 本のエッジに集約し、該当軸の基準スコアを合算する（要件22.9）。
- *      基準スコア（決定的）: same-favorite(両想い級)=4, same-color=3, same-period=2,
- *      same-favorite(気になる存在)=1。代表ラベル（label）は軸優先順位
- *      （same-favorite(両想い級) > same-color > same-period > same-favorite(気になる存在)）で
- *      最上位の軸のラベルを採用する。axes は判定順（same-color, same-period, same-favorite）で保持する。
- *   3. 各ノード（Character）視点で、接続エッジをスコア降順（同点は相手 id 昇順）で並べ、上位3本を
- *      「採用候補」とする。両端のノードでともに上位3本（採用候補）に入るエッジのみを最終エッジとして
- *      採用する（両端合意方式）。これにより各ノードの次数は 3 以下になる（要件22.10, 22.11, 22.12）。
- *   4. 自己ループ（i === j）は生成しない。エッジは常に相異なる 2 件を結ぶ無向関係（a < b、要件22.13）。
- *   返り値の edges は決定的な順序（a 昇順 → b 昇順）に整列して返す。
+ * ハッシュは既存 `DailyPickSelector` と同じ FNV-1a 32bit（{@link fnv1a32}）を流用する。
+ *
+ * 手順（すべて決定的・id のみ依存）:
+ *   1. すべての無向ペア（i < j、id 昇順に正規化して a < b、a === b は作らない）について、
+ *      以下を id から求める。
+ *      - 関係タグ tag: `TAGS[fnv1a32(a + '\u0000' + b) mod 5]`（要件22.2, 22.3）。
+ *      - 向きあり印象: `impressionAtoB = IMPRESSIONS[fnv1a32(a + '>' + b) mod len]`、
+ *        `impressionBtoA = IMPRESSIONS[fnv1a32(b + '>' + a) mod len]`（要件22.4〜22.6）。
+ *        a→b と b→a は入力が異なるため一般に別の一言になりうる。
+ *      - つながりスコア score: `fnv1a32(CONNECT_SALT + a + '\u0000' + b)`
+ *        （関係タグ選択とは別 salt、登録データ非依存、要件22.7）。
+ *   2. どの線を残すか（各ノード最大3本、要件22.7, 22.8）: 各ノード視点で接続する線を
+ *      score 降順（同点は相手 id 昇順）で並べ、上位3本を「採用候補」とする。両端のノードで
+ *      ともに上位3本（採用候補）に入る線のみを最終の線として採用する（両端合意方式）。
+ *      これにより各ノードの次数は 3 以下になり、取捨は決定的（要件22.8, 22.9）。
+ *   3. 自己ループ（i === j）は生成しない。線は常に相異なる 2 件を結ぶ無向関係（a < b、要件22.10）。
+ *   返り値の edges は決定的な順序（a 昇順 → b 昇順）に整列して返す（要件22.9）。
+ *   全 Character が 0/1 件のときは edges は空（要件22.11）。
  *
  * 参照: design.md「イテレーション14（キャラ相関図、要件22）」「buildRelationshipMap」、
- * 要件22.1〜22.13, 22.16, 22.17、Correctness Property 30〜32
+ * 要件22.1〜22.14、Correctness Property 30〜32
  */
 
-import type {
-  Character,
-  RelationshipAxis,
-  RelationshipEdge,
-  RelationshipMap,
-} from './types';
+import type { Character, RelationshipEdge, RelationshipMap, RelationshipTag } from './types';
+import { fnv1a32 } from './DailyPickSelector';
 
-/** 各ノードに残せるエッジ本数の上限（次数上限）。要件22.10 */
+/** 各ノードに残せる線の本数の上限（次数上限）。要件22.7 */
 const MAX_DEGREE = 3;
 
-/** 関係ラベル文言（Relationship_Label）。要件22.9 */
-const LABEL_MUTUAL = '両想い級'; // same-favorite で両者 >= 4
-const LABEL_COLOR = 'おそろいカラー'; // same-color
-const LABEL_PERIOD = '同期'; // same-period
-const LABEL_CRUSH = '気になる存在'; // same-favorite で上記以外の同値
-
-/** お気に入り度の「両想い級」しきい値（この値以上の同値で両想い級）。要件22.7 */
-const MUTUAL_FAVORITE_THRESHOLD = 4;
-
-/** 基準スコア（決定的）。要件22.9 */
-const SCORE_MUTUAL = 4; // same-favorite（両想い級）
-const SCORE_COLOR = 3; // same-color
-const SCORE_PERIOD = 2; // same-period
-const SCORE_CRUSH = 1; // same-favorite（気になる存在）
-
 /**
- * metOn の年月（`YYYY-MM`、先頭 7 文字）を返す。未設定（undefined）は null。
- * 入力は正規化済みの `YYYY-MM-DD` を前提とする（`normalizeMetOn` 通過値）。
+ * 関係タグの固定順（`fnv1a32(a + '\u0000' + b) mod 5` のインデックスに対応）。要件22.2
+ * 順序を変えると既存の割り当てが変わるため、固定の並びを維持する。
  */
-function yearMonth(metOn: string | undefined): string | null {
-  if (metOn === undefined) {
-    return null;
-  }
-  return metOn.slice(0, 7);
-}
-
-/** 2 件の Character が same-favorite で「両想い級」条件（両者 >= 4）を満たすか。 */
-function isMutualFavorite(ca: Character, cb: Character): boolean {
-  return (
-    ca.favoriteLevel >= MUTUAL_FAVORITE_THRESHOLD &&
-    cb.favoriteLevel >= MUTUAL_FAVORITE_THRESHOLD
-  );
-}
+export const TAGS: readonly RelationshipTag[] = [
+  'friend',
+  'rival',
+  'fighting',
+  'crush',
+  'buddy',
+];
 
 /**
- * 2 件の Character（すでに a < b に正規化済み）から関係エッジを導出する。
- * 該当軸が 1 つもなければ null（エッジを作らない）。
+ * 向きあり印象のテンプレート集（要件22.4, 22.5）。
+ *
+ * かわいい内輪ノリの非空の短文。名前を含まないため、名前が空の Character でも成立する。
+ * `fnv1a32(from + '>' + to) mod IMPRESSIONS.length` で 1 つを決定的に選ぶ。
+ * 順序を変えると既存の割り当てが変わるため、固定の並びを維持する。
  */
-function deriveEdge(a: string, b: string, ca: Character, cb: Character): RelationshipEdge | null {
-  const axes: RelationshipAxis[] = [];
-  let score = 0;
+export const IMPRESSIONS: readonly string[] = [
+  'あこがれてる',
+  'ちょっと気になる',
+  'いつも一緒にいたい',
+  '実はライバル視してる',
+  'なんだか放っておけない',
+  '話してみたい',
+  'いてくれると安心する',
+  'ひそかに応援してる',
+  'つい目で追っちゃう',
+  '一緒にいると楽しい',
+  'そばにいたい',
+  '内心すごいと思ってる',
+];
 
-  // 軸判定は判定順（same-color, same-period, same-favorite）で行い、axes もこの順で保持する。
-  const sameColor = ca.imageColor === cb.imageColor && ca.imageColor !== 'none';
-  const ym = yearMonth(ca.metOn);
-  const samePeriod = ym !== null && ym === yearMonth(cb.metOn);
-  const sameFavorite = ca.favoriteLevel === cb.favoriteLevel;
-  const mutual = sameFavorite && isMutualFavorite(ca, cb);
+/**
+ * つながりスコア用の salt（関係タグ選択の入力と衝突しないための接頭辞）。要件22.7
+ * 末尾の `\u0000` により id との境界を明確にする。
+ */
+const CONNECT_SALT = 'score\u0000';
 
-  if (sameColor) {
-    axes.push('same-color');
-    score += SCORE_COLOR;
-  }
-  if (samePeriod) {
-    axes.push('same-period');
-    score += SCORE_PERIOD;
-  }
-  if (sameFavorite) {
-    axes.push('same-favorite');
-    score += mutual ? SCORE_MUTUAL : SCORE_CRUSH;
-  }
-
-  if (axes.length === 0) {
-    return null;
-  }
-
-  // 代表ラベル（label）: 軸優先順位で最上位の軸のラベルを採用する（要件22.9）。
-  //   同期(両想い級) > おそろいカラー > 同期 > 気になる存在
-  let label: string;
-  if (sameFavorite && mutual) {
-    label = LABEL_MUTUAL;
-  } else if (sameColor) {
-    label = LABEL_COLOR;
-  } else if (samePeriod) {
-    label = LABEL_PERIOD;
-  } else {
-    // ここに来るのは sameFavorite（気になる存在）のみが該当するケース。
-    label = LABEL_CRUSH;
-  }
-
-  return { a, b, axes, score, label };
+/**
+ * 無向ペア（a < b 正規化済み）の関係タグを id のみから決定的に選ぶ。要件22.2, 22.3
+ */
+export function pickTag(a: string, b: string): RelationshipTag {
+  return TAGS[fnv1a32(`${a}\u0000${b}`) % TAGS.length];
 }
 
 /**
- * エッジをノード視点で並べるための比較。スコア降順 → 相手 id 昇順（要件22.11）。
+ * 有向 (from, to) の向きあり印象を id のみから決定的に選ぶ。非空。要件22.4〜22.6
+ */
+export function pickImpression(from: string, to: string): string {
+  return IMPRESSIONS[fnv1a32(`${from}>${to}`) % IMPRESSIONS.length];
+}
+
+/**
+ * 無向ペア（a < b 正規化済み）のつながりスコアを id のみから決定的に計算する。要件22.7, 22.8
+ */
+export function connectScore(a: string, b: string): number {
+  return fnv1a32(`${CONNECT_SALT}${a}\u0000${b}`);
+}
+
+/**
+ * 線をノード視点で並べるための比較。score 降順 → 相手 id 昇順（要件22.7, 22.8）。
  * `self` はこのノードの id で、相手 id を比較する。
  */
 function compareForNode(self: string, x: RelationshipEdge, y: RelationshipEdge): number {
   if (x.score !== y.score) {
-    return y.score - x.score; // スコア降順
+    return y.score - x.score; // score 降順
   }
   const otherX = x.a === self ? x.b : x.a;
   const otherY = y.a === self ? y.b : y.a;
@@ -139,38 +115,42 @@ function compareForNode(self: string, x: RelationshipEdge, y: RelationshipEdge):
 
 /**
  * 登録済み Character 集合から相関図（Relationship_Map）を決定的に生成する。
+ * 各 Character の id（および id 集合）のみを用い、登録データには一切依存しない。
  * 副作用なし・入力を変更しない純粋関数。
  *
  * @param characters 登録済み Character の読み取り専用配列
- * @returns 次数上限3・両端合意を満たす最終エッジ（a 昇順 → b 昇順）を持つ相関図
+ * @returns 次数上限3・両端合意を満たす最終の線（a 昇順 → b 昇順）を持つ相関図
  */
 export function buildRelationshipMap(characters: readonly Character[]): RelationshipMap {
-  // 0/1 件では関係を作れない（要件22.14）。
+  // 0/1 件では関係を作れない（要件22.11）。
   if (characters.length < 2) {
     return { edges: [] };
   }
 
-  // 1. 全無向ペアを生成し、a < b（id 昇順）に正規化して軸判定・集約する。
+  // 1. 全無向ペアを生成し、a < b（id 昇順）に正規化して id のみから各線を求める。
   const candidateEdges: RelationshipEdge[] = [];
   for (let i = 0; i < characters.length; i++) {
     for (let j = i + 1; j < characters.length; j++) {
-      const ci = characters[i];
-      const cj = characters[j];
-      // id 昇順に (a, b) を決める。自己ループ（同一 id）は作らない。
-      if (ci.id === cj.id) {
+      const idI = characters[i].id;
+      const idJ = characters[j].id;
+      // 自己ループ（同一 id）は作らない。
+      if (idI === idJ) {
         continue;
       }
-      const [ca, cb] = ci.id < cj.id ? [ci, cj] : [cj, ci];
-      const edge = deriveEdge(ca.id, cb.id, ca, cb);
-      if (edge !== null) {
-        candidateEdges.push(edge);
-      }
+      const a = idI < idJ ? idI : idJ;
+      const b = idI < idJ ? idJ : idI;
+      candidateEdges.push({
+        a,
+        b,
+        tag: pickTag(a, b),
+        impressionAtoB: pickImpression(a, b),
+        impressionBtoA: pickImpression(b, a),
+        score: connectScore(a, b),
+      });
     }
   }
 
-  // 3. 各ノード視点で上位3本を採用候補とし、両端合意のエッジのみ最終採用する。
-  //    ノードごとに接続エッジをスコア降順→相手 id 昇順で並べ、上位3本の集合を作る。
-  const acceptedByNode = new Map<string, Set<RelationshipEdge>>();
+  // 2. 各ノード視点で上位3本を採用候補とし、両端合意の線のみ最終採用する。
   const incident = new Map<string, RelationshipEdge[]>();
   const addIncident = (node: string, edge: RelationshipEdge): void => {
     const list = incident.get(node);
@@ -184,20 +164,20 @@ export function buildRelationshipMap(characters: readonly Character[]): Relation
     addIncident(edge.a, edge);
     addIncident(edge.b, edge);
   }
+  const acceptedByNode = new Map<string, Set<RelationshipEdge>>();
   for (const [node, edges] of incident) {
     const sorted = edges.slice().sort((x, y) => compareForNode(node, x, y));
-    const top = new Set(sorted.slice(0, MAX_DEGREE));
-    acceptedByNode.set(node, top);
+    acceptedByNode.set(node, new Set(sorted.slice(0, MAX_DEGREE)));
   }
 
-  // 両端のノードでともに上位3本に入るエッジのみを最終エッジとして採用する（両端合意方式）。
+  // 両端のノードでともに上位3本に入る線のみを最終の線として採用する（両端合意方式）。
   const finalEdges = candidateEdges.filter((edge) => {
     const aTop = acceptedByNode.get(edge.a);
     const bTop = acceptedByNode.get(edge.b);
     return aTop !== undefined && bTop !== undefined && aTop.has(edge) && bTop.has(edge);
   });
 
-  // 6. a 昇順 → b 昇順で決定的に整列して返す。
+  // 3. a 昇順 → b 昇順で決定的に整列して返す。
   finalEdges.sort((x, y) => {
     if (x.a < y.a) return -1;
     if (x.a > y.a) return 1;

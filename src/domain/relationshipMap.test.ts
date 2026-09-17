@@ -1,27 +1,39 @@
 /**
  * relationshipMap（キャラ相関図の関係生成）のプロパティテスト（fast-check + Vitest）
  *
- * イテレーション14（キャラ相関図、要件22）で追加した純粋関数 `buildRelationshipMap` を
- * property-based testing で検証する。Correctness Property 30〜32 に対応する。
+ * イテレーション14（キャラ相関図、要件22）で id 由来・決定的・登録データ非依存に作り替えた
+ * 純粋関数 `buildRelationshipMap` を property-based testing で検証する。
+ * Correctness Property 30〜32 に対応する。
  *
- * - Property 30: 決定的・要素妥当・入力不変・0/1件で edges 空
+ * - Property 30: 決定的・要素妥当・入力不変・0/1件で edges 空・登録データ非依存
  * - Property 31: 次数上限3・無向対称/正規化・自己ループなし
- * - Property 32: 軸メンバーシップ・スコア集約・代表ラベル・読み取り専用
+ * - Property 32: 関係タグ/向きあり印象の id 由来決定性・妥当性・方向性・読み取り専用
  *
  * ジェネレータは design.md「ジェネレータ網羅」の相関図分に従い、0/1/多数の Character・
- * ImageColor 各値（'none' 含む）・metOn 妥当/未設定/同一 YYYY-MM/異なる月・favoriteLevel 1〜5・
- * 同値・★4以上同値/★3以下同値・次数超過が起きる密な集合・関係ゼロ集合を網羅する。
+ * id の多様さ（辞書順が入れ替わる組・区切り文字を含む・空文字近縁）・次数超過が起きる密な
+ * 集合を網羅する。登録データ非依存の検証のため「同一 id 集合を持ち imageColor/metOn/
+ * favoriteLevel だけ差し替えた対の集合」を生成して比較する。
+ *
+ * オラクルは実装が export する定数（`TAGS`/`IMPRESSIONS`）とハッシュ（`fnv1a32`）を import して
+ * 使い、実装内部の再実装（重複定義）に依存しないようにする。
  *
  * 参照: design.md「Correctness Properties / Property 30〜32」「buildRelationshipMap」、
- * 要件22.1〜22.13, 22.16
+ * 要件22.1〜22.14
  */
 
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
-import { buildRelationshipMap } from './relationshipMap';
-import type { Character, ImageColor, PhotoData, RelationshipAxis } from './types';
+import {
+  buildRelationshipMap,
+  TAGS,
+  IMPRESSIONS,
+  pickTag,
+  pickImpression,
+} from './relationshipMap';
+import { fnv1a32 } from './DailyPickSelector';
+import type { Character, ImageColor, PhotoData } from './types';
 
-// --- 定数（実装と独立に再定義してオラクルとする） ------------------------------
+const MAX_DEGREE = 3;
 
 const IMAGE_COLOR_PRESETS: readonly ImageColor[] = [
   'none',
@@ -32,13 +44,6 @@ const IMAGE_COLOR_PRESETS: readonly ImageColor[] = [
   'sky',
 ];
 
-const LABEL_MUTUAL = '両想い級';
-const LABEL_COLOR = 'おそろいカラー';
-const LABEL_PERIOD = '同期';
-const LABEL_CRUSH = '気になる存在';
-const MUTUAL_THRESHOLD = 4;
-const MAX_DEGREE = 3;
-
 // --- ジェネレータ -------------------------------------------------------------
 
 /** ダミー写真データ（小さな ArrayBuffer + MIME）。関係生成ロジックには影響しない。 */
@@ -46,11 +51,7 @@ const photoData: fc.Arbitrary<PhotoData> = fc
   .uint8Array({ minLength: 0, maxLength: 4 })
   .map((bytes) => ({ data: bytes.slice().buffer, type: 'image/png' }));
 
-/**
- * 妥当な metOn（`YYYY-MM-DD`）または undefined を生成する。
- * 年月を狭い範囲（year 2000〜2001、month 1〜3）に寄せて、同一 YYYY-MM・異なる月の
- * 双方が高確率で発生するようにする。day は 1〜28 でうるう年を気にせず妥当。
- */
+/** 妥当な metOn（`YYYY-MM-DD`）または undefined。登録データ非依存性の検証用に多様な値を生成。 */
 const metOnArb: fc.Arbitrary<string | undefined> = fc.option(
   fc
     .record({
@@ -68,96 +69,79 @@ const metOnArb: fc.Arbitrary<string | undefined> = fc.option(
 );
 
 /**
- * Character（関係生成に関わる属性のみ意味を持つ）を生成するファクトリ。
- * id は一意化のため index を埋め込む。favoriteLevel は 1〜5（★4以上/★3以下の同値が
- * 踏めるよう全域）、imageColor は 'none' を含む全プリセット、metOn は妥当/未設定を混在。
+ * id 集合を多様に生成する（0〜10 件・一意）。
+ * - 辞書順が入れ替わる組（数字/英字混在・長短）
+ * - 区切り文字（`\u0000`・`>`・`-`）を含む id
+ * - 空文字に近い短い id
+ * これらにより a<b 正規化・区切り衝突耐性・密な次数超過の集合を踏む。
  */
-function characterArb(index: number): fc.Arbitrary<Character> {
-  return fc
-    .record({
-      seq: fc.integer({ min: 0, max: 20 }),
-      favoriteLevel: fc.integer({ min: 1, max: 5 }),
-      photo: photoData,
-      createdAt: fc.integer({ min: 0, max: 8 }),
-      metOn: metOnArb,
-      imageColor: fc.constantFrom(...IMAGE_COLOR_PRESETS),
-    })
-    .map(({ seq, favoriteLevel, photo, createdAt, metOn, imageColor }) => ({
-      // id は一意（index を末尾に埋め込む）。seq を前置して順序を揺らす。
-      id: `c-${String(seq).padStart(3, '0')}-${String(index).padStart(3, '0')}`,
-      name: '',
-      nickname: '',
-      memo: '',
-      favoriteLevel,
-      photo,
-      createdAt,
-      metOn,
-      imageColor,
-    }));
+const idFragmentArb: fc.Arbitrary<string> = fc.oneof(
+  fc.constantFrom('', 'a', 'b', 'z', '0', '10', '2', '>', '-', '\u0000', 'aa'),
+  fc.string({ minLength: 0, maxLength: 4 }),
+);
+
+const idsArb: fc.Arbitrary<string[]> = fc.uniqueArray(
+  fc
+    .tuple(idFragmentArb, fc.integer({ min: 0, max: 9999 }))
+    .map(([frag, seq]) => `${frag}#${seq}`),
+  { minLength: 0, maxLength: 10, selector: (id) => id },
+);
+
+/** id 集合に対して、登録データ（favoriteLevel/metOn/imageColor）をランダムに割り当てた Character 配列を作る。 */
+function charactersFromIds(
+  ids: readonly string[],
+  payloads: readonly {
+    favoriteLevel: number;
+    metOn: string | undefined;
+    imageColor: ImageColor;
+    photo: PhotoData;
+    createdAt: number;
+  }[],
+): Character[] {
+  return ids.map((id, i) => ({
+    id,
+    name: '',
+    nickname: '',
+    memo: '',
+    favoriteLevel: payloads[i].favoriteLevel,
+    photo: payloads[i].photo,
+    createdAt: payloads[i].createdAt,
+    metOn: payloads[i].metOn,
+    imageColor: payloads[i].imageColor,
+  }));
 }
+
+const payloadArb = fc.record({
+  favoriteLevel: fc.integer({ min: 1, max: 5 }),
+  metOn: metOnArb,
+  imageColor: fc.constantFrom(...IMAGE_COLOR_PRESETS),
+  photo: photoData,
+  createdAt: fc.integer({ min: 0, max: 8 }),
+});
+
+/** 一意な id を持つ Character 配列を生成する（0〜10 件）。 */
+const charactersArb: fc.Arbitrary<Character[]> = idsArb.chain((ids) =>
+  fc
+    .tuple(...ids.map(() => payloadArb))
+    .map((payloads) => charactersFromIds(ids, payloads)),
+);
 
 /**
- * 一意な id を持つ Character 配列を生成する（0〜10 件）。
- * favoriteLevel が 1〜5 の 5 値・imageColor が 6 値と少ないため、10 件規模で
- * 同一 favoriteLevel・同一 imageColor が多数生じ、次数超過（>3）が起きる密な集合や、
- * 逆にほとんど関係が生じない集合の双方を網羅する。0/1 件も範囲に含む。
+ * 同一 id 集合を持ち、登録データ（favoriteLevel/metOn/imageColor）だけが異なる 2 つの
+ * Character 集合の対を生成する（登録データ非依存性の検証用）。
  */
-const charactersArb: fc.Arbitrary<Character[]> = fc
-  .integer({ min: 0, max: 10 })
-  .chain((n) => fc.tuple(...Array.from({ length: n }, (_, i) => characterArb(i))));
+const characterPairArb: fc.Arbitrary<[Character[], Character[]]> = idsArb.chain((ids) =>
+  fc
+    .tuple(
+      fc.tuple(...ids.map(() => payloadArb)),
+      fc.tuple(...ids.map(() => payloadArb)),
+    )
+    .map(([p1, p2]) => [charactersFromIds(ids, p1), charactersFromIds(ids, p2)]),
+);
 
-// --- オラクル（実装と独立な参照ロジック） ------------------------------------
+// --- 補助 ---------------------------------------------------------------------
 
-function yearMonth(metOn: string | undefined): string | null {
-  return metOn === undefined ? null : metOn.slice(0, 7);
-}
-
-/** ペア (ca, cb) の該当軸を判定順（same-color, same-period, same-favorite）で返す。 */
-function expectedAxes(ca: Character, cb: Character): RelationshipAxis[] {
-  const axes: RelationshipAxis[] = [];
-  if (ca.imageColor === cb.imageColor && ca.imageColor !== 'none') {
-    axes.push('same-color');
-  }
-  const ym = yearMonth(ca.metOn);
-  if (ym !== null && ym === yearMonth(cb.metOn)) {
-    axes.push('same-period');
-  }
-  if (ca.favoriteLevel === cb.favoriteLevel) {
-    axes.push('same-favorite');
-  }
-  return axes;
-}
-
-function isMutual(ca: Character, cb: Character): boolean {
-  return ca.favoriteLevel >= MUTUAL_THRESHOLD && cb.favoriteLevel >= MUTUAL_THRESHOLD;
-}
-
-function expectedScore(axes: readonly RelationshipAxis[], mutual: boolean): number {
-  let score = 0;
-  for (const axis of axes) {
-    if (axis === 'same-color') score += 3;
-    else if (axis === 'same-period') score += 2;
-    else if (axis === 'same-favorite') score += mutual ? 4 : 1;
-  }
-  return score;
-}
-
-function expectedLabel(axes: readonly RelationshipAxis[], mutual: boolean): string {
-  const hasFavorite = axes.includes('same-favorite');
-  if (hasFavorite && mutual) return LABEL_MUTUAL;
-  if (axes.includes('same-color')) return LABEL_COLOR;
-  if (axes.includes('same-period')) return LABEL_PERIOD;
-  return LABEL_CRUSH;
-}
-
-/** id → Character のインデックスを作る。 */
-function byId(chars: readonly Character[]): Map<string, Character> {
-  const m = new Map<string, Character>();
-  for (const c of chars) m.set(c.id, c);
-  return m;
-}
-
-/** Character を関係生成に効く属性だけで深く比較するためのスナップショット。 */
+/** Character を「関係生成に効く属性＋登録データ」を含めて深く比較するためのスナップショット。 */
 function snapshot(chars: readonly Character[]): string {
   return JSON.stringify(
     chars.map((c) => ({
@@ -175,17 +159,16 @@ function snapshot(chars: readonly Character[]): string {
 
 /** 配列の順序を決定的に入れ替える（内容は不変）。 */
 function reorder<T>(arr: readonly T[]): T[] {
-  // 逆順にするだけで「入力順が違う」ケースを作れる。
   return arr.slice().reverse();
 }
 
 // --- Property 30 --------------------------------------------------------------
 
-// Feature: chara-collection, Property 30: 相関図は決定的で要素妥当・入力を変更しない
-describe('Property 30: buildRelationshipMap は決定的・要素妥当・入力不変', () => {
-  it('決定性・要素妥当性・入力不変・0/1件で空を満たす', () => {
+// Feature: chara-collection, Property 30: 相関図は決定的で要素妥当・入力を変更しない・登録データに依存しない
+describe('Property 30: buildRelationshipMap は決定的・要素妥当・入力不変・登録データ非依存', () => {
+  it('決定性・要素妥当性・入力不変・0/1件で空・登録データ非依存を満たす', () => {
     fc.assert(
-      fc.property(charactersArb, (characters) => {
+      fc.property(characterPairArb, ([characters, variant]) => {
         const before = snapshot(characters);
         const ids = new Set(characters.map((c) => c.id));
 
@@ -198,9 +181,8 @@ describe('Property 30: buildRelationshipMap は決定的・要素妥当・入力
         const map2 = buildRelationshipMap(characters);
         expect(map2).toStrictEqual(map1);
 
-        // (a) 入力順を変えても内容が同じなら同一結果（決定的順序）。
-        const reordered = reorder(characters);
-        const map3 = buildRelationshipMap(reordered);
+        // (a) 入力順を変えても同一結果（決定的順序）。
+        const map3 = buildRelationshipMap(reorder(characters));
         expect(map3).toStrictEqual(map1);
 
         // (d) 0/1 件なら edges は空。
@@ -212,10 +194,16 @@ describe('Property 30: buildRelationshipMap は決定的・要素妥当・入力
         for (const e of map1.edges) {
           expect(ids.has(e.a)).toBe(true);
           expect(ids.has(e.b)).toBe(true);
-          expect(e.score).toBeGreaterThanOrEqual(1);
-          expect(e.axes.length).toBeGreaterThanOrEqual(1);
-          expect(e.label.length).toBeGreaterThanOrEqual(1);
+          expect(TAGS.includes(e.tag)).toBe(true);
+          expect(e.impressionAtoB.length).toBeGreaterThanOrEqual(1);
+          expect(e.impressionBtoA.length).toBeGreaterThanOrEqual(1);
+          expect(typeof e.score).toBe('number');
+          expect(Number.isNaN(e.score)).toBe(false);
         }
+
+        // (e) 登録データ非依存: 同一 id 集合で色/日付/お気に入り度を変えても完全一致。
+        const mapVariant = buildRelationshipMap(variant);
+        expect(mapVariant).toStrictEqual(map1);
       }),
       { numRuns: 100 },
     );
@@ -231,12 +219,13 @@ describe('Property 31: buildRelationshipMap のグラフ不変条件', () => {
       fc.property(charactersArb, (characters) => {
         const { edges } = buildRelationshipMap(characters);
 
-        // (c) 自己ループなし & (b) 正規化 a < b。
         const seenPairs = new Set<string>();
         const degree = new Map<string, number>();
         for (const e of edges) {
-          expect(e.a).not.toBe(e.b); // 自己ループなし
-          expect(e.a < e.b).toBe(true); // a < b に正規化
+          // (c) 自己ループなし。
+          expect(e.a).not.toBe(e.b);
+          // (b) a < b に正規化。
+          expect(e.a < e.b).toBe(true);
 
           // (b) 同一無向ペアは高々 1 本。
           const key = `${e.a}\u0000${e.b}`;
@@ -259,34 +248,39 @@ describe('Property 31: buildRelationshipMap のグラフ不変条件', () => {
 
 // --- Property 32 --------------------------------------------------------------
 
-// Feature: chara-collection, Property 32: 相関図の関係軸・スコア集約・ラベルの判定は定義どおり
-describe('Property 32: buildRelationshipMap の軸・スコア・ラベル判定', () => {
-  it('軸メンバーシップ・スコア集約・代表ラベル・読み取り専用を満たす', () => {
+// Feature: chara-collection, Property 32: 相関図の関係タグと向きあり印象は id 由来で決定的・妥当
+describe('Property 32: buildRelationshipMap の関係タグ・向きあり印象の id 由来決定性/妥当性', () => {
+  it('タグ/印象の決定性・妥当性・方向性・読み取り専用を満たす', () => {
     fc.assert(
       fc.property(charactersArb, (characters) => {
         const before = snapshot(characters);
-        const index = byId(characters);
         const { edges } = buildRelationshipMap(characters);
 
         // (d) 読み取り専用（入力不変）。
         expect(snapshot(characters)).toBe(before);
 
         for (const e of edges) {
-          const ca = index.get(e.a)!;
-          const cb = index.get(e.b)!;
-          const axes = expectedAxes(ca, cb);
-          const mutual = isMutual(ca, cb);
+          // (a) 関係タグの決定性・妥当性: id のみ由来のハッシュ mod 5。
+          const expectedTag = TAGS[fnv1a32(`${e.a}\u0000${e.b}`) % TAGS.length];
+          expect(e.tag).toBe(expectedTag);
+          expect(e.tag).toBe(pickTag(e.a, e.b));
+          expect(TAGS.includes(e.tag)).toBe(true);
 
-          // (a) 軸メンバーシップ: 実装の axes は定義どおりの該当軸集合と一致。
-          expect(e.axes).toEqual(axes);
-          // 該当軸が 1 つ以上あるからエッジが存在する（空はありえない）。
-          expect(axes.length).toBeGreaterThanOrEqual(1);
+          // (b) 向きあり印象の決定性・妥当性: from>to 順のハッシュ、テンプレート集の非空要素。
+          const expectedAtoB = IMPRESSIONS[fnv1a32(`${e.a}>${e.b}`) % IMPRESSIONS.length];
+          const expectedBtoA = IMPRESSIONS[fnv1a32(`${e.b}>${e.a}`) % IMPRESSIONS.length];
+          expect(e.impressionAtoB).toBe(expectedAtoB);
+          expect(e.impressionBtoA).toBe(expectedBtoA);
+          expect(e.impressionAtoB).toBe(pickImpression(e.a, e.b));
+          expect(e.impressionBtoA).toBe(pickImpression(e.b, e.a));
+          expect(IMPRESSIONS.includes(e.impressionAtoB)).toBe(true);
+          expect(IMPRESSIONS.includes(e.impressionBtoA)).toBe(true);
+          expect(e.impressionAtoB.length).toBeGreaterThanOrEqual(1);
+          expect(e.impressionBtoA.length).toBeGreaterThanOrEqual(1);
 
-          // (b) スコア集約。
-          expect(e.score).toBe(expectedScore(axes, mutual));
-
-          // (c) 代表ラベル。
-          expect(e.label).toBe(expectedLabel(axes, mutual));
+          // (c) 方向性: 同一有向ペアは常に同一（決定的）。
+          expect(pickImpression(e.a, e.b)).toBe(pickImpression(e.a, e.b));
+          expect(pickImpression(e.b, e.a)).toBe(pickImpression(e.b, e.a));
         }
       }),
       { numRuns: 100 },

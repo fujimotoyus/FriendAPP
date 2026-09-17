@@ -9,7 +9,7 @@
  *
  * 各ノードカードは当該 Character の名前（`deriveCardDisplay` の主表示相当）を見出しにし、
  * そのノードに接続する関係（無向エッジ `edges` の端点 a/b のいずれかが当該ノード）を、
- * 相手 Character の表示名・関係ラベル（`label`）・関係軸（`axes`）付きで縦積みに列挙する。
+ * 相手 Character の表示名・関係タグ（`tag`）・双方向の印象付きで縦積みに列挙する。
  *
  * 空状態（要件22.14, 22.15）:
  * - `hasEnough === false`（Character が 0/1 件）→ 「関係を作るには 2 件以上の登録が必要」旨を
@@ -25,7 +25,7 @@
  *
  * Requirements: 22.1, 22.14, 22.15, 22.16, 22.17, 22.18, 22.19, 22.20, 22.21, 2.9, 9
  */
-import type { Character, RelationshipAxis, ResolvedRelationshipEdge } from '../domain/types';
+import type { Character, RelationshipTag, ResolvedRelationshipEdge } from '../domain/types';
 import { deriveCardDisplay } from '../domain/deriveCardDisplay';
 import { useRelationshipMap } from '../hooks/useRelationshipMap';
 import { storeErrorMessage } from '../hooks/errorMessages';
@@ -38,13 +38,31 @@ export interface RelationshipMapViewProps {
 }
 
 /**
- * 関係軸（{@link RelationshipAxis}）を利用者向けの短い日本語ラベルへ写像する。
- * 表示専用（色/記号のみに依存しないよう文字で意味を伝える。要件22.20 / 9.7）。
+ * 関係タグ（{@link RelationshipTag}）を利用者向けの短い日本語ラベルへ写像する。
+ * 表示専用（色/記号のみに依存しないよう文字で意味を伝える。要件22.18 / 9.7）。
  */
-const AXIS_LABELS: Record<RelationshipAxis, string> = {
-  'same-color': 'おそろいカラー',
-  'same-period': '同期',
-  'same-favorite': 'お気に入り度が同じ',
+const TAG_LABELS: Record<RelationshipTag, string> = {
+  friend: '仲良し',
+  rival: 'ライバル',
+  fighting: '喧嘩中',
+  crush: '気になる存在',
+  buddy: '相棒',
+};
+
+/**
+ * 関係タグ（{@link RelationshipTag}）を種類ごとの色分けクラスへ写像する（要件22.18）。
+ * 実際の色はすべて CSS 側（global.css の `.rel-tag--*`）でテーマトークン経由に解決し、
+ * ここでは色値をハードコードせずクラス名の対応のみを持つ。色対応（design.md「表示ラベルと
+ * 色トークン」）: friend=--color-primary / rival=--image-color-butter /
+ * fighting=--color-text-secondary / crush=--image-color-lavender / buddy=--image-color-mint。
+ * 色だけに依存しないよう {@link TAG_LABELS} の日本語ラベルを必ず併記する（要件22.17 / 9.7）。
+ */
+const TAG_CLASS: Record<RelationshipTag, string> = {
+  friend: 'rel-tag--friend',
+  rival: 'rel-tag--rival',
+  fighting: 'rel-tag--fighting',
+  crush: 'rel-tag--crush',
+  buddy: 'rel-tag--buddy',
 };
 
 /** Character の主表示テキスト（`deriveCardDisplay` の primary）を返す。 */
@@ -59,17 +77,21 @@ function primaryNameOf(character: Character): string {
 interface NodeRelation {
   /** 関係の相手側 Character。 */
   other: Character;
-  /** 代表ラベル（`RelationshipEdge.label`）。 */
-  label: string;
-  /** 該当した関係軸（1 つ以上）。 */
-  axes: RelationshipAxis[];
-  /** 該当軸の基準スコア合算。 */
+  /** 当該ペアの関係タグ。 */
+  tag: RelationshipTag;
+  /** このノード → 相手 の印象（非空）。 */
+  impressionToOther: string;
+  /** 相手 → このノード の印象（非空）。 */
+  impressionFromOther: string;
+  /** つながりスコア。 */
   score: number;
 }
 
 /**
  * あるノードに接続する関係を、相手側 Character 付きで抽出する。
  * `edges` は無向（端点 a/b）なので、当該ノードが a なら相手は b、b なら相手は a。
+ * 向きあり印象は、当該ノードが a のとき「自分→相手」= impressionAtoB、
+ * 「相手→自分」= impressionBtoA。b のときは逆に対応付ける（要件22.4〜22.6）。
  * 出現順は `edges` の決定的順序（a 昇順 → b 昇順）を保つ。
  */
 function relationsForNode(
@@ -79,9 +101,21 @@ function relationsForNode(
   const relations: NodeRelation[] = [];
   for (const edge of edges) {
     if (edge.a.id === self.id) {
-      relations.push({ other: edge.b, label: edge.label, axes: edge.axes, score: edge.score });
+      relations.push({
+        other: edge.b,
+        tag: edge.tag,
+        impressionToOther: edge.impressionAtoB,
+        impressionFromOther: edge.impressionBtoA,
+        score: edge.score,
+      });
     } else if (edge.b.id === self.id) {
-      relations.push({ other: edge.a, label: edge.label, axes: edge.axes, score: edge.score });
+      relations.push({
+        other: edge.a,
+        tag: edge.tag,
+        impressionToOther: edge.impressionBtoA,
+        impressionFromOther: edge.impressionAtoB,
+        score: edge.score,
+      });
     }
   }
   return relations;
@@ -137,7 +171,7 @@ export function RelationshipMapView({ onBack }: RelationshipMapViewProps): JSX.E
       edges.length === 0 ? (
         <EmptyStateView
           icon="🔍"
-          message="関係が見つかりませんでした。イメージカラーや出会った日、お気に入り度をそろえると関係が生まれます。"
+          message="関係が見つかりませんでした。"
         />
       ) : null}
 
@@ -162,18 +196,20 @@ export function RelationshipMapView({ onBack }: RelationshipMapViewProps): JSX.E
                       <span className="relationship-map__relation-other">
                         {primaryNameOf(relation.other)}
                       </span>
-                      <span className="relationship-map__relation-label">
-                        {relation.label}
+                      <span
+                        className={`relationship-map__relation-label ${TAG_CLASS[relation.tag]}`}
+                      >
+                        {TAG_LABELS[relation.tag]}
                       </span>
-                      <span className="relationship-map__relation-axes">
-                        {relation.axes.map((axis) => (
-                          <span
-                            key={axis}
-                            className="relationship-map__axis-badge"
-                          >
-                            {AXIS_LABELS[axis]}
-                          </span>
-                        ))}
+                      <span className="relationship-map__relation-impressions">
+                        <span className="relationship-map__impression">
+                          {primaryNameOf(character)}→{primaryNameOf(relation.other)}:{' '}
+                          {relation.impressionToOther}
+                        </span>
+                        <span className="relationship-map__impression">
+                          {primaryNameOf(relation.other)}→{primaryNameOf(character)}:{' '}
+                          {relation.impressionFromOther}
+                        </span>
                       </span>
                     </li>
                   ))}

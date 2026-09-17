@@ -275,73 +275,84 @@ export interface FieldError {
 export type SortOrder = 'newest' | 'favorite' | 'name' | 'metOn';
 
 /**
- * 関係軸（Relationship_Axis、要件22.2〜22.8）。
+ * 関係タグ（Relationship_Tag、要件22.2, 22.3）。
  *
- * 登録済み Character の既存フィールドから導出する 3 種の関係の種類。
+ * 各無向の線に付く関係の種類（5 種）。登録データ（`imageColor` / `metOn` /
+ * `favoriteLevel`）には一切依存せず、無向ペア `{a, b}`（`a < b` に正規化）の id を
+ * 連結した文字列の決定的ハッシュ（`fnv1a32`）を `mod 5` した結果で 1 つを選ぶ（要件22.3）。
  *
- * - `'same-color'`    : 同一 Image_Color（`'none'` 以外）でつながる。`'none'` どうしはつながない（要件22.2, 22.3）
- * - `'same-period'`   : Met_On の年月（`YYYY-MM`）が一致してつながる。一方でも未設定なら作らない（要件22.4, 22.5）
- * - `'same-favorite'` : Favorite_Level が同値でつながる（ラベルは 4 以上の同値=両想い級 / それ以外の同値=気になる存在、要件22.6〜22.8）
+ * 表示ラベル（日本語）と表示色（テーマトークン）は UI/定数側で対応付ける（型は英語 enum）:
+ * - `'friend'`   : 仲良し
+ * - `'rival'`    : ライバル
+ * - `'fighting'` : 喧嘩中
+ * - `'crush'`    : 気になる存在
+ * - `'buddy'`    : 相棒
  *
  * 参照: design.md「Data Models」「イテレーション14（キャラ相関図、要件22）」
  */
-export type RelationshipAxis = 'same-color' | 'same-period' | 'same-favorite';
+export type RelationshipTag = 'friend' | 'rival' | 'fighting' | 'crush' | 'buddy';
 
 /**
- * 関係エッジ（Relationship_Edge、要件22）。id ベースの無向スコア付きエッジ。
+ * 関係の線（Relationship_Edge、要件22）。id ベースの無向の線。
  *
  * `a` / `b` は結ぶ 2 件の {@link Character} の id で、常に `a < b`（id 昇順）に正規化する
- * （自己ループなし、要件22.13）。同一の無向ペアに複数の軸が該当する場合は 1 本のエッジに
- * 集約し、`axes` に該当軸集合（1 つ以上）、`score` に該当軸の基準スコアの合算、`label` に
- * 軸優先順位で選ばれた代表ラベル（Relationship_Label）を保持する（要件22.9）。
- * `buildRelationshipMap` が Character の内容（`imageColor` / `metOn` / `favoriteLevel`）のみから
- * 決定的に生成する読み取り専用の値で、Character_Store のデータを一切変更しない（要件22.16）。
+ * （自己ループなし・同一無向ペアは高々 1 本、要件22.10）。`tag` は当該ペアに id 由来で
+ * 決定的に選ばれた関係タグ（要件22.2）、`impressionAtoB` / `impressionBtoA` は向きを持つ
+ * 印象（それぞれ a→b / b→a、いずれも非空、要件22.4〜22.6）、`score` は「つながり」を
+ * 決めるための内部スコア（`fnv1a32` 由来・登録データ非依存、要件22.7, 22.8）。
+ * `buildRelationshipMap` が各 Character の id（および id 集合）のみから決定的に生成する
+ * 読み取り専用の値で、Character_Store のデータを一切変更しない（要件22.13）。
  *
- * 参照: design.md「Data Models」「イテレーション14」、要件22.1, 22.9, 22.13
+ * 参照: design.md「Data Models」「イテレーション14」、要件22.1, 22.2, 22.4, 22.10
  */
 export interface RelationshipEdge {
-  /** 一方の Character の id（`a < b` に正規化）。要件22.13 */
+  /** 一方の Character の id（`a < b` に正規化）。要件22.10 */
   a: string;
-  /** もう一方の Character の id（`a < b` に正規化）。要件22.13 */
+  /** もう一方の Character の id（`a < b` に正規化）。要件22.10 */
   b: string;
-  /** 該当した関係軸（1 つ以上）。要件22.9 */
-  axes: RelationshipAxis[];
-  /** 該当軸の基準スコアの合算。要件22.9 */
+  /** 当該ペアの関係タグ（id 由来で決定的に 1 つ、要件22.2）。 */
+  tag: RelationshipTag;
+  /** a→b の向きあり印象（印象テンプレート集の非空要素、要件22.4, 22.5）。 */
+  impressionAtoB: string;
+  /** b→a の向きあり印象（印象テンプレート集の非空要素、要件22.4, 22.5）。 */
+  impressionBtoA: string;
+  /** つながり決定用の内部スコア（`fnv1a32` 由来・決定的・登録データ非依存、要件22.7, 22.8）。 */
   score: number;
-  /** 代表の関係ラベル（例「おそろいカラー」「同期」「両想い級」「気になる存在」）。要件22.9 */
-  label: string;
 }
 
 /**
  * 相関図（Relationship_Map、要件22）。`buildRelationshipMap` の戻り値。
  *
- * 次数上限3・両端合意を満たす最終エッジの列を保持する。順序は決定的（`a` 昇順 → `b` 昇順）で、
- * 同一の Character 集合からは常に同一の相関図を返す（要件22.12）。
+ * 次数上限3・両端合意を満たす最終の線の列を保持する。順序は決定的（`a` 昇順 → `b` 昇順）で、
+ * 同一の id 集合からは常に同一の相関図を返す（要件22.9）。
  *
- * 参照: design.md「Data Models」「イテレーション14」、要件22.1, 22.9, 22.10〜22.13
+ * 参照: design.md「Data Models」「イテレーション14」、要件22.1, 22.9, 22.10
  */
 export interface RelationshipMap {
-  /** 次数上限3・両端合意を満たす最終エッジ。決定的順序（`a` 昇順 → `b` 昇順）。 */
+  /** 次数上限3・両端合意を満たす最終の線。決定的順序（`a` 昇順 → `b` 昇順）。 */
   edges: RelationshipEdge[];
 }
 
 /**
- * 表示用に id を {@link Character} へ解決した関係エッジ（`useRelationshipMap` が公開）。
+ * 表示用に id を {@link Character} へ解決した関係の線（`useRelationshipMap` が公開）。
  *
  * {@link RelationshipEdge} の `a` / `b`（id）を対応する Character へ解決したもので、
- * `RelationshipMapView` が名前/イメージカラー等付きで関係を可視化するために用いる（要件22 の可視化用）。
+ * `RelationshipMapView` が関係タグの色付きバッジと双方向の印象付きで関係を可視化するために
+ * 用いる（要件22 の可視化用）。
  *
- * 参照: design.md「Data Models」「RelationshipMapView」、要件22.1, 22.16
+ * 参照: design.md「Data Models」「RelationshipMapView」、要件22.1
  */
 export interface ResolvedRelationshipEdge {
   /** 一方の Character（{@link RelationshipEdge.a} を解決）。 */
   a: Character;
   /** もう一方の Character（{@link RelationshipEdge.b} を解決）。 */
   b: Character;
-  /** 該当した関係軸（1 つ以上）。要件22.9 */
-  axes: RelationshipAxis[];
-  /** 該当軸の基準スコアの合算。要件22.9 */
+  /** 当該ペアの関係タグ（要件22.2）。 */
+  tag: RelationshipTag;
+  /** a→b の向きあり印象（非空、要件22.4）。 */
+  impressionAtoB: string;
+  /** b→a の向きあり印象（非空、要件22.4）。 */
+  impressionBtoA: string;
+  /** つながり決定用の内部スコア（要件22.7, 22.8）。 */
   score: number;
-  /** 代表の関係ラベル。要件22.9 */
-  label: string;
 }

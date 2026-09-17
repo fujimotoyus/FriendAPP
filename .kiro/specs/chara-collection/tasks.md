@@ -21,7 +21,7 @@
 - **イテレーション11**: トーナメント表を図に（`TournamentBracketView` を接続線つき縦向きブラケット図へ表示強化。データ/ドメイン/エンジン変更なし）（要件18.7 の表示強化）
 - **イテレーション12**: お題に沿った実況（各試合の Battle_Commentary に、その回のお題 Battle_Theme の観点ワード＝Theme_Aspect を織り込む。状況別実況を維持しつつお題に沿った文面にする。`battleTheme` に `getBattleThemeAspect` を追加し既存8お題すべてに観点ワードを定義（未知ラベルは非空フォールバック）、`BattleCommentator.narrate` を末尾任意引数 `aspect?` で後方互換拡張、`useRankingBattle` が観点ワードを実況へ渡す。`TournamentEngine` の勝敗判定・`pickBattleTheme` シグネチャは不変、既存 Property 11〜14, 24, 25, 26, 27 を保持）（要件19.6、要件19/21 の拡張）
 - **イテレーション13**: 優勝見出しもお題連動（優勝発表 `phase === 'champion'` の見出しをその回のお題 Battle_Theme の観点ワード Theme_Aspect から「{観点}No.1 👑」形式で表示。お題未選択（空 theme）時は従来の「最も好きなキャラ 👑」にフォールバック。`battleTheme` に純粋関数 `buildChampionTitle(theme)` を追加し `getBattleThemeAspect` を利用、`RankingBattleView` の優勝見出しを差し替え、`useRankingBattle` の `theme` を使用。`TournamentEngine` の勝敗判定・`pickBattleTheme` / `getBattleThemeAspect` は不変、既存 Property 11〜14, 24, 25, 26, 27, 28 を保持）（要件20.6、要件20/21 の拡張）
-- **イテレーション14**: キャラ相関図（登録済み Character 同士の関係を登録内容からルールベースで自動生成し、新画面 Relationship_Map でリストベースに可視化。3軸（same-color＝同一 Image_Color（'none' 除外）/same-period＝Met_On の年月一致/same-favorite＝Favorite_Level 同値、★4以上同値=「両想い級」/他=「気になる存在」）でスコア付き無向エッジ（RelationshipEdge）を決定的生成し、同一無向ペアは1本に集約してスコア合算・軸優先順位で代表ラベル決定、各ノードの次数を上位3本に制限（両端合意・スコア降順→相手 id 昇順でタイブレーク）。純粋関数 `buildRelationshipMap` で端末内・決定的に導出し外部送信しない。`useRelationshipMap`（読み取り専用）と `RelationshipMapView`（追加ライブラリなし・横スクロールなし・トークン経由・44×44 px・空状態）を追加し `App`/`NavigationBar` に「相関図」導線を配線。`Character` 型・`Character_Store`・既存ドメイン関数は変更せず、既存 Property 1〜29 を保持。新規 Property 30〜32）（要件22、要件3.8・7・9・14・15 と整合）
+- **イテレーション14**: キャラ相関図（新画面 Relationship_Map でリストベースに可視化。関係の割り当ては登録データの内容（Image_Color・Met_On・Favorite_Level）に依存せず、Character の id（および id 集合）から `fnv1a32`（`DailyPickSelector` 流用）で決定的に行う。各無向の線に関係タグ（RelationshipTag: 仲良し/ライバル/喧嘩中/気になる存在/相棒の5種を id ハッシュ mod 5 で選択・種類ごとに色分けをテーマトークン経由で表示）と向きあり印象（Impression: A→B と B→A を from>to の id ハッシュで印象テンプレート集から決定的に選ぶ・非空）を持たせ、各ノードの相手を最大3本に制限（つながりスコア降順→相手 id 昇順でタイブレーク・両端合意）。純粋関数 `buildRelationshipMap` で端末内・決定的・登録データ非依存に導出し外部送信しない。`useRelationshipMap`（読み取り専用）と `RelationshipMapView`（追加ライブラリなし・関係タグ色付き＋双方向印象表示・横スクロールなし・トークン経由・44×44 px・空状態）を追加し `App`/`NavigationBar` に「相関図」導線を配線。`Character` 型・`Character_Store`・既存ドメイン関数は変更せず、既存 Property 1〜29 を保持。新規 Property 30〜32）（要件22、要件3.8・7・9 と整合）
 
 実装言語は **TypeScript**、UI は **React**、ビルドは **Vite** で確定している（design.md「技術方針」）。ドメインロジックはフレームワーク非依存の純粋 TypeScript モジュールとして切り出す。永続化は IndexedDB（`idb` ラッパ、写真は Blob）。PWA 化は `vite-plugin-pwa`（Web App Manifest + Service Worker）。UI はパステルカラー基調・角丸多用のデザインを CSS カスタムプロパティで実現する。
 
@@ -608,55 +608,55 @@
 - [x] 64. Iteration 13 チェックポイント（優勝見出しもお題連動）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
-- [x] 65. ドメイン型: キャラ相関図（Relationship_Map）用の型を追加する（要件22.1, 22.9, 22.13）
-  - `src/domain/types.ts` に相関図用の型を**追記のみ**で追加する（既存の `Character` 型・`ImageColor`・`SortOrder` など既存型は破壊せず不変とする）。追加する型は次のとおり（design.md「Data Models」イテレーション14節に厳密に一致させる）:
-    - `RelationshipAxis = 'same-color' | 'same-period' | 'same-favorite'`（関係軸。same-color=同一 Image_Color（'none' 以外）/same-period=Met_On の年月（YYYY-MM）一致/same-favorite=Favorite_Level 同値、要件22.2〜22.8）
-    - `RelationshipEdge { a: string; b: string; axes: RelationshipAxis[]; score: number; label: string }`（id ベースの無向エッジ。`a`/`b` は結ぶ 2 件の Character の id で常に `a < b`（id 昇順）に正規化、`axes` は該当軸集合（1 つ以上）、`score` は該当軸の基準スコア合算、`label` は軸優先順位で選ばれた代表ラベル、要件22.9, 22.13）
-    - `ResolvedRelationshipEdge { a: Character; b: Character; axes: RelationshipAxis[]; score: number; label: string }`（表示用に id を Character へ解決したエッジ。`useRelationshipMap` が公開、要件22.1）
-    - `RelationshipMap { edges: RelationshipEdge[] }`（`buildRelationshipMap` の戻り値。次数上限3・両端合意を満たす最終エッジを決定的順序（a 昇順→b 昇順）で保持）
-  - _Requirements: 22.1, 22.9, 22.13_
+- [x] 65. ドメイン型: キャラ相関図（Relationship_Map）用の型を追加する（要件22.1, 22.2, 22.10）
+  - `src/domain/types.ts` に相関図用の型を**追記のみ**で追加する（既存の `Character` 型・`ImageColor`・`SortOrder` など既存型は破壊せず不変とする）。旧型 `RelationshipAxis` は本改訂で廃止し、次の型に作り替える（design.md「Data Models」イテレーション14節に厳密に一致させる）:
+    - `RelationshipTag = 'friend' | 'rival' | 'fighting' | 'crush' | 'buddy'`（関係タグ。表示ラベルは「仲良し」「ライバル」「喧嘩中」「気になる存在」「相棒」。id 由来ハッシュで5種から決定、登録データ非依存、要件22.2, 22.3）
+    - `RelationshipEdge { a: string; b: string; tag: RelationshipTag; impressionAtoB: string; impressionBtoA: string; score: number }`（id ベースの無向の線。`a`/`b` は結ぶ 2 件の Character の id で常に `a < b`（id 昇順）に正規化、`tag` は当該ペアの関係タグ、`impressionAtoB`/`impressionBtoA` は向きあり印象（非空）、`score` はつながり決定用の内部スコア、要件22.2, 22.4, 22.10）
+    - `ResolvedRelationshipEdge { a: Character; b: Character; tag: RelationshipTag; impressionAtoB: string; impressionBtoA: string; score: number }`（表示用に id を Character へ解決した線。`useRelationshipMap` が公開、要件22.1）
+    - `RelationshipMap { edges: RelationshipEdge[] }`（`buildRelationshipMap` の戻り値。次数上限3・両端合意を満たす最終の線を決定的順序（a 昇順→b 昇順）で保持）
+  - _Requirements: 22.1, 22.2, 22.10_
 
-- [x] 66. ドメイン: 相関図生成の純粋関数 `buildRelationshipMap` を実装する（要件22.2〜22.13）
-  - `src/domain` に新規ファイル（例 `src/domain/relationshipMap.ts`）を作成し、`buildRelationshipMap(characters: readonly Character[]): RelationshipMap` を実装する。決定的・純粋（副作用なし・入力の配列および各 Character オブジェクトを一切変更しない）とする。手順はすべて決定的に定義する（design.md「Data Models」`buildRelationshipMap` 節・イテレーション14節に厳密に一致させる）:
-    - **3 軸判定（要件22.2〜22.8）**: すべての無向ペア（`i < j`、id 昇順に正規化）について、(1) `same-color`＝両者の `imageColor` が同一プリセット色で当該色が `'none'` でないとき（`'none'` どうしはつながない、要件22.2, 22.3）、(2) `same-period`＝両者の `metOn` がともに設定済みで年月（`YYYY-MM`）が一致するとき（一方でも未設定なら不可、要件22.4, 22.5）、(3) `same-favorite`＝両者の `favoriteLevel` が同値のとき（要件22.6）。
-    - **スコア・ラベル（要件22.7〜22.9）**: 基準スコアは `same-favorite`(両想い級／両者 `favoriteLevel >= 4` の同値)=4, `same-color`=3, `same-period`=2, `same-favorite`(気になる存在／上記以外の同値)=1。同一無向ペアに複数軸が該当したら **1 本のエッジに集約** し `score` を合算する（要件22.9）。代表 `label` は軸優先順位 `same-favorite`(両想い級) > `same-color` > `same-period` > `same-favorite`(気になる存在) で最上位軸のラベル（例「両想い級」「おそろいカラー」「同期」「気になる存在」）とする（要件22.7, 22.8, 22.9）。
-    - **次数上限3・両端合意・タイブレーク（要件22.10, 22.11）**: 各ノードに接続するエッジをスコア降順→相手 id 昇順のタイブレークで上位3本に制限し、両端ノードの上位3本を同時に満たすエッジのみを最終採用する（両端合意方式）。
-    - **正規化・自己ループなし・順序（要件22.12, 22.13）**: エッジは常に `a < b`（id 昇順）で自己ループ（`a === b`）を作らず、返り値 `edges` は決定的順序（`a` 昇順→`b` 昇順）で整列する。`characters` が 0/1 件のとき `edges` は空とする（要件22.14）。
-    - `Math.random()` は使用せず外部送信も行わない（端末内・決定的、要件22.16, 22.17, 3.8）。`Character` 型・`Character_Store`・既存ドメイン関数は変更しない（相関図用の関数を追記するのみ、要件22.16）。
-  - _Requirements: 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9, 22.10, 22.11, 22.12, 22.13, 22.16, 22.17_
+- [x] 66. ドメイン: 相関図生成の純粋関数 `buildRelationshipMap` を id 由来・決定的・登録データ非依存に作り替える（要件22.2〜22.10）
+  - `src/domain/relationshipMap.ts` を新ルールで作り替える。`buildRelationshipMap(characters: readonly Character[]): RelationshipMap` を実装し、各 Character の id（および id 集合）**のみ**を用いて決定的に線を生成する。登録データ（`imageColor`/`metOn`/`favoriteLevel`）は一切用いない（要件22.3）。ハッシュは既存 `DailyPickSelector` の `fnv1a32` を流用する（`import` またはハッシュを共有ユーティリティへ切り出す）。決定的・純粋（副作用なし・入力の配列および各 Character オブジェクトを一切変更しない）とする（design.md「Data Models」`buildRelationshipMap` 節・イテレーション14節に厳密に一致させる）:
+    - **関係タグ選択（要件22.2, 22.3）**: すべての無向ペア（`i < j`、id 昇順に正規化して `a < b`）について、`tag = TAGS[fnv1a32(a + '\u0000' + b) mod 5]`（`TAGS = ['friend','rival','fighting','crush','buddy']` 等の固定順）で 5 種類から決定的に 1 つ選ぶ。登録データは使わない。
+    - **向きあり印象選択（要件22.4〜22.6）**: 非空の印象テンプレート集 `IMPRESSIONS`（かわいい内輪ノリの短文。名前が空でも成立する表現）を定義し、`impressionAtoB = IMPRESSIONS[fnv1a32(a + '>' + b) mod len]`、`impressionBtoA = IMPRESSIONS[fnv1a32(b + '>' + a) mod len]` で決定的に選ぶ。A→B と B→A は入力順序が異なるため一般に別の一言になりうる。
+    - **つながりスコア・次数上限3・両端合意（要件22.7, 22.8, 22.9）**: 関係タグ選択とは別の salt を足した id 連結文字列の `fnv1a32` 値を `score` とする（登録データ非依存）。各ノード視点で接続する線を `score` 降順→相手 id 昇順で上位3本に制限し、両端ノードの上位3本を同時に満たす線のみを最終採用する（両端合意方式）。
+    - **正規化・自己ループなし・順序（要件22.9, 22.10）**: 線は常に `a < b`（id 昇順）で自己ループ（`a === b`）を作らず、同一無向ペアは高々 1 本。返り値 `edges` は決定的順序（`a` 昇順→`b` 昇順）で整列する。`characters` が 0/1 件のとき `edges` は空とする（要件22.11）。
+    - `Math.random()` は使用せず外部送信も行わない（端末内・決定的、要件22.13, 22.14, 3.8）。`Character` 型・`Character_Store`・既存ドメイン関数は変更しない（相関図用の関数を作り替えるのみ、要件22.13）。
+  - _Requirements: 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9, 22.10, 22.13, 22.14_
 
-  - [x]* 66.1 相関図の決定性・要素妥当性・入力不変のプロパティテスト
-    - **Property 30: 相関図は決定的で要素妥当・入力を変更しない**（任意の `Character` 集合について、(a) 決定性: 同一集合に何度呼んでも同一の相関図（同一エッジ集合・`axes`・`score`・`label`・並び順）を返し、入力順を並べ替えても内容が同じなら同一結果、同点の取捨も決定的タイブレーク（スコア降順→相手 id 昇順）で一意、(b) 要素妥当性: 各 `RelationshipEdge` の `a`/`b` は入力集合に存在する Character の id、`score >= 1`、`axes` は空でない、`label` は空でない、(c) 入力不変: 入力の `characters`（配列・各 Character オブジェクト）を一切変更しない、(d) 小規模: 0/1 件のとき `edges` は空）
-    - **Validates: Requirements 22.1, 22.9, 22.11, 22.12, 22.14, 22.16**
-    - `// Feature: chara-collection, Property 30` タグ・`numRuns: 100`。対象 `buildRelationshipMap`
+  - [x]* 66.1 相関図の決定性・要素妥当性・入力不変・登録データ非依存のプロパティテスト
+    - **Property 30: 相関図は決定的で要素妥当・入力を変更しない・登録データに依存しない**（任意の `Character` 集合について、(a) 決定性: 同一 id 集合に何度呼んでも同一の相関図（同一の線集合・`tag`・`impressionAtoB`・`impressionBtoA`・`score`・並び順）を返し、入力順を並べ替えても同一結果、同点の取捨も決定的タイブレーク（つながりスコア降順→相手 id 昇順）で一意、(b) 要素妥当性: 各 `RelationshipEdge` の `a`/`b` は入力集合に存在する Character の id、`tag` は5種のいずれか、`impressionAtoB`/`impressionBtoA` は非空、`score` は数値、(c) 入力不変: 入力の `characters`（配列・各 Character オブジェクト）を一切変更しない、(d) 小規模: 0/1 件のとき `edges` は空、(e) 登録データ非依存: 同一 id 集合を持ち `imageColor`/`metOn`/`favoriteLevel` だけ異なる 2 集合で完全に同一の相関図を返す）
+    - **Validates: Requirements 22.1, 22.2, 22.3, 22.8, 22.9, 22.11, 22.13**
+    - `// Feature: chara-collection, Property 30` タグ・`numRuns: 100`。対象 `buildRelationshipMap`。ジェネレータは「同一 id 集合で登録データだけ差し替えた対の集合」を含める
 
-  - [x]* 66.2 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）のプロパティテスト
-    - **Property 31: 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）**（任意の `Character` 集合について、`buildRelationshipMap` が返す `edges` は、(a) 次数上限3: 各 Character を端点に持つエッジ本数（次数）は 3 以下、(b) 無向対称・正規化: 各エッジは `a < b`（id 昇順）に正規化され同一無向ペアに対応するエッジは高々 1 本、(c) 自己ループなし: 各エッジで `a !== b`。両端合意により両端ノードの上位3本を満たすエッジのみが採用される）
-    - **Validates: Requirements 22.10, 22.13**
+  - [x]* 66.2 相関図のグラフ不変条件（次数上限3・無向対称/同一ペア高々1本・自己ループなし）のプロパティテスト
+    - **Property 31: 相関図のグラフ不変条件（次数上限3・無向対称・自己ループなし）**（任意の `Character` 集合について、`buildRelationshipMap` が返す `edges` は、(a) 次数上限3: 各 Character を端点に持つ線の本数（次数）は 3 以下、(b) 無向対称・正規化: 各線は `a < b`（id 昇順）に正規化され同一無向ペアに対応する線は高々 1 本、(c) 自己ループなし: 各線で `a !== b`。両端合意により両端ノードの上位3本を満たす線のみが採用される）
+    - **Validates: Requirements 22.7, 22.10**
     - `// Feature: chara-collection, Property 31` タグ・`numRuns: 100`。対象 `buildRelationshipMap`
 
-  - [x]* 66.3 相関図の関係軸・スコア集約・ラベル判定のプロパティテスト
-    - **Property 32: 相関図の関係軸・スコア集約・ラベルの判定は定義どおり**（任意の `Character` 集合について、返る各 `RelationshipEdge`（端点の Character を `ca`/`cb` とする）は、(a) 軸メンバーシップ: `'same-color'` を含むのは `ca.imageColor === cb.imageColor` かつ当該色が `'none'` でないとき、`'same-period'` を含むのは両者の `metOn` がともに設定済みで年月（`YYYY-MM`）一致のとき、`'same-favorite'` を含むのは `ca.favoriteLevel === cb.favoriteLevel` のとき、に限られ、いずれも該当しないペアにエッジは存在しない、(b) スコア集約: `score` は該当軸の基準スコア（same-favorite(両想い級)=4, same-color=3, same-period=2, same-favorite(気になる存在)=1）の合算、(c) 代表ラベル: `label` は軸優先順位（same-favorite(両想い級) > same-color > same-period > same-favorite(気になる存在)）で最上位軸のラベルに等しく、`same-favorite` の同値で両者 `favoriteLevel >= 4` なら「両想い級」・それ以外の同値なら「気になる存在」）。あわせて **読み取り専用**（入力配列・各要素を変更しない）ことを確認する
-    - **Validates: Requirements 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9**
+  - [x]* 66.3 相関図の関係タグ・向きあり印象の id 由来決定性/妥当性のプロパティテスト
+    - **Property 32: 相関図の関係タグと向きあり印象は id 由来で決定的・妥当**（任意の `Character` 集合について、返る各 `RelationshipEdge`（`a < b` 正規化）は、(a) 関係タグの決定性・妥当性: `tag` は無向ペアの id 連結文字列の決定的ハッシュ（`fnv1a32`）で5種から選んだ結果に等しく5種のいずれか、id のみに依存し登録データを用いない、(b) 向きあり印象の決定性・妥当性: `impressionAtoB` は `a>b` 順、`impressionBtoA` は `b>a` 順の決定的ハッシュで印象テンプレート集から選ばれた要素であり、いずれも非空でテンプレート集の要素、(c) 方向性: A→B と B→A は入力順序が異なることに基づき一般に異なりうるが、同一有向ペアからは常に同一の一言（決定的）、(d) 読み取り専用: 入力を一切変更しない）
+    - **Validates: Requirements 22.2, 22.3, 22.4, 22.5, 22.6, 22.13**
     - `// Feature: chara-collection, Property 32` タグ・`numRuns: 100`。対象 `buildRelationshipMap`
 
-- [x] 67. Hook: 相関図の読み取り専用 view-state `useRelationshipMap` を実装する（要件22.14, 22.15, 22.16, 22.17）
-  - `src/hooks/useRelationshipMap.ts` を新規作成し、読み取り専用の view-state を公開する。`reload()` で `fetchAll()`（`Character_Store`）から全 Character を取得し、`buildRelationshipMap(characters)` で id ベースの `RelationshipEdge` を得たのち、各 id を取得済み Character へ解決して `edges: ResolvedRelationshipEdge[]` を公開する。公開する状態は design.md「Hooks」節に一致させる: `loadState: LoadState`（idle/loading/loaded/failed）、`characters: Character[]`、`edges: ResolvedRelationshipEdge[]`、`hasEnough: boolean`（Character が 2 件以上か。1 件以下なら関係を作れない、要件22.14）、`reload: () => Promise<void>`。`Character_Store` の読み取りのみで一切変更せず（要件22.16）、導出は端末内の純粋関数のみで外部送信しない（要件22.17, 3.8）。Character が 0/1 件なら `hasEnough=false` かつ `edges=[]`、2 件以上でも edges が空なら `edges=[]`（空状態表示は UI 側、要件22.14, 22.15）
-  - _Requirements: 22.14, 22.15, 22.16, 22.17_
+- [x] 67. Hook: 相関図の読み取り専用 view-state `useRelationshipMap` を新型に追従させる（要件22.11, 22.12, 22.13, 22.14）
+  - `src/hooks/useRelationshipMap.ts` を新型（`ResolvedRelationshipEdge` に `tag`/`impressionAtoB`/`impressionBtoA`/`score`）へ追従させる。id 解決ロジック自体は大きく変わらない。`reload()` で `fetchAll()`（`Character_Store`）から全 Character を取得し、`buildRelationshipMap(characters)` で id ベースの `RelationshipEdge` を得たのち、各 id を取得済み Character へ解決して `edges: ResolvedRelationshipEdge[]` を公開する。公開する状態は design.md「Hooks」節に一致させる: `loadState: LoadState`（idle/loading/loaded/failed）、`characters: Character[]`、`edges: ResolvedRelationshipEdge[]`、`hasEnough: boolean`（Character が 2 件以上か。1 件以下なら関係を作れない、要件22.11）、`reload: () => Promise<void>`。`Character_Store` の読み取りのみで一切変更せず（要件22.13）、導出は端末内の純粋関数のみで外部送信しない（要件22.14, 3.8）。Character が 0/1 件なら `hasEnough=false` かつ `edges=[]`、2 件以上でも edges が空なら `edges=[]`（空状態表示は UI 側、要件22.11, 22.12）
+  - _Requirements: 22.11, 22.12, 22.13, 22.14_
 
-- [x] 68. UI: `RelationshipMapView` を実装し `App`/`NavigationBar` に「相関図」導線を配線する（要件22.1, 22.14, 22.15, 22.16, 22.18, 22.19, 22.20, 22.21）
-  - `src/components/RelationshipMapView.tsx` を新規作成する。`useRelationshipMap` の `{ loadState, characters, edges, hasEnough, reload }` を用い、**追加ライブラリなしの軽量な自前描画**・**横スクロールを一切出さない**方針で、各 Character（ノード）ごとに接続する関係を相手 Character・関係ラベル（`label`）・関係軸（`axes`）付きで縦積みに列挙する**リストベースのカード表示**を描画する（要件22.1, 22.16, 22.20）。ロジックは持たず hook から受け取ったデータを描画するのみとする。空状態: `hasEnough === false`（Character 0/1 件）のときは「関係を作るには 2 件以上の登録が必要」旨の空状態を `EmptyStateView` で、2 件以上でも `edges` が空のときは「関係が見つからなかった」旨の空状態を表示する（要件22.14, 22.15）。
-  - `src/App.tsx` に `'relationship'` ビュー状態を追加し、`view === 'relationship'` のとき `RelationshipMapView` を描画する。`NavigationBar` の `goToRelationship()` で `'relationship'` へ遷移し、アクティブタブを現在の `view`（`list`/`gacha`/`battle`/`relationship`）から導出する（要件22.18, 13.6）。
-  - `src/components/NavigationBar.tsx` に「相関図」タブを追加し（既存 4 タブに 1 つ追加、`goToRelationship` を呼ぶ）、320〜430 CSS px の縦向きでも横スクロールなしを維持し、最小 44×44 CSS px タッチ領域・rem 追従を満たす（要件22.18, 22.19, 22.21, 13.9）。既存 4 タブの遷移・表示制御は不変とする。色/角丸/影/余白は大人かわいいテーマのトークン経由で適用する（要件22.19, 9）。外部送信は行わない（要件22.17, 3.8）
-  - _Requirements: 22.1, 22.14, 22.15, 22.16, 22.18, 22.19, 22.20, 22.21_
+- [x] 68. UI: `RelationshipMapView` を関係タグ色付き＋双方向印象表示に作り替え、`App`/`NavigationBar` に「相関図」導線を配線する（要件22.1, 22.4, 22.6, 22.11, 22.12, 22.13, 22.15, 22.16, 22.17, 22.18）
+  - `src/components/RelationshipMapView.tsx` を新ルールで作り替える。`useRelationshipMap` の `{ loadState, characters, edges, hasEnough, reload }` を用い、**追加ライブラリなしの軽量な自前描画**・**横スクロールを一切出さない**方針で、各 Character（ノード）ごとに接続する各線を、相手 Character・**関係タグ（`tag`）の色付きバッジ**・**双方向の印象（このノード→相手／相手→このノード）**付きで縦積みに列挙する**リストベースのカード表示**を描画する（要件22.1, 22.4, 22.6, 22.13, 22.17）。旧「軸バッジ（おそろいカラー等）」は廃止する。関係タグの表示ラベル（「仲良し」等）と色トークンの対応を定数で持ち、色は種類ごとにテーマトークン経由で切り替える（色値をハードコードしない、要件22.18）。ロジックは持たず hook から受け取ったデータを描画するのみとする。空状態: `hasEnough === false`（Character 0/1 件）のときは「関係を作るには 2 件以上の登録が必要」旨の空状態を `EmptyStateView` で、2 件以上でも `edges` が空のときは「関係が見つからなかった」旨の空状態を表示する（要件22.11, 22.12）。
+  - `src/App.tsx` に `'relationship'` ビュー状態を追加し、`view === 'relationship'` のとき `RelationshipMapView` を描画する。`NavigationBar` の `goToRelationship()` で `'relationship'` へ遷移し、アクティブタブを現在の `view`（`list`/`gacha`/`battle`/`relationship`）から導出する（要件22.15, 13.6）。
+  - `src/components/NavigationBar.tsx` に「相関図」タブを追加し（既存 4 タブに 1 つ追加、`goToRelationship` を呼ぶ）、320〜430 CSS px の縦向きでも横スクロールなしを維持し、最小 44×44 CSS px タッチ領域・rem 追従を満たす（要件22.15, 22.16, 22.17, 13.9）。既存 4 タブの遷移・表示制御は不変とする。色/角丸/影/余白は大人かわいいテーマのトークン経由で適用する（要件22.18, 9）。外部送信は行わない（要件22.14, 3.8）
+  - _Requirements: 22.1, 22.4, 22.6, 22.11, 22.12, 22.13, 22.15, 22.16, 22.17, 22.18_
 
   - [x]* 68.1 相関図 UI・ナビゲーション導線のユニットテスト（任意）
-    - React Testing Library で、(a) 相関図が `edges` の関係（相手・ラベル・軸）を表示すること、(b) Character 0/1 件時に「2 件以上必要」旨の空状態、2 件以上でも関係 0 件時に「関係が見つからなかった」旨の空状態を表示すること、(c) `NavigationBar` に「相関図」タブがあり `goToRelationship` で `view` が `'relationship'` へ遷移し `RelationshipMapView` が描画されること、を例示確認する。既存のナビゲーション・各画面テストは不変で保持する（要件22.14, 22.15, 22.18）
-    - _Requirements: 22.14, 22.15, 22.18_
+    - React Testing Library で、(a) 相関図が `edges` の関係（相手・関係タグの色付きバッジ・双方向の印象）を表示すること、A→B と B→A で異なる印象になりうる具体例が表示されること（要件22.1, 22.4, 22.6）、(b) Character 0/1 件時に「2 件以上必要」旨の空状態、2 件以上でも関係 0 件時に「関係が見つからなかった」旨の空状態を表示すること（要件22.11, 22.12）、(c) `NavigationBar` に「相関図」タブがあり `goToRelationship` で `view` が `'relationship'` へ遷移し `RelationshipMapView` が描画されること（要件22.15）、を例示確認する。既存のナビゲーション・各画面テストは不変で保持する
+    - _Requirements: 22.1, 22.4, 22.6, 22.11, 22.12, 22.15_
 
-- [x] 69. CSS: 相関図のスタイルをトークン経由で追加する（要件22.19, 22.21, 9）
-  - `src/styles/global.css` に `.relationship-map*` 等のクラスを追加する。配色・角丸・影・余白・トランジションはすべて大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*` / `--transition-*`）経由で適用する。横スクロールを一切出さない（320〜430 CSS px でノードカード・関係リストを画面幅に収め、長い名前は折り返す）。トランジションは `--transition-*`（200〜500ms）経由とし、`@media (prefers-reduced-motion: reduce)` で無効化/短縮する。最小 44×44 CSS px タッチ領域・rem 追従を満たす（要件22.19, 22.21, 9.1, 9.2, 9.4, 9.5, 9.6, 9.7）
-  - _Requirements: 22.19, 22.21, 9.1, 9.2, 9.4, 9.5, 9.6, 9.7_
+- [x] 69. CSS: 相関図のスタイルと関係タグ5色をトークン経由で追加する（要件22.16, 22.18, 9）
+  - `src/styles/global.css` に `.relationship-map*` 等のクラスを追加/更新する。配色・角丸・影・余白・トランジションはすべて大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*` / `--transition-*`）経由で適用する。関係タグの5種類（`friend`/`rival`/`fighting`/`crush`/`buddy`）の色をトークン経由で切り替えるクラス（例 `.rel-tag--friend` 等）を用意し、色値をハードコードしない（要件22.18）。横スクロールを一切出さない（320〜430 CSS px でノードカード・関係リスト・印象文を画面幅に収め、長い名前・印象文は折り返す）。トランジションは `--transition-*`（200〜500ms）経由とし、`@media (prefers-reduced-motion: reduce)` で無効化/短縮する。最小 44×44 CSS px タッチ領域・rem 追従を満たす（要件22.16, 22.18, 9.1, 9.2, 9.4, 9.5, 9.6, 9.7）
+  - _Requirements: 22.16, 22.18, 9.1, 9.2, 9.4, 9.5, 9.6, 9.7_
 
 - [x] 70. Iteration 14 チェックポイント（キャラ相関図）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
