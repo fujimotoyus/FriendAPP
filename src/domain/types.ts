@@ -54,8 +54,14 @@ export interface Character {
   memo: string;
   /** お気に入り度。1〜5 の整数。範囲外・非整数は保存拒否。要件1.7, 8.1 */
   favoriteLevel: number;
-  /** 写真（必須）。ArrayBuffer(バイト列)+MIME として IndexedDB に格納する。要件1.8, 3.3 */
-  photo: PhotoData;
+  /**
+   * 写真（必須・複数）。1 枚以上・最大 {@link ../domain/photos.PHOTOS_MAX} 枚（= 5）の配列で、
+   * 取り込み順を保持し先頭 `photos[0]` を代表画像とする（一覧・ガチャ・対戦・相関図・
+   * トーナメント表には代表画像のみを表示）。各写真は ArrayBuffer(バイト列)+MIME として
+   * IndexedDB に格納する。旧データ（単数 `photo` のみを持つ既存 Character）は読み出し時に
+   * 要素数 1 の配列へ正規化して後方互換を保つ。要件23.2, 23.7, 23.14, 23.15, 1.8, 3.3
+   */
+  photos: PhotoData[];
   /** 登録日時（epoch ミリ秒）。一覧の並び順（新しい順）・暦日固定選出の安定キー。要件2.1, 5.2 */
   createdAt: number;
   /**
@@ -87,8 +93,13 @@ export interface CharacterDraft {
   memo: string;
   /** お気に入り度（整数 1〜5）。要件1.7, 8.1 */
   favoriteLevel: number;
-  /** 写真。ArrayBuffer(バイト列)+MIME。未取得は null（写真は登録時に必須）。要件1.3, 1.8 */
-  photo: PhotoData | null;
+  /**
+   * 写真（複数）。ArrayBuffer(バイト列)+MIME の配列で、取り込み順を保持する。
+   * 未取得は空配列 `[]`（保存時に 1 枚以上を要求し、0 枚なら保存を保留してメッセージ表示）。
+   * 最大 {@link ../domain/photos.PHOTOS_MAX} 枚（= 5）で、超過分の取り込みは拒否する。
+   * 先頭 `photos[0]` を代表画像とする。要件23.1〜23.4, 23.13, 1.3, 1.8
+   */
+  photos: PhotoData[];
   /**
    * 出会った日の入力（`<input type="date">` の値 `YYYY-MM-DD`）。空/未入力は `undefined`。
    * 要件14.1
@@ -256,7 +267,12 @@ export type PhotoError =
  * 参照: design.md「補助的な値型」、要件1.3〜1.7, 6.2, 8.1
  */
 export interface FieldError {
-  /** エラー対象のフィールド */
+  /**
+   * エラー対象のフィールド。
+   *
+   * `'photo'` は複数写真化（要件23）後も列挙値を変えず、意味を「写真は 1 枚以上必須」
+   * （`draft.photos.length < 1`、および上限超過の防御的検証）へ読み替える。要件23.4, 23.13
+   */
   field: 'name' | 'nickname' | 'memo' | 'favoriteLevel' | 'photo' | 'metOn' | 'imageColor';
   /** ユーザー向けの説明メッセージ */
   message: string;

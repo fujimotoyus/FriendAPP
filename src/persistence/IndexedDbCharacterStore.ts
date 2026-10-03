@@ -47,16 +47,50 @@ async function normalizePhoto(photo: unknown): Promise<PhotoData> {
 }
 
 /**
+ * 読み出した Character の写真を {@link PhotoData} の配列（`photos`）へ正規化する
+ * （複数写真対応・後方互換、要件23.14, 23.15）。
+ *
+ * - `photos`（配列）があれば、各要素を {@link normalizePhoto} で正規化した配列を返す
+ *   （枚数・順序を保持）。
+ * - `photos` が無く旧 `photo`（単数）があれば、`[normalizePhoto(photo)]`（要素数 1 の配列）
+ *   を返す（イテレーション15 以前の旧データとの後方互換、要件23.14）。
+ * - どちらも無ければ空配列 `[]` を返す（想定外データ。UI 側のプレースホルダー表示に委ねる）。
+ *
+ * {@link normalizePhoto} は async（Blob を arrayBuffer 化）のため、配列は `Promise.all`
+ * で並行に正規化する。
+ */
+async function normalizePhotos(character: unknown): Promise<PhotoData[]> {
+  const source = character as { photos?: unknown; photo?: unknown };
+
+  // 新形式: photos 配列があれば各要素を正規化（枚数・順序を保持）。
+  if (Array.isArray(source.photos)) {
+    return Promise.all(source.photos.map((p) => normalizePhoto(p)));
+  }
+
+  // 旧形式: 単数 photo を要素数 1 の配列へ正規化（後方互換、要件23.14）。
+  if (source.photo !== undefined && source.photo !== null) {
+    return [await normalizePhoto(source.photo)];
+  }
+
+  // どちらも無い想定外データは空配列（プレースホルダー表示に委ねる）。
+  return [];
+}
+
+/**
  * 読み出した Character を後方互換のため正規化した新しい Character を返す。
  *
- * - `photo`: {@link PhotoData}（ArrayBuffer + MIME）へ正規化（旧 Blob データ対応）。
+ * - `photos`: {@link PhotoData} の配列（ArrayBuffer + MIME）へ正規化。旧 Blob データ・
+ *   旧単数 `photo` にも対応し、常に `photos: PhotoData[]` を持つ（`photo` フィールドは残さない。
+ *   {@link normalizePhotos}、要件23.14, 23.15）。
  * - `metOn` / `imageColor`: イテレーション6 で追加した属性を持たない旧データを
  *   既定値へ補完する（`metOn` 欠落/不正 → `undefined`、`imageColor` 欠落/不正 → `'none'`。
  *   {@link normalizeNewFields}、要件14.11, 15.5）。DB バージョン・スキーマは据え置き。
  */
 async function normalizeCharacter(character: Character): Promise<Character> {
-  const photo = await normalizePhoto((character as { photo?: unknown }).photo);
-  return normalizeNewFields({ ...character, photo });
+  const photos = await normalizePhotos(character);
+  // 旧単数 `photo` フィールドは残さない（photos へ一本化）。
+  const { photo: _legacyPhoto, ...rest } = character as Character & { photo?: unknown };
+  return normalizeNewFields({ ...rest, photos });
 }
 
 /** データベース名（design.md「IndexedDB スキーマとバージョニング」）。 */
@@ -248,4 +282,4 @@ export class IndexedDbCharacterStore implements CharacterStore {
   }
 }
 
-export { StoreErrorException, isStoreErrorException };
+export { StoreErrorException, isStoreErrorException, normalizePhoto, normalizePhotos };

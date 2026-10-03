@@ -39,6 +39,10 @@
     "66.3 相関図の関係タグ・向きあり印象の id 由来決定性/妥当性のプロパティテスト": {
       "status": "passed",
       "lastRunTimestamp": 1789663091353
+    },
+    "72.1 複数写真取り込みの順序保存・5枚制限のプロパティテスト": {
+      "status": "passed",
+      "lastRunTimestamp": 1791011733708
     }
   },
   "executionHistory": {

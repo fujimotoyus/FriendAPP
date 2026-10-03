@@ -1,8 +1,9 @@
 /**
  * CharacterDetailView（詳細）— 選択された Character の詳細表示と編集・削除の導線。
  *
- * 写真（{@link PhotoFrame}）・名前・ニックネーム・メモ・お気に入り度を表示する
- * （要件2.8）。一覧へ戻る導線に加え、編集・削除の導線を提供する（要件6）。
+ * 写真（{@link PhotoGallery}：複数写真を取り込み順に横スクロールギャラリーで表示、要件23.8）・
+ * 名前・ニックネーム・メモ・お気に入り度を表示する（要件2.8）。一覧へ戻る導線に加え、
+ * 編集・削除の導線を提供する（要件6）。
  *
  * 編集・削除の実処理はロジック層（App 経由の {@link useRegistration} /
  * {@link useCollection} / {@link CharacterStore}）に委譲し、本コンポーネントは表示と
@@ -42,7 +43,7 @@ import { deriveImageColorStyle } from '../domain/imageColor';
 import { formatMetOn } from '../domain/metOn';
 import { FavoriteLevelDisplay } from './FavoriteLevelDisplay';
 import { PastelButton } from './PastelButton';
-import { PhotoFrame } from './PhotoFrame';
+import { PhotoGallery } from './PhotoGallery';
 
 /** `metOn` が妥当な `YYYY-MM-DD` 形式かの簡易判定（表示時点の防御的チェック）。 */
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -95,8 +96,8 @@ export function CharacterDetailView({
         </PastelButton>
       </header>
 
-      <PhotoFrame
-        photo={character.photo}
+      <PhotoGallery
+        photos={character.photos}
         alt={displayName}
         className={photoBorderClass}
         style={photoBorderStyle}

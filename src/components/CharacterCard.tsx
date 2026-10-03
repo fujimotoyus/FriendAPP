@@ -52,7 +52,7 @@ function CharacterCardContent({ character }: { character: Character }): JSX.Elem
   return (
     <>
       <PhotoFrame
-        photo={character.photo}
+        photo={character.photos[0] ?? null}
         alt={primary}
         className="character-card__photo"
       />

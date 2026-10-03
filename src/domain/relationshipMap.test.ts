@@ -104,7 +104,7 @@ function charactersFromIds(
     nickname: '',
     memo: '',
     favoriteLevel: payloads[i].favoriteLevel,
-    photo: payloads[i].photo,
+    photos: [payloads[i].photo],
     createdAt: payloads[i].createdAt,
     metOn: payloads[i].metOn,
     imageColor: payloads[i].imageColor,

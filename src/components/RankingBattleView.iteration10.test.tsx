@@ -47,7 +47,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     nickname: '',
     memo: '',
     favoriteLevel: 3,
-    photo: makePhoto(),
+    photos: [makePhoto()],
     createdAt: 1000,
     metOn: undefined,
     imageColor: 'none',

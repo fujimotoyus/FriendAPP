@@ -7,16 +7,24 @@
  * - `library`: `<input type="file" accept="image/*">`（capture なし）。
  *              端末の写真ライブラリ / ファイルから選ぶ（フォトからアップロード）。
  *
+ * 複数選択（要件23.1）:
+ * - `multiple` を `true` にすると `<input ... multiple>` を描画し、選択された複数ファイルを
+ *   そのまま `onSelectFiles(files)` へ渡す（`useRegistration.pickPhotos` へ直結できる）。
+ *   空の FileList / 選択なしは従来どおり `onCancel()`。
+ * - `multiple` 省略時（既定 false）は従来どおり単一ファイルを `onSelect(files[0])` で返す
+ *   （後方互換）。
+ *
  * ネイティブ input を隠しつつ、かわいいタップ可能なラベルで包む。ラベルは最小
- * 44×44 CSS px のタッチ領域を確保する（要件7.7）。デザインシステムのトークン
- * （`--color-*`・`--radius-*`）でパステル・角丸のポップな見た目にする（要件7.5）。
+ * 44×44 CSS px のタッチ領域を確保する（要件7.7, 23.16）。デザインシステムのトークン
+ * （`--color-*`・`--radius-*`）でパステル・角丸のポップな見た目にする（要件7.5, 9）。
  *
  * ファイル選択の結果は呼び出し側へコールバックで通知する。ファイルが選択されれば
- * `onSelect(file)`、キャンセル（空の FileList / 選択なし）やブラウザによるアクセス
- * ブロックの場合は `onCancel()` を呼ぶ。これにより呼び出し側は「写真が取り込まれ
- * なかった」旨を伝え、入力内容を保持したまま再取得を促せる（要件1.11）。
+ * `onSelect(file)`（単一）/ `onSelectFiles(files)`（複数）、キャンセル（空の FileList /
+ * 選択なし）やブラウザによるアクセスブロックの場合は `onCancel()` を呼ぶ。これにより
+ * 呼び出し側は「写真が取り込まれなかった」旨を伝え、入力内容を保持したまま再取得を
+ * 促せる（要件1.11）。
  *
- * Requirements: 1.2, 1.11, 7.5, 7.7
+ * Requirements: 1.2, 1.11, 7.5, 7.7, 23.1, 23.16
  */
 import { useId } from 'react';
 import type { ChangeEvent } from 'react';
@@ -25,13 +33,26 @@ import type { ChangeEvent } from 'react';
 export type PhotoSource = 'camera' | 'library';
 
 export interface PhotoInputProps {
-  /** ファイルが選択されたときに、その File を受け取るコールバック。 */
-  onSelect: (file: File) => void;
+  /**
+   * 単一ファイルが選択されたときに、その File を受け取るコールバック（`multiple !== true` 時）。
+   * 複数選択モード（`multiple === true`）では使用せず、`onSelectFiles` が呼ばれる。
+   */
+  onSelect?: (file: File) => void;
+  /**
+   * 複数ファイルが選択されたときに、その FileList を受け取るコールバック（`multiple === true` 時）。
+   * `useRegistration.pickPhotos(files)` へそのまま渡せる（要件23.1）。
+   */
+  onSelectFiles?: (files: FileList) => void;
   /**
    * ファイル選択がキャンセルされた、またはアクセスがブロックされて
    * 何も取得できなかったときに呼ばれるコールバック（要件1.11）。省略可。
    */
   onCancel?: () => void;
+  /**
+   * 複数選択モード。`true` のとき `<input ... multiple>` を描画し、選択ファイル群を
+   * `onSelectFiles` で返す。省略時は false（従来の単一選択・`onSelect`）。要件23.1
+   */
+  multiple?: boolean;
   /** 取り込み元。省略時は 'library'（フォトから選択）。要件1.2 */
   source?: PhotoSource;
   /** ラベル/ボタンに表示する文言。省略時は source に応じた既定の文言。 */
@@ -48,7 +69,9 @@ const DEFAULT_LABELS: Record<PhotoSource, string> = {
 
 export function PhotoInput({
   onSelect,
+  onSelectFiles,
   onCancel,
+  multiple = false,
   source = 'library',
   label,
   className,
@@ -62,8 +85,12 @@ export function PhotoInput({
     // 空の FileList / 選択なし = キャンセル、またはアクセスブロック（要件1.11）。
     if (files == null || files.length === 0) {
       onCancel?.();
+    } else if (multiple) {
+      // 複数選択: FileList をそのまま返す（pickPhotos へ直結、要件23.1）。
+      onSelectFiles?.(files);
     } else {
-      onSelect(files[0]);
+      // 単一選択（後方互換）: 先頭 1 件のみ返す。
+      onSelect?.(files[0]);
     }
 
     // 同じファイルを再選択しても change が発火するよう入力値をリセットする。
@@ -83,6 +110,8 @@ export function PhotoInput({
         className="photo-input__field"
         type="file"
         accept="image/*"
+        // 複数選択モードのときだけ multiple を付与する（要件23.1）。
+        {...(multiple ? { multiple: true } : {})}
         // camera のときだけ capture を付与してカメラ起動を促す（要件1.2）。
         {...(source === 'camera' ? { capture: 'environment' as const } : {})}
         onChange={handleChange}

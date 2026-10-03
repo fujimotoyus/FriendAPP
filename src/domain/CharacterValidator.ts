@@ -11,16 +11,18 @@
  * - nickname:      0〜50 文字。要件1.5
  * - memo:          0〜500 文字。要件1.6
  * - favoriteLevel: 1〜5 の整数。非整数・範囲外は不可。要件1.7, 8.1
- * - photo:         必須（null は不可）。要件1.3
+ * - photos:        1 枚以上必須（空配列は不可）。防御的に最大 `PHOTOS_MAX`（= 5）枚までとし、
+ *                  超過は上限超過エラーを返す（`field: 'photo'`）。要件23.4, 23.13
  * - metOn:         任意。空/未設定は許可。値がある場合は `YYYY-MM-DD` の形式チェックのみ
  *                  行い、形式不正な非空値のみ FieldError を返す。実在日・範囲（1900-01-01〜
  *                  today）・未来日の厳密判定は `normalizeMetOn`（metOn.ts）へ委ねる。要件14.4
  * - imageColor:    プリセット許容値以外は FieldError を出さず `'none'` として扱う正規化方針。
  *                  許容判定 `isValidImageColor` / 正規化 `normalizeImageColor` を提供する。要件15.4
  *
- * 参照要件: 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 6.2, 8.1, 14.4, 15.4
+ * 参照要件: 1.4, 1.5, 1.6, 1.7, 1.9, 6.2, 8.1, 14.4, 15.4, 23.4, 23.13
  */
 
+import { PHOTOS_MAX } from './photos';
 import type { CharacterDraft, FieldError, ImageColor } from './types';
 
 /** 名前の最大文字数（0 文字も許可）。要件1.4, 1.9 */
@@ -122,11 +124,18 @@ export function validate(draft: CharacterDraft): FieldError[] {
     });
   }
 
-  // 写真: 必須（null は不可）。要件1.3
-  if (draft.photo == null) {
+  // 写真: 1 枚以上必須（空配列は不可）。要件23.4, 23.13
+  // 加えて、防御的に上限（PHOTOS_MAX = 5）超過もエラーとする（通常は hook 側で
+  // 5 枚に抑えるが、万一超過した draft を保存させない）。要件23.4
+  if (draft.photos.length < 1) {
     errors.push({
       field: 'photo',
-      message: '写真は必須です。写真を選択してください。',
+      message: '写真は1枚以上必須です。写真を選択してください。',
+    });
+  } else if (draft.photos.length > PHOTOS_MAX) {
+    errors.push({
+      field: 'photo',
+      message: `写真は最大${PHOTOS_MAX}枚までです。`,
     });
   }
 

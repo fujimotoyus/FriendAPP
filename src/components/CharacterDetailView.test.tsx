@@ -33,7 +33,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     nickname: 'たろ',
     memo: 'メモ本文',
     favoriteLevel: 4,
-    photo: makePhoto(),
+    photos: [makePhoto()],
     createdAt: 1000,
     metOn: undefined,
     imageColor: 'none',

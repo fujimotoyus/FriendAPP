@@ -30,6 +30,7 @@
 - **イテレーション12**: お題に沿った実況（各試合の Battle_Commentary に、その回のお題 Battle_Theme の観点ワード（Theme_Aspect、例「かわいさ」「頼れる度」）を織り込む。状況別実況（favored/upset/even）を維持しつつお題に沿った文面にする。観点ワードは端末内で導出し外部送信しない。TournamentEngine の勝敗判定は不変、`pickBattleTheme` シグネチャ不変、`narrate` は末尾任意引数で後方互換）（要件19・要件21 の拡張）
 - **イテレーション13**: 優勝見出しもお題連動（優勝発表の見出しをその回のお題 Battle_Theme の観点ワード Theme_Aspect から「{観点}No.1」形式で表示。お題未選択時は従来の「最も好きなキャラ」にフォールバック。純粋関数 `buildChampionTitle(theme)` で端末内導出し外部送信しない。エンジン変更なし）（要件20・要件21 の拡張）
 - **イテレーション14**: キャラ相関図（Character 同士の関係を新画面 Relationship_Map として図で表示。関係は登録データの内容（Image_Color・Met_On・Favorite_Level）に依存せず、Character の id（および全 Character の id 集合）から決定的に割り当てる。各無向の線（Relationship_Edge）には5種類の関係タグ（Relationship_Tag: 仲良し／ライバル／喧嘩中／気になる存在／相棒）から id 由来のハッシュで1つを決定的に選び、種類ごとに色を変えてテーマトークン経由で表示する。さらに各線には向きあり印象（Impression、A→B と B→A で別々に決定的に選ぶ短い一言）を持たせる。各 Character につながる相手は最大3人（決定的なタイブレークで上位3本）に制限する。同一の id 集合から常に同一の図になる決定的生成で、端末内の純粋関数のみで導出し外部送信しない。Character_Store を変更しない読み取り専用の可視化。0/1件時・関係0件時の空状態を持つ）（要件22、要件3.8・要件7・要件9 と整合）
+- **イテレーション15**: 複数写真対応（Characterの写真を単数photoから1枚以上・最大5枚のphotos配列へ拡張。登録/編集で複数選択アップロードと各写真の個別削除、詳細画面での横スクロールギャラリー表示、代表画像=photos[0]を一覧/ガチャ/対戦/相関図/トーナメント表に表示。旧データ=単数photoは読み出し時に要素数1のphotosへ正規化し後方互換を維持。各写真はArrayBuffer+MIMEで端末内保存・外部送信なし。要件1.3の写真必須を1枚以上必須へ、要件2.3/2.8の表示を複数前提へ読み替え）（要件23、要件1・2・3・6・7・9と整合）
 
 ## Glossary
 
@@ -41,6 +42,7 @@
 - **Collection_View**: 登録済みキャラクターを一覧表示する画面（図鑑）
 - **Registration_Form**: キャラクターを新規登録・編集する入力画面。React画面/コンポーネントとして提供される
 - **Character_Photo**: キャラクターに紐づく画像データ。端末の写真/カメラから、ブラウザのファイル選択（input[type=file]）で取り込んだ画像であり、1件あたり端末の写真1枚相当のサイズを上限の目安とする。対応する画像形式はブラウザが標準で扱える画像形式（JPEG、PNG、WebPなど）に準ずる
+- **Character_Photos（複数写真）**: 1件のCharacterに紐づくCharacter_Photoの配列（1枚以上・最大5枚＝Character_Photos_Max）。取り込み順を保持し、先頭（photos[0]）を代表画像とする。従来の単数Character_Photoを置き換えるモデル拡張であり、単数の写真しか持たない既存Characterは読み出し時に要素数1の配列へ正規化して後方互換を保つ。各写真は従来どおりArrayBuffer+MIME（PhotoData）として端末内（Character_Store）に保存し、外部サーバーへ送信しない（要件23、要件3.3・要件3.8と整合）
 - **Favorite_Level**: キャラクターへのお気に入り度合いを表す属性（1〜5の整数）
 - **Ranking_Battle**: 全登録キャラクターを対象にトーナメント（勝ち抜き）形式で自動対戦させ、最も好きな1件を決めるモード。各Battle_Pairの勝敗はChara_Appがランダム要素を含めて自動的に判定し、試行のたびに結果が変動する
 - **Battle_Pair**: ランキング対戦で同時に提示される2件のキャラクターの組
@@ -409,3 +411,28 @@
 16. WHEN ビューポート幅が320〜430 CSSピクセルの縦向き画面でRelationship_Mapを表示する, THE Chara_App SHALL 横スクロールを発生させないレイアウトでRelationship_Mapを表示する（要件7.6、要件9.7と整合）
 17. THE Chara_App SHALL Relationship_Mapの操作要素を最小44×44 CSSピクセルのタッチ領域で提供する（要件7.7、要件9.6と整合）
 18. THE Chara_App SHALL Relationship_Mapの配色・角丸・影・余白を大人かわいいテーマ（Adult_Cute_Theme）のテーマトークン経由で適用して表示し、関係タグ（Relationship_Tag）を種類ごとに異なる色で、いずれもテーマトークン経由（色値をハードコードしない）で表示する（要件9と整合）
+
+### 要件23: 複数写真対応（Character_Photos）
+
+**ユーザーストーリー:** カップルとして、1件のキャラに複数の写真を登録し、詳細画面で横スクロールして見返したい。そうすることで、そのキャラのいろいろな姿を二人で楽しめる。
+
+本要件は、従来「写真は1件（単数）」であった Character のデータモデルを「1枚以上・最大5枚の写真（Character_Photos）」へ拡張する。旧データ（単数の写真を持つ既存 Character）は読み出し時に「1枚の配列」へ正規化して後方互換を保つ非破壊拡張として整理する。要件1.3（写真必須）・要件1.8（保存）・要件2.3/2.8（表示）・要件3.3（端末内保存）・要件6.4（編集時の差し替え）は、本要件により「複数写真」を前提に読み替える。写真の端末内保存方式（ArrayBuffer+MIME）・外部送信しない方針（要件3.8）は不変とする。
+
+#### 受け入れ基準
+
+1. THE Registration_Form SHALL ブラウザのファイル選択（input[type=file], accept="image/*", multiple）により、端末の写真またはカメラから複数のCharacter_Photoを一度に取り込む手段を提供する
+2. THE Chara_App SHALL 1件のCharacterが保持するCharacter_Photoの枚数を1枚以上かつ最大5枚（Character_Photos_Max）とする
+3. IF 取り込み・追加の結果としてCharacter_Photoの合計枚数が5枚を超える場合, THEN THE Chara_App SHALL 5枚を超える分の取り込みを拒否し、1件あたり最大5枚である旨のメッセージを表示し、既に取り込み済みの写真と他の入力内容を保持する
+4. IF 利用者がCharacter_Photoを1枚も指定せずに登録を確定しようとした場合, THEN THE Chara_App SHALL 登録を保留し、入力済みの各項目の内容を保持したまま、写真が1枚以上必須である旨のメッセージを表示する（要件1.3の複数前提への読み替え）
+5. WHEN 利用者がCharacter_Photoを1枚以上指定し登録を確定する, THE Chara_App SHALL 入力内容から1件のCharacterを作成し、取り込み順を保ったCharacter_Photosの配列としてCharacter_Storeへ保存する（要件1.8の複数前提への読み替え）
+6. THE Chara_App SHALL Character_Photosの各写真を個別に対応画像形式（JPEG/PNG/WebPなど）およびサイズ上限で検証し、対応しない形式またはサイズ上限を超える写真の取り込みを個別に拒否し、対応する形式とサイズの目安を示すメッセージを表示する（要件1.10・要件8.2を各写真へ適用）
+7. THE Chara_App SHALL Character_Photosの先頭の写真（photos[0]）を当該Characterの代表画像とし、Collection_View・Daily_Gacha・Ranking_Battle・Relationship_Map・Tournament_Bracketの各表示では代表画像のみを表示する
+8. WHEN 利用者が一覧内の1件のCharacterを選択して詳細を表示する, THE CharacterDetailView SHALL 当該CharacterのCharacter_Photosを取り込み順に、横スクロール可能なギャラリー（スワイプで切り替え）として表示する
+9. WHEN CharacterDetailViewが複数のCharacter_Photoを持つCharacterのギャラリーを表示する, THE Chara_App SHALL ギャラリー内の横スクロールを画像ギャラリーの領域内に限定し、ビューポート幅320〜430 CSSピクセルの縦向き画面で画面全体に横スクロールを発生させない（要件7.6・要件9.7と整合）
+10. IF あるCharacter_Photoの読み込みに失敗した場合, THEN THE Chara_App SHALL 当該写真に代替のプレースホルダー画像を表示し、同一Characterの他の写真および他のCharacterの表示を継続する（要件2.4の複数前提への読み替え）
+11. THE Registration_Form SHALL 編集時に当該CharacterのCharacter_Photosを取り込み順のサムネイル一覧として表示し、各写真を個別に削除する手段と、写真を追加する手段を提供する
+12. WHEN 利用者が編集でCharacter_Photoの追加・削除を行い確定する, THE Chara_App SHALL 更新後のCharacter_Photos（1枚以上・最大5枚）で当該CharacterのCharacter_Storeのデータを上書き保存する（要件6.4の複数前提への読み替え）
+13. IF 利用者が編集でCharacter_Photoをすべて削除して確定しようとした場合, THEN THE Chara_App SHALL 保存を保留し、写真が1枚以上必須である旨のメッセージを表示し、入力内容を保持する
+14. WHERE Character_Photosの属性を持たず単数のCharacter_Photoを持つ既存のCharacterが読み出される場合, THE Chara_App SHALL 当該単数の写真を要素数1のCharacter_Photosへ正規化して扱う（後方互換）
+15. THE Chara_App SHALL Character_Photosを端末内（Character_Store）にのみ保持し、各写真を従来と同じくArrayBuffer+MIMEのバイト列として保存し、いかなる外部サーバーへも送信しない（要件3.3・要件3.8と整合）
+16. THE Registration_Form SHALL Character_Photosの追加・削除の操作要素を最小44×44 CSSピクセルのタッチ領域で提供し、サムネイル一覧・ギャラリーを大人かわいいテーマ（Adult_Cute_Theme）の配色・角丸・影・余白のトークン経由で表示する（要件7.7・要件9と整合）

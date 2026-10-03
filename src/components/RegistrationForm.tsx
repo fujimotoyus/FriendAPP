@@ -3,7 +3,8 @@
  *
  * {@link useRegistration} を用いて入力保持用の {@link CharacterDraft} を編集し、
  * 名前・ニックネーム・メモ・お気に入り度（{@link FavoriteLevelPicker}）・写真
- * （{@link PhotoInput} + {@link PhotoFrame} プレビュー）を入力させる（要件1.2, 1.4〜1.7）。
+ * （{@link PhotoInput}（複数選択）＋取り込み済みサムネイル一覧の {@link PhotoFrame}）を
+ * 入力させる（要件1.2, 1.4〜1.7, 23.1, 23.11, 23.12）。
  * ドメインロジック（検証・画像判定・保存）は hook に委譲し、本コンポーネントは
  * 描画とユーザー操作の受け取りのみを担う（design.md「UI 層」「フロー1」）。
  *
@@ -77,9 +78,11 @@ export function RegistrationForm({
     draft,
     fieldErrors,
     photoError,
+    photosTruncated,
     storeError,
     setField,
-    pickPhoto,
+    pickPhotos,
+    removePhoto,
     save,
   } = useRegistration(editing);
 
@@ -94,22 +97,6 @@ export function RegistrationForm({
     }
     // 'invalid' / 'storeError' の場合はここに留まり、hook のエラー状態が表示される
     // （入力は保持される。要件1.3, 1.12, 8.1〜8.5）。
-  };
-
-  // PhotoInput からのファイル選択・キャンセルを hook の pickPhoto に集約する。
-  // PhotoInput は onSelect(file) / onCancel() を提供するため、それぞれ FileList 相当へ
-  // 変換して pickPhoto を呼ぶ（キャンセルは null を渡し acquisitionFailed になる）。
-  const handlePhotoSelect = (file: File): void => {
-    const list = {
-      0: file,
-      length: 1,
-      item: (index: number) => (index === 0 ? file : null),
-    } as unknown as FileList;
-    void pickPhoto(list);
-  };
-
-  const handlePhotoCancel = (): void => {
-    void pickPhoto(null);
   };
 
   const nameError = fieldErrorMessage(fieldErrors, 'name');
@@ -137,31 +124,64 @@ export function RegistrationForm({
         className="registration-form__form"
         onSubmit={(event) => void handleSubmit(event)}
       >
-        {/* 写真: プレビュー + 取り込み（要件1.2, 1.8） */}
+        {/* 写真: 取り込み済みサムネイル一覧（取り込み順）＋追加（要件1.2, 23.1, 23.11） */}
         <div className="registration-form__field">
-          <span className="registration-form__label">写真（必須）</span>
-          <PhotoFrame
-            photo={draft.photo}
-            alt="登録する写真のプレビュー"
-            className="registration-form__photo-preview"
-          />
+          <span className="registration-form__label">写真（1枚以上必須・最大5枚）</span>
+
+          {/* 取り込み済みの写真を取り込み順にサムネイルで並べ、各サムネに削除ボタンを添える
+              （要件23.11, 23.12）。削除ボタンは最小 44×44 CSS px（.touch-target）。
+              0 枚のときはサムネ一覧を描画しない（下の案内メッセージで促す）。 */}
+          {draft.photos.length > 0 ? (
+            <ul className="photo-thumbnails">
+              {draft.photos.map((photo, index) => (
+                <li className="photo-thumbnails__item" key={index}>
+                  <PhotoFrame
+                    photo={photo}
+                    alt={`登録する写真 ${index + 1}`}
+                    className="photo-thumbnails__photo"
+                  />
+                  <button
+                    type="button"
+                    className="photo-thumbnails__remove touch-target"
+                    aria-label="写真を削除"
+                    onClick={() => removePhoto(index)}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
           <div className="registration-form__photo-actions">
             <PhotoInput
               source="camera"
-              onSelect={handlePhotoSelect}
-              onCancel={handlePhotoCancel}
+              multiple
+              onSelectFiles={(files) => void pickPhotos(files)}
+              onCancel={() => void pickPhotos(null)}
             />
             <PhotoInput
               source="library"
-              onSelect={handlePhotoSelect}
-              onCancel={handlePhotoCancel}
+              multiple
+              onSelectFiles={(files) => void pickPhotos(files)}
+              onCancel={() => void pickPhotos(null)}
             />
           </div>
+
+          {/* 写真0枚で保存しようとしたときの「1枚以上必須」案内（要件23.4, 23.13）。 */}
           {photoFieldError ? (
             <p className="registration-form__error" role="alert">
               {photoFieldError}
             </p>
           ) : null}
+
+          {/* 5枚上限を超えて取り込もうとして一部拒否したときの案内（要件23.3）。 */}
+          {photosTruncated ? (
+            <p className="registration-form__error" role="alert">
+              写真は最大5枚までです。
+            </p>
+          ) : null}
+
           {photoError ? (
             <p className="registration-form__error" role="alert">
               {photoErrorMessage(photoError)}

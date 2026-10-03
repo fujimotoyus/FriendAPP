@@ -70,7 +70,7 @@ export function DailyGachaView({
       {partner != null ? (
         <div className="daily-gacha__partner">
           <PhotoFrame
-            photo={partner.photo}
+            photo={partner.photos[0] ?? null}
             alt={displayName}
             className="daily-gacha__photo"
           />

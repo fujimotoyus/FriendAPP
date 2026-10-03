@@ -98,6 +98,23 @@
 - **UI 配線・レイアウト（要件22.15〜22.18, 7, 9）**: `useRelationshipMap`（`fetchAll` → `buildRelationshipMap` → id を Character へ解決して公開する読み取り専用 hook）と `RelationshipMapView`（追加ライブラリなしの軽量な自前描画。各 Character に紐づく「関係のある相手」を列挙するリストベースのカード表示で横スクロールを出さない）を追加し、`App.tsx` のビュー状態と `NavigationBar` へ導線を配線する。各線は関係タグ（色付きバッジ）と、相手ごとに「A→B の印象」「B→A の印象」の双方向表示を出す。配色・角丸・影・余白はすべて大人かわいいテーマのトークン経由で適用し、関係タグの色も種類ごとにトークンで切り替える。横スクロールなし（320〜430 CSS px）・最小 44×44 CSS px タッチ領域・rem 追従・`prefers-reduced-motion` 尊重を満たす（トーナメント表 `TournamentBracketView` の横スクロールなし方針と整合）。
 - **不変の制約の維持**: `Character` 型・`Character_Store`・既存ドメイン関数は変更しない（相関図用の型と関数を追記するのみ）。既存 Property 1〜29 は不変で保持し、相関図の決定性・要素妥当性・登録データ非依存・グラフ不変条件（次数上限・無向対称・自己ループなし）・関係タグ/向きあり印象の決定性を新規 Correctness Property 30〜32 で検証する。
 
+### イテレーション15（複数写真対応、要件23）
+
+イテレーション15では、Character の写真を単数 photo: PhotoData から **1枚以上・最大5枚の配列 photos: PhotoData[]** へ拡張する。これは本ロードマップで唯一データモデル変更を伴うイテレーションであり、旧データ（単数 photo）を読み出し時に photos: [photo] へ正規化して **後方互換を保つ非破壊拡張** として設計する。初回スコープは「複数選択で追加・各写真を個別に削除・先頭を代表画像に固定」のシンプル版とし、**並べ替え・代表画像の明示指定は含めない**（将来拡張）。要点は次のとおり。
+
+- **データモデル変更（要件23.2, 23.14）**: Character.photo: PhotoData を Character.photos: PhotoData[]（1枚以上・最大 PHOTOS_MAX = 5）へ置き換える。CharacterDraft.photo: PhotoData | null を CharacterDraft.photos: PhotoData[]（0枚＝未取得も表現可、保存時に1枚以上を要求）へ置き換える。先頭 photos[0] を代表画像とする。FieldError.field の 'photo' は複数前提の「写真」メッセージ（1枚以上必須）へ読み替える（型の列挙値は不変）。
+- **後方互換の正規化（要件23.14, 3.3）**: IndexedDbCharacterStore.fetchAll / InMemoryCharacterStore の読み出し時に、既存の 
+ormalizePhoto（Blob/旧形式→PhotoData）を再利用しつつ、photos 欠落時は旧 photo（単数）を [normalizePhoto(photo)] へ、photos ありなら各要素を 
+ormalizePhoto で正規化した配列へ落とす正規化を追加する（新ヘルパ 
+ormalizePhotos）。DB バージョン・スキーマは **1 のまま据え置き**（新規プロパティ追加のみ、既存イテレーション6の方針と同じ）。空配列になった想定外データは要素0のままとし、UI 側のプレースホルダー表示へ委ねる。
+- **写真検証（要件23.6）**: PhotoProcessor.validateAndProcess（単一ファイル→Result<PhotoData, PhotoError>）は **シグネチャ不変**とし、複数ファイルは呼び出し側（useRegistration.pickPhotos）が各 File に対して個別に適用する。対応形式・サイズ上限（JPEG/PNG/WebP、10 MiB）は従来の SUPPORTED_MIME_TYPES / MAX_PHOTO_SIZE_BYTES を各写真へ適用する。
+- **バリデーション（要件23.4, 23.13）**: CharacterValidator.validate の写真チェックを「draft.photos.length < 1 のとき ield: 'photo' エラー（1枚以上必須）」へ変更する。加えて draft.photos.length > PHOTOS_MAX を上限超過エラーとする（通常は hook 側で5枚に抑えるため防御的）。他フィールド（名前/ニックネーム/メモ/お気に入り度/metOn/imageColor）の検証は不変。
+- **純粋関数 ddPhotos（要件23.3, 23.2）**: 既存の photos に新規 PhotoData[] を取り込み順に連結し、合計を PHOTOS_MAX = 5 枚に切り詰める純粋関数 ddPhotos(current: readonly PhotoData[], incoming: readonly PhotoData[]): { photos: PhotoData[]; truncated: boolean } を src/domain/photos.ts に実装する（	runcated は5枚超過で取り込みを一部拒否したか）。削除は配列からの index 除去（UI/hook 側）で表現する。決定的・副作用なし・入力不変。
+- **Hook（useRegistration）**: draft.photo を draft.photos: PhotoData[] に置き換え、pickPhoto(files) を pickPhotos(files) へ拡張する。pickPhotos は各 File を PhotoProcessor で検証して成功分を PhotoData 化し、ddPhotos で既存へ連結（5枚上限・超過は 	runcated を通知）、不正/キャンセル/ブロックは draft を破棄せずエラー種別を保持する（要件23.3, 23.6、要件1.11/8.2/8.3 の複数前提への適用）。emovePhoto(index) を追加して個別削除する。編集モードは既存 photos を初期化。save() は alidate（1枚以上）→ count < 1000 → insert/update。
+- **UI（表示は代表画像、詳細はギャラリー、要件23.7〜23.10）**: 一覧 CharacterCard・DailyGachaView・RankingBattleView・TournamentBracketView・RelationshipMapView は photos[0]（代表画像）を PhotoFrame に渡す（character.photo → character.photos[0] への差し替えのみ）。詳細 CharacterDetailView は新規 PhotoGallery（photos: PhotoData[] を受け取り、CSS scroll-snap（overflow-x: auto; scroll-snap-type: x mandatory;）で横スクロールギャラリー表示。ギャラリー内のみ横スクロールし、画面全体には横スクロールを出さない。各写真は PhotoFrame を再利用し onError でプレースホルダー）へ差し替える。イメージカラーの縁取り（deriveImageColorStyle）は従来どおり代表画像枠・詳細写真枠へ適用する。
+- **登録/編集フォーム（要件23.1, 23.11, 23.16）**: PhotoInput を multiple 対応（ccept="image/*" multiple）にし、選択ファイル群をコールバックで返す。RegistrationForm に取り込み済みサムネイル一覧（取り込み順）＋各サムネの削除ボタン（44×44 CSS px 以上）＋追加ボタンを配置し、useRegistration.pickPhotos/emovePhoto に接続する。5枚上限到達時・写真0枚保存時はメッセージを表示し入力を保持する（要件23.3, 23.4, 23.13）。配色・角丸・影・余白はトークン経由（要件9）。
+- **CSS**: src/styles/global.css に .photo-gallery*（scroll-snap・横スクロールはギャラリー内限定）と .photo-thumbnails*（登録/編集のサムネ一覧・削除ボタン）をトークン（--color-* / --radius-* / --shadow-* / --space-*）経由で追加する。横スクロールなし（画面全体）・44×44 CSS px・rem 追従・prefers-reduced-motion 尊重を維持する。
+- **不変の制約の維持**: 各写真は従来どおり ArrayBuffer+MIME（PhotoData）として端末内（IndexedDB）に保存し、いかなる外部サーバーへも送信しない（要件23.15、要件3.8）。iOS WebKit の Blob 保存バグ回避方針（ArrayBuffer 保存）を各写真へそのまま適用する。意思決定ロジック（ddPhotos / 検証）は Domain 層の純粋関数へ寄せ property-based testing で検証する（新規 Correctness Property 33〜34）。既存 Property 1〜32 は、写真関連の Property 3（写真必須）・Property 5（保存・復元ラウンドトリップ）・Property 20（新フィールド含む保存・復元）を複数写真前提へ更新したうえで保持する。
 ### 技術方針
 
 - **プラットフォーム**: Web（PWA）。iPhone Safari でホーム画面に追加し、スタンドアロン・ポートレートで起動する（要件7.1, 7.2）。オフラインファースト設計とする。
@@ -666,7 +683,7 @@ interface Character {
   nickname: string;      // 0〜50文字（要件1.5）。空文字は「未登録」扱い
   memo: string;          // 0〜500文字（要件1.6）
   favoriteLevel: number; // 1〜5 の整数（要件1.7, 8.1）
-  photo: PhotoData;      // 写真（ArrayBuffer+MIME）（要件1.8, 3.3）
+  photos: PhotoData[];   // 写真（1枚以上・最大5枚、ArrayBuffer+MIME）。先頭が代表画像（要件1.8, 3.3, 23）。※イテレーション15で単数 photo:PhotoData から配列へ変更。旧データ（単数 photo）は読み出し時に [photo] へ正規化
   createdAt: number;     // 登録日時（epoch ミリ秒）。並び順・決定的選出のキー
   metOn?: string;        // 出会った日（ISO 8601 の YYYY-MM-DD、任意）。未設定は undefined（要件14）
   imageColor: ImageColor;// イメージカラー（プリセット列挙）。既定は 'none'（要件15）
@@ -711,7 +728,7 @@ interface CharacterDraft {   // 入力保持用（要件1.3, 1.11, 1.12, 8.3〜8
   nickname: string;
   memo: string;
   favoriteLevel: number;
-  photo: PhotoData | null;   // ArrayBuffer+MIME。未取得は null
+  photos: PhotoData[];       // 写真（0〜5枚、ArrayBuffer+MIME）。未取得は空配列。保存時は1枚以上必須（要件23）。※イテレーション15で単数 photo:PhotoData|null から配列へ変更
   metOn?: string;            // 出会った日の入力（<input type="date"> の値 YYYY-MM-DD）。空/未入力は undefined（要件14）
   imageColor: ImageColor;    // イメージカラーの選択。既定は 'none'（要件15）
   editingId?: string;        // 未指定なら新規、値ありなら編集
@@ -1317,6 +1334,19 @@ iPhone Safari では「共有」→「ホーム画面に追加」でインスト
 
 **Validates: Requirements 22.2, 22.3, 22.4, 22.5, 22.6, 22.13**
 
+### Property 33: 複数写真の取り込みは順序を保ち5枚に制限する
+
+*任意の* 既存写真列 current（0〜5枚の PhotoData[]）と取り込み写真列 incoming（任意枚数の PhotoData[]）について、ddPhotos(current, incoming) は次を満たす。(a) **順序保存**: 戻り値 photos は current の全要素に続けて incoming の要素を取り込み順に連結した列の、先頭から最大 PHOTOS_MAX（= 5）枚の prefix に等しい（current が既に5枚以上なら incoming は一切追加されない）。(b) **上限**: photos.length <= 5 を常に満たす。(c) **truncated フラグ**: current.length + incoming.length > 5 のとき 	runcated === true、そうでなければ alse である。(d) **入力不変**: current / incoming（配列および各 PhotoData）を一切変更しない（純粋関数）。
+
+**Validates: Requirements 23.2, 23.3**
+
+### Property 34: 複数写真を含む保存・復元ラウンドトリップ
+
+*任意の* 妥当な Character（photos が 1〜5 枚の PhotoData、各 metOn（YYYY-MM-DD または undefined）・imageColor を持つ）を InMemoryCharacterStore に保存して取得すると、photos の**枚数・順序・各写真のバイト内容（data）と MIME（type）**がすべて等価に復元され、他属性（
+ame / 
+ickname / memo / avoriteLevel / createdAt / id / metOn / imageColor）も等価に復元される。さらに、photos を持たず単数 photo のみを持つ**旧形式レコード**を読み出すと、要素数 1 の photos（[normalizePhoto(photo)]）へ正規化される（後方互換、要件23.14）。本プロパティはイテレーション15における Property 5 / Property 20 の複数写真前提への更新版であり、単数前提の旧プロパティを置き換える。
+
+**Validates: Requirements 23.5, 23.14, 23.15, 1.8, 3.3**
 ## Error Handling
 
 エラーハンドリング

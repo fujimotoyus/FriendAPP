@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { InMemoryCharacterStore } from './InMemoryCharacterStore';
+import { normalizePhoto } from './IndexedDbCharacterStore';
 import type { Character, ImageColor, PhotoData } from '../domain/types';
 
 /** イメージカラーのプリセット許容値（`types.ts` の {@link ImageColor} と一致）。 */
@@ -65,7 +66,9 @@ const validCharacter: fc.Arbitrary<Character> = fc.record({
   nickname: fc.string({ maxLength: 50 }),
   memo: fc.string({ maxLength: 500 }),
   favoriteLevel: fc.integer({ min: 1, max: 5 }),
-  photo: photoData,
+  // イテレーション15: 写真は 1 枚以上の配列（本テストでは最小限 1〜3 枚を生成）。
+  // 複数写真を含むラウンドトリップの網羅検証は Property 34（タスク74.1）で行う。
+  photos: fc.array(photoData, { minLength: 1, maxLength: 3 }),
   createdAt: fc.integer({ min: 0, max: 4_000_000_000_000 }),
   metOn,
   imageColor,
@@ -119,9 +122,12 @@ describe('InMemoryCharacterStore ラウンドトリップ — Property 20', () =
           expect(restored.metOn).toBe(original.metOn);
           expect(restored.imageColor).toBe(original.imageColor);
 
-          // 写真: MIME とバイト内容が完全一致する。
-          expect(restored.photo.type).toBe(original.photo.type);
-          expectSamePhotoBytes(restored.photo.data, original.photo.data);
+          // 写真: 枚数・順序・各要素の MIME とバイト内容が完全一致する。
+          expect(restored.photos).toHaveLength(original.photos.length);
+          for (let i = 0; i < original.photos.length; i += 1) {
+            expect(restored.photos[i].type).toBe(original.photos[i].type);
+            expectSamePhotoBytes(restored.photos[i].data, original.photos[i].data);
+          }
         }
       }),
       { numRuns: 100 },
@@ -174,9 +180,111 @@ describe('InMemoryCharacterStore ラウンドトリップ — Property 20', () =
           // 正規化は新フィールド以外の属性を壊さない。
           expect(restored.id).toBe(base.id);
           expect(restored.favoriteLevel).toBe(base.favoriteLevel);
-          expect(restored.photo.type).toBe(base.photo.type);
+          expect(restored.photos).toHaveLength(base.photos.length);
+          expect(restored.photos[0].type).toBe(base.photos[0].type);
         },
       ),
+      { numRuns: 100 },
+    );
+  });
+});
+
+/**
+ * Property 34 用の妥当な Character アービトラリ（複数写真: 1〜5 枚）。
+ * イテレーション15 で `photos` を 1〜5 枚へ広げ、複数写真の枚数・順序・各写真の
+ * バイト内容/MIME のラウンドトリップを網羅検証する（design.md「Property 34」）。
+ */
+const validCharacterMultiPhoto: fc.Arbitrary<Character> = fc.record({
+  id: fc.uuid(),
+  name: fc.string({ maxLength: 50 }),
+  nickname: fc.string({ maxLength: 50 }),
+  memo: fc.string({ maxLength: 500 }),
+  favoriteLevel: fc.integer({ min: 1, max: 5 }),
+  // 複数写真: 1 枚以上 5 枚以下。
+  photos: fc.array(photoData, { minLength: 1, maxLength: 5 }),
+  createdAt: fc.integer({ min: 0, max: 4_000_000_000_000 }),
+  metOn,
+  imageColor,
+});
+
+/** 一意な id を持つ複数写真 Character 群を生成するアービトラリ。 */
+const uniqueMultiPhotoCharacters: fc.Arbitrary<Character[]> = fc.uniqueArray(
+  validCharacterMultiPhoto,
+  { minLength: 1, maxLength: 20, selector: (c) => c.id },
+);
+
+describe('InMemoryCharacterStore 複数写真ラウンドトリップ — Property 34', () => {
+  // Feature: chara-collection, Property 34: 複数写真を含む保存・復元ラウンドトリップ
+  it('複数写真（1〜5枚）を含む Character を保存後に取得すると枚数・順序・各写真のバイト/MIME と全属性が等価に復元される', async () => {
+    await fc.assert(
+      fc.asyncProperty(uniqueMultiPhotoCharacters, async (characters) => {
+        const store = new InMemoryCharacterStore();
+        for (const character of characters) {
+          await store.insert(character);
+        }
+
+        const fetched = await store.fetchAll();
+        expect(fetched).toHaveLength(characters.length);
+
+        const byId = new Map(fetched.map((c) => [c.id, c]));
+        for (const original of characters) {
+          const restored = byId.get(original.id);
+          expect(restored).toBeDefined();
+          if (!restored) return;
+
+          // スカラー属性の等価復元。
+          expect(restored.id).toBe(original.id);
+          expect(restored.name).toBe(original.name);
+          expect(restored.nickname).toBe(original.nickname);
+          expect(restored.memo).toBe(original.memo);
+          expect(restored.favoriteLevel).toBe(original.favoriteLevel);
+          expect(restored.createdAt).toBe(original.createdAt);
+          expect(restored.metOn).toBe(original.metOn);
+          expect(restored.imageColor).toBe(original.imageColor);
+
+          // 写真: 枚数・順序・各要素の MIME とバイト内容が完全一致する。
+          expect(restored.photos).toHaveLength(original.photos.length);
+          for (let i = 0; i < original.photos.length; i += 1) {
+            expect(restored.photos[i].type).toBe(original.photos[i].type);
+            expectSamePhotoBytes(restored.photos[i].data, original.photos[i].data);
+          }
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  // Feature: chara-collection, Property 34: 複数写真を含む保存・復元ラウンドトリップ
+  it('photos を持たず単数 photo のみの旧形式レコードは要素数1の photos へ正規化される（後方互換）', async () => {
+    await fc.assert(
+      fc.asyncProperty(validCharacterMultiPhoto, photoData, async (base, legacyPhoto) => {
+        // 旧形式: `photos` を持たず単数 `photo` のみを持つレコードを構築する。
+        const { photos: _photos, ...withoutPhotos } = base;
+        const legacy = {
+          ...withoutPhotos,
+          photo: legacyPhoto,
+        } as unknown as Character;
+
+        const store = new InMemoryCharacterStore([legacy]);
+        const [restored] = await store.fetchAll();
+        expect(restored).toBeDefined();
+
+        // `[normalizePhoto(photo)]` 相当: 要素数 1 の photos へ正規化される。
+        const expectedPhoto = await normalizePhoto(legacyPhoto);
+        expect(restored.photos).toHaveLength(1);
+        expect(restored.photos[0].type).toBe(expectedPhoto.type);
+        expectSamePhotoBytes(restored.photos[0].data, expectedPhoto.data);
+
+        // 旧単数 photo フィールドは残さない（photos へ一本化）。
+        expect((restored as unknown as { photo?: unknown }).photo).toBeUndefined();
+
+        // 正規化は他属性を壊さない。
+        expect(restored.id).toBe(base.id);
+        expect(restored.name).toBe(base.name);
+        expect(restored.favoriteLevel).toBe(base.favoriteLevel);
+        expect(restored.metOn).toBe(base.metOn);
+        expect(restored.imageColor).toBe(base.imageColor);
+      }),
       { numRuns: 100 },
     );
   });

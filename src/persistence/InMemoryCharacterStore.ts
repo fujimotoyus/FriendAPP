@@ -14,7 +14,7 @@
  */
 import type { Character } from '../domain/types';
 import type { CharacterStore } from './CharacterStore';
-import { StoreErrorException } from './IndexedDbCharacterStore';
+import { StoreErrorException, normalizePhotos } from './IndexedDbCharacterStore';
 import { normalizeNewFields } from './normalizeCharacterFields';
 
 /** 保持可能な Character の上限（要件2.2）。実ストアと同じ値でミラーする。 */
@@ -42,13 +42,25 @@ export class InMemoryCharacterStore implements CharacterStore {
    * 実ストアと同様に、入力集合の並べ替えのみを行い要素の過不足はない（Property 9）。
    *
    * 実ストア（{@link IndexedDbCharacterStore}）と挙動を揃えるため、読み出し時に
+   * 写真の `photos` 配列正規化（旧単数 `photo` → 要素数 1 の配列、要件23.14）と
    * `metOn` / `imageColor` の後方互換正規化を適用する（`metOn` 欠落/不正 → `undefined`、
-   * `imageColor` 欠落/不正 → `'none'`。{@link normalizeNewFields}、要件14.11, 15.5）。
+   * `imageColor` 欠落/不正 → `'none'`。{@link normalizePhotos} / {@link normalizeNewFields}、
+   * 要件14.11, 15.5, 23.14, 23.15）。
    */
   async fetchAll(): Promise<Character[]> {
-    return [...this.characters.values()]
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .map((character) => normalizeNewFields(character));
+    const ordered = [...this.characters.values()].sort(
+      (a, b) => b.createdAt - a.createdAt,
+    );
+    return Promise.all(
+      ordered.map(async (character) => {
+        const photos = await normalizePhotos(character);
+        // 旧単数 `photo` フィールドは残さない（photos へ一本化）。
+        const { photo: _legacyPhoto, ...rest } = character as Character & {
+          photo?: unknown;
+        };
+        return normalizeNewFields({ ...rest, photos });
+      }),
+    );
   }
 
   /**

@@ -87,7 +87,7 @@ function characterArb(index: number): fc.Arbitrary<Character> {
     nickname: '',
     memo: '',
     favoriteLevel,
-    photo,
+    photos: [photo],
     createdAt,
     metOn,
     imageColor,

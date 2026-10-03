@@ -36,7 +36,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     nickname: 'たろ',
     memo: '',
     favoriteLevel: 3,
-    photo: makePhoto(),
+    photos: [makePhoto()],
     createdAt: 1000,
     metOn: undefined,
     imageColor: 'none',
@@ -136,10 +136,10 @@ describe('useRegistration — 保存された属性の観測（RegistrationForm 
     const store = new InMemoryCharacterStore([]);
     const { result } = renderHook(() => useRegistration(undefined, store));
 
-    // 写真は必須のため draft に写真をセットしてから保存する。
+    // 写真は必須のため draft に写真をセットしてから保存する（複数写真対応・要件23.1）。
     act(() => {
       result.current.setField('name', 'ゆうき');
-      result.current.setField('photo', makePhoto());
+      result.current.setField('photos', [makePhoto()]);
     });
 
     let saveResult: string | undefined;

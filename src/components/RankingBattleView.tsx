@@ -184,7 +184,7 @@ export function RankingBattleView({
           >
             <div className="ranking-battle__contestant ranking-battle__contestant--enter">
               <PhotoFrame
-                photo={currentPairCharacters.left.photo}
+                photo={currentPairCharacters.left.photos[0] ?? null}
                 alt={displayNameOf(currentPairCharacters.left)}
                 className="ranking-battle__photo"
               />
@@ -199,7 +199,7 @@ export function RankingBattleView({
 
             <div className="ranking-battle__contestant ranking-battle__contestant--enter">
               <PhotoFrame
-                photo={currentPairCharacters.right.photo}
+                photo={currentPairCharacters.right.photos[0] ?? null}
                 alt={displayNameOf(currentPairCharacters.right)}
                 className="ranking-battle__photo"
               />
@@ -235,7 +235,7 @@ export function RankingBattleView({
               }
             >
               <PhotoFrame
-                photo={currentPairCharacters.left.photo}
+                photo={currentPairCharacters.left.photos[0] ?? null}
                 alt={displayNameOf(currentPairCharacters.left)}
                 className="ranking-battle__photo"
               />
@@ -257,7 +257,7 @@ export function RankingBattleView({
               }
             >
               <PhotoFrame
-                photo={currentPairCharacters.right.photo}
+                photo={currentPairCharacters.right.photos[0] ?? null}
                 alt={displayNameOf(currentPairCharacters.right)}
                 className="ranking-battle__photo"
               />
@@ -308,7 +308,7 @@ export function RankingBattleView({
             {buildChampionTitle(theme)}
           </p>
           <PhotoFrame
-            photo={champion.photo}
+            photo={champion.photos[0] ?? null}
             alt={displayNameOf(champion)}
             className="ranking-battle__champion-photo"
           />

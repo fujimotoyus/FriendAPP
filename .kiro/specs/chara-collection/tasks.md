@@ -62,22 +62,22 @@
     - `src/persistence/FailingCharacterStore.ts` に、`insert`/`update` が指定の `StoreError` を throw する失敗スタブを実装する（保存失敗テスト用）
     - _Requirements: 3.2, 8.4, 8.5_
 
-  - [ ]* 4.3 保存・復元ラウンドトリップのプロパティテスト
+  - [x]* 4.3 保存・復元ラウンドトリップのプロパティテスト
     - **Property 5: 保存・復元のラウンドトリップ**（`InMemoryCharacterStore` へ保存後に取得すると写真 Blob 含む全属性が等価）
     - **Validates: Requirements 1.8, 3.3, 3.6**
     - `// Feature: chara-collection, Property 5` タグ・`numRuns: 100`
 
-  - [ ]* 4.4 一覧の降順整列のプロパティテスト
+  - [x]* 4.4 一覧の降順整列のプロパティテスト
     - **Property 9: 一覧は登録日時の降順**（`fetchAll` は入力集合の並べ替えかつ `createdAt` 降順）
     - **Validates: Requirements 2.1**
     - `// Feature: chara-collection, Property 9` タグ・`numRuns: 100`
 
-  - [ ]* 4.5 削除の単一除去のプロパティテスト
+  - [x]* 4.5 削除の単一除去のプロパティテスト
     - **Property 8: 削除は対象1件のみを除去**（削除で当該要素のみ除去・件数1減・他要素不変）
     - **Validates: Requirements 6.7**
     - `// Feature: chara-collection, Property 8` タグ・`numRuns: 100`
 
-  - [ ]* 4.6 IndexedDbCharacterStore の上限・エラー変換のユニットテスト
+  - [x]* 4.6 IndexedDbCharacterStore の上限・エラー変換のユニットテスト
     - 1,000 件到達時に `capacityReached` を throw すること、`QuotaExceededError` を `quotaExceeded` へ変換することを検証する（fake-indexeddb 等でエラーを注入）
     - _Requirements: 2.2, 3.2, 8.4_
 
@@ -86,17 +86,17 @@
     - `src/domain/CharacterValidator.ts` に `validate(draft): FieldError[]` を実装する。名前 0〜50・ニックネーム 0〜50・メモ 0〜500 の文字数、`favoriteLevel` の整数 1〜5、写真必須（`photo == null` で `photo` エラー）を検証する
     - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 6.2, 8.1_
 
-  - [ ]* 5.2 フィールド文字数バリデーションのプロパティテスト
+  - [x]* 5.2 フィールド文字数バリデーションのプロパティテスト
     - **Property 1: フィールド文字数バリデーション**（名前/ニックネーム 0〜50・メモ 0〜500 の通過と超過エラー、名前0文字許可）
     - **Validates: Requirements 1.4, 1.5, 1.6, 1.9, 6.2**
     - `// Feature: chara-collection, Property 1` タグ・`numRuns: 100`
 
-  - [ ]* 5.3 お気に入り度範囲バリデーションのプロパティテスト
+  - [x]* 5.3 お気に入り度範囲バリデーションのプロパティテスト
     - **Property 2: お気に入り度の範囲バリデーション**（整数かつ 1〜5 のみ通過、範囲外・非整数はエラー）
     - **Validates: Requirements 1.7, 8.1, 6.2**
     - `// Feature: chara-collection, Property 2` タグ・`numRuns: 100`
 
-  - [ ]* 5.4 写真必須のプロパティテスト
+  - [x]* 5.4 写真必須のプロパティテスト
     - **Property 3: 写真は必須**（`photo` が null の draft は写真必須エラーを返し、入力内容は不変）
     - **Validates: Requirements 1.3**
     - `// Feature: chara-collection, Property 3` タグ・`numRuns: 100`
@@ -105,7 +105,7 @@
     - `src/domain/PhotoProcessor.ts` に `validateAndProcess(file): Promise<Result<Blob, PhotoError>>` を実装する。対応 MIME（JPEG/PNG/WebP）判定・サイズ上限チェックを行い、非対応は `unsupportedFormat`、過大は `tooLarge` を返し、正常時は Blob を返す
     - _Requirements: 1.10, 8.2_
 
-  - [ ]* 5.6 非対応・過大画像拒否のプロパティテスト
+  - [x]* 5.6 非対応・過大画像拒否のプロパティテスト
     - **Property 4: 非対応・過大画像の拒否**（非対応 MIME または上限超過は対応する `PhotoError` の失敗を返す）
     - **Validates: Requirements 1.10, 8.2**
     - `// Feature: chara-collection, Property 4` タグ・`numRuns: 100`
@@ -123,7 +123,7 @@
     - `CharacterCard`: `PhotoFrame`・名前・（あれば）ニックネームを表示（要件2.3, 2.5, 2.6）
     - _Requirements: 1.7, 2.3, 2.5, 2.6, 2.7, 7.5, 7.7_
 
-  - [ ]* 6.3 PhotoInput 属性・PhotoFrame フォールバックのユニットテスト
+  - [x]* 6.3 PhotoInput 属性・PhotoFrame フォールバックのユニットテスト
     - `PhotoInput` が `accept="image/*"` と `capture` 属性を持つこと、`PhotoFrame` が `onError` でプレースホルダー表示に切り替わることを検証する
     - _Requirements: 1.2, 2.4_
 
@@ -136,12 +136,12 @@
     - `src/hooks/useRegistration.ts` に `draft`・`fieldErrors`・`setField`・`pickPhoto(files)`・`save()` を実装する。`pickPhoto` は `PhotoProcessor` を呼び、キャンセル/ブロック/不正時は `draft` を破棄せずエラー種別を保持する。`save()` は `CharacterValidator.validate` → `count() < 1000` 確認 → `insert` を行い、`'saved' | 'invalid' | 'storeError'` を返す。保存失敗時は入力を保持する（editing 引数で新規/編集を切替）
     - _Requirements: 1.3, 1.8, 1.10, 1.11, 1.12, 2.2, 3.1, 3.2, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ]* 7.3 保存失敗時の原子性・入力保持のプロパティテスト
+  - [x]* 7.3 保存失敗時の原子性・入力保持のプロパティテスト
     - **Property 7: 保存失敗時の原子性と入力保持**（永続化失敗時は Character がストアに残らず件数不変、draft は保持）
     - **Validates: Requirements 1.12, 3.2, 8.4, 8.5**
     - 失敗スタブ Store + `save` ロジックを対象。`// Feature: chara-collection, Property 7` タグ・`numRuns: 100`
 
-  - [ ]* 7.4 useRegistration の写真取得・保存分岐のユニットテスト
+  - [x]* 7.4 useRegistration の写真取得・保存分岐のユニットテスト
     - ファイル選択キャンセル/ブロック時に入力保持・再取得を促すこと、非対応/過大画像時に形式・サイズ案内を出すことを検証する（要件1.11, 8.2, 8.3）
     - _Requirements: 1.11, 8.2, 8.3_
 
@@ -156,12 +156,12 @@
     - `App.tsx` に「一覧 ↔ 登録 ↔ 詳細」の画面遷移を配線し、登録完了後に一覧へ戻り再読み込みする
     - _Requirements: 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 8.6_
 
-  - [ ]* 8.3 表示ビュー必須情報のプロパティテスト
+  - [x]* 8.3 表示ビュー必須情報のプロパティテスト
     - **Property 10: 表示ビューの必須情報の網羅**（カード/詳細の表示モデルが名前・(あれば)ニックネーム・写真を含み、詳細はさらにメモとお気に入り度を含む）
     - **Validates: Requirements 2.3, 2.5, 2.6, 2.8**
     - 表示モデル導出関数を対象。`// Feature: chara-collection, Property 10` タグ・`numRuns: 100`
 
-  - [ ]* 8.4 一覧の空状態・写真読込失敗・読込失敗のユニットテスト
+  - [x]* 8.4 一覧の空状態・写真読込失敗・読込失敗のユニットテスト
     - 0 件時の空状態表示（要件2.7, 8.6）、1 件の写真読込失敗時に当該のみプレースホルダーで他は継続（要件2.4）、ストア読込失敗時の再試行導線と非破壊（要件2.9）を検証する
     - _Requirements: 2.4, 2.7, 2.9, 8.6_
 
@@ -209,22 +209,22 @@
     - `src/domain/BattleCommentator.ts` に `narrate(pair: { winner: string; loser: string }, rng: () => number): string` を実装する。複数の実況テンプレート（例: 「{winner} が {loser} を圧倒！」「接戦の末、{winner} が {loser} を下した！」等）を持ち、rng でテンプレートを 1 つ選び勝者/敗者名を差し込む。純粋関数で副作用を持たず rng を外部注入するため、同一の対戦結果でも rng の値により文面が変動しうる
     - _Requirements: 4.3, 4.5_
 
-  - [ ]* 13.3 唯一の勝者で自動終了のプロパティテスト
+  - [x]* 13.3 唯一の勝者で自動終了のプロパティテスト
     - **Property 11: トーナメントは唯一の勝者で自動終了する**（2件以上・任意の rng シード列で、進行中は相異なる2件の pair、最終的に要素ちょうど1件が champion として確定して終了し、利用者の勝敗選択を要しない）
     - **Validates: Requirements 4.1, 4.2, 4.7**
     - 対象: `TournamentEngine`（rng 注入）。`// Feature: chara-collection, Property 11` タグ・`numRuns: 100`
 
-  - [ ]* 13.4 自動判定の敗者除外・単調減少のプロパティテスト
+  - [x]* 13.4 自動判定の敗者除外・単調減少のプロパティテスト
     - **Property 12: 自動判定は敗者を除外し勝者を進める**（rng による自動判定で選ばれた勝者は次の対戦へ進み、敗者は以降のいずれの対戦にも現れず、勝ち残り総数は単調減少）
     - **Validates: Requirements 4.2, 4.4**
     - 対象: `TournamentEngine`（rng 注入）。`// Feature: chara-collection, Property 12` タグ・`numRuns: 100`
 
-  - [ ]* 13.5 奇数ラウンドの不戦勝のプロパティテスト
+  - [x]* 13.5 奇数ラウンドの不戦勝のプロパティテスト
     - **Property 13: 奇数ラウンドの不戦勝**（奇数件のラウンドでちょうど1件が不戦勝で次へ、全 Character が過不足なく次ラウンドへ引き継がれる）
     - **Validates: Requirements 4.6**
     - 対象: `TournamentEngine`（rng 注入）。`// Feature: chara-collection, Property 13` タグ・`numRuns: 100`
 
-  - [ ]* 13.6 対戦実況の妥当性・変動性のプロパティテスト
+  - [x]* 13.6 対戦実況の妥当性・変動性のプロパティテスト
     - **Property 14: 対戦実況は妥当で実行ごとに変動しうる**（`narrate` は非空で勝者を表す情報を含む実況文字列を返し、実況テンプレートは複数存在し rng の値を変えると同一の対戦結果に対して複数の異なる実況文面が生成されうる）
     - **Validates: Requirements 4.3, 4.5**
     - 対象: `BattleCommentator`（rng 注入）。`// Feature: chara-collection, Property 14` タグ・`numRuns: 100`
@@ -238,7 +238,7 @@
     - `src/components/RankingBattleView.tsx`: 現在の `BattlePair` 2 件を並べて表示する。勝敗は利用者が選ばず、アプリが自動判定する。ランダムに変わる実況（`currentCommentary`）と勝敗結果を表示して自動進行する（利用者の操作は「開始」「次へ／自動再生」のみで勝敗選択はしない）。最終勝者を「最も好きなキャラ」として表示。2 件未満は開始せずメッセージ表示（要件4.8）。App のナビゲーションに対戦画面を追加する
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.8_
 
-  - [ ]* 14.3 useRankingBattle の2件未満ガード・初期化・実況のユニットテスト
+  - [x]* 14.3 useRankingBattle の2件未満ガード・初期化・実況のユニットテスト
     - 2 件未満で開始せずメッセージを表示すること（要件4.8）、`reset()`／再マウントで進行状態が初期化されること（要件4.9）、実況が複数テンプレートから rng でランダム生成され rng を固定/シードすると決定的に検証できること（勝者/敗者名の差し込み・非空、要件4.3, 4.5）を検証する
     - _Requirements: 4.3, 4.5, 4.8, 4.9_
 
@@ -254,12 +254,12 @@
     - 編集・削除の導線を提供し、削除時は確認を求める。キャンセルで元表示に戻し（要件6.6）、確認で `useCollection.remove(id)`（`CharacterStore.delete`）を呼び削除完了を通知する（要件6.5, 6.7）
     - _Requirements: 6.5, 6.6, 6.7_
 
-  - [ ]* 16.3 更新ラウンドトリップ・件数不変のプロパティテスト
+  - [x]* 16.3 更新ラウンドトリップ・件数不変のプロパティテスト
     - **Property 6: 更新のラウンドトリップと件数不変**（更新後の取得が新属性を反映し写真差し替えを含み上書き、件数不変）
     - **Validates: Requirements 6.1, 6.3, 6.4**
     - `// Feature: chara-collection, Property 6` タグ・`numRuns: 100`
 
-  - [ ]* 16.4 削除確認フローのユニットテスト
+  - [x]* 16.4 削除確認フローのユニットテスト
     - 削除確認の要求・キャンセルで非削除・確定で削除通知を検証する（要件6.5, 6.6, 6.7）
     - _Requirements: 6.5, 6.6, 6.7_
 
@@ -268,7 +268,7 @@
     - design.md「Error Handling」表に従い、`StoreError`（`quotaExceeded`/`writeFailed`/`loadFailed`/`capacityReached`）・`PhotoError`・`FieldError` をユーザー向けメッセージへマッピングする共通ヘルパを `src/hooks/errorMessages.ts` に実装し、`RegistrationForm`・`CollectionView`・`DailyGachaView`・`RankingBattleView` に配線する。容量超過は不要データ削除の促し、その他保存失敗は再試行の促し、いずれも入力・保存済みデータを破棄しない
     - _Requirements: 1.3, 1.10, 1.11, 1.12, 2.2, 2.4, 2.7, 2.9, 3.2, 3.7, 4.6, 5.6, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-  - [ ]* 17.2 空状態・エラー分岐の横断ユニットテスト
+  - [x]* 17.2 空状態・エラー分岐の横断ユニットテスト
     - 上限1,000件到達通知（要件2.2）、復元失敗時の非破壊（要件3.7）、favoriteLevel 不正時のメッセージ（要件8.1）、容量不足と再試行の各メッセージ（要件8.4, 8.5）を検証する
     - _Requirements: 2.2, 3.7, 8.1, 8.4, 8.5_
 
@@ -293,7 +293,7 @@
     - `src/domain/sortCharacters.ts` に `sortCharacters(characters: readonly Character[], order: SortOrder): Character[]` を実装する。元配列を変更せず新配列を返す。タイブレーク: `newest` = `createdAt` 降順 → `id` 昇順 / `favorite` = `favoriteLevel` 降順 → `createdAt` 降順 → `id` 昇順 / `name` = 名前の Unicode コードポイント順昇順（空名は後方）→ `id` 昇順。決定的順序とする
     - _Requirements: 11.2, 11.3, 11.4, 11.5, 11.6_
 
-  - [ ]* 21.2 並び替えの決定性・要素保存のプロパティテスト
+  - [x]* 21.2 並び替えの決定性・要素保存のプロパティテスト
     - **Property 17: 並び替えは決定的で要素を保存する**（入力集合の並べ替え＝要素の過不足なし、元配列不変、各 SortOrder で決定的順序・タイブレーク）
     - **Validates: Requirements 11.2, 11.3, 11.4, 11.5, 11.6**
     - `// Feature: chara-collection, Property 17` タグ・`numRuns: 100`。対象 `sortCharacters`
@@ -309,7 +309,7 @@
     - `CharacterCard` を `deriveCardDisplay` ベースに更新し、主表示を先頭かつ副表示より大きい文字サイズ、副表示を補助表示にする（要件10.4）。詳細画面（`CharacterDetailView`）の表示順は変更しない
     - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-  - [ ]* 22.2 一覧カード主表示/副表示のプロパティテスト
+  - [x]* 22.2 一覧カード主表示/副表示のプロパティテスト
     - **Property 18: 一覧カードの主表示/副表示の決定**
     - **Validates: Requirements 10.1, 10.2, 10.3**
     - `// Feature: chara-collection, Property 18` タグ・`numRuns: 100`。対象 `deriveCardDisplay`
@@ -320,7 +320,7 @@
     - `src/components/FavoriteLevelDisplay.tsx`（表示専用）を実装する。塗り記号 `filled` 個＋未塗りで合計 5 個、色/記号のみに依存しないよう `aria-label` 等で「5段階中N」を提供する。`CharacterCard` と `CharacterDetailView` に配置する（要件12.1, 12.2, 12.3, 12.4）
     - _Requirements: 12.1, 12.2, 12.3, 12.4_
 
-  - [ ]* 23.2 お気に入り度表示のプロパティテスト
+  - [x]* 23.2 お気に入り度表示のプロパティテスト
     - **Property 19: お気に入り度表示は個数一致とテキスト等価物を持つ**
     - **Validates: Requirements 12.1, 12.3, 12.4**
     - `// Feature: chara-collection, Property 19` タグ・`numRuns: 100`。対象 `deriveFavoriteLevelDisplay`
@@ -331,7 +331,7 @@
     - `App.tsx` を更新する: `NavigationBar` を `view` が `'list'`/`'gacha'`/`'battle'` のときのみ表示し、`'detail'`/`'add'` では非表示にする（要件13.6, 13.7）。各タブは `goToList`/`goToGacha`/`goToBattle`/`goToAdd`（`goToAdd` は編集状態を引き継がない新規）に対応させる。アクティブタブは現在の `view` から導出する
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10_
 
-  - [ ]* 24.2 NavigationBar 表示制御・遷移のユニットテスト
+  - [x]* 24.2 NavigationBar 表示制御・遷移のユニットテスト
     - 各タブ選択で `view` が期待どおり遷移すること（`goToList`/`goToGacha`/`goToBattle`/`goToAdd`）、主要画面（list/gacha/battle）で表示・詳細/フォームで非表示、アクティブタブ一致、`goToAdd` が新規（編集状態を持たない）であることを検証する（要件13.2〜13.7）
     - _Requirements: 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
 
@@ -661,6 +661,66 @@
 - [x] 70. Iteration 14 チェックポイント（キャラ相関図）
   - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。
 
+- [x] 71. ドメイン型・写真上限定数を複数写真へ拡張する（要件23.2, 23.14）
+  - `src/domain/types.ts` の `Character.photo: PhotoData` を `Character.photos: PhotoData[]`（1枚以上・最大5枚、先頭が代表画像）へ置き換える（design.md「Data Models」「イテレーション15」）。`CharacterDraft.photo: PhotoData | null` を `CharacterDraft.photos: PhotoData[]`（未取得は空配列、保存時に1枚以上を要求）へ置き換える。JSDoc を複数写真前提へ更新する。`FieldError.field` の列挙値 `'photo'` は不変（メッセージを「1枚以上必須」へ読み替える）
+  - 写真枚数上限の定数 `PHOTOS_MAX = 5` を `src/domain` の適所（例 `src/domain/photos.ts`）に定義しエクスポートする
+  - 本タスクは型の破壊的変更を伴うため、以降のタスク72〜78 で全参照箇所（store/validator/hook/UI）を複数写真へ追従させるまでは `tsc` が赤くなりうる。各タスクで追従し、チェックポイント（タスク79）で build/test グリーンを確認する
+  - _Requirements: 23.2, 23.14_
+
+- [x] 72. ドメイン純粋関数 `addPhotos` を実装する（要件23.2, 23.3）
+  - `src/domain/photos.ts` に `addPhotos(current: readonly PhotoData[], incoming: readonly PhotoData[]): { photos: PhotoData[]; truncated: boolean }` を実装する。`current` に続けて `incoming` を取り込み順に連結し先頭から最大 `PHOTOS_MAX`（=5）枚へ切り詰める。`truncated` は `current.length + incoming.length > 5` のとき true。元配列・各 PhotoData を変更しない純粋関数とする（design.md「イテレーション15」）
+  - _Requirements: 23.2, 23.3_
+
+  - [x]* 72.1 複数写真取り込みの順序保存・5枚制限のプロパティテスト
+    - **Property 33: 複数写真の取り込みは順序を保ち5枚に制限する**（順序保存＝current+incoming の prefix、上限5枚、truncated フラグの一致、入力不変）
+    - **Validates: Requirements 23.2, 23.3**
+    - `// Feature: chara-collection, Property 33` タグ・`numRuns: 100`。対象 `addPhotos`
+
+- [x] 73. CharacterValidator を複数写真へ拡張する（要件23.4, 23.13）
+  - `src/domain/CharacterValidator.ts` の `validate(draft)` の写真チェックを「`draft.photos.length < 1` のとき `field: 'photo'` エラー（写真は1枚以上必須）」へ変更する。加えて `draft.photos.length > PHOTOS_MAX` を上限超過エラー（`field: 'photo'`）とする。名前/ニックネーム/メモ/お気に入り度/metOn/imageColor の検証は不変とする
+  - 既存の写真必須テスト（Property 3 系・ユニット）を複数写真前提（0枚でエラー／1枚以上で通過）へ更新する
+  - _Requirements: 23.4, 23.13_
+
+- [x] 74. Persistence の複数写真正規化（読み出し時・後方互換）を実装する（要件23.14, 23.15）
+  - `src/persistence` に `normalizePhotos` を追加/配置する。読み出し Character に `photos` があれば各要素を既存 `normalizePhoto` で正規化した配列へ、`photos` が無く旧 `photo`（単数）があれば `[normalizePhoto(photo)]` へ、どちらも無ければ空配列へ落とす
+  - `src/persistence/IndexedDbCharacterStore.ts` の `normalizeCharacter`（`fetchAll` 読み出し時）で `photo` 正規化を `photos` 正規化へ置き換える。`insert`/`update` は `photos` を持つ Character をそのまま保存する。DB バージョン・スキーマは 1 のまま据え置き
+  - `src/persistence/InMemoryCharacterStore.ts`・`FailingCharacterStore.ts` を `photos` 前提へ追従させる（読み出し結果が `photos` を含む）
+  - _Requirements: 23.14, 23.15_
+
+  - [x]* 74.1 複数写真を含む保存・復元ラウンドトリップのプロパティテスト
+    - **Property 34: 複数写真を含む保存・復元ラウンドトリップ**（1〜5枚の photos の枚数・順序・各バイト内容/MIME と他属性が等価に復元、旧単数 photo は要素数1の photos へ正規化）
+    - **Validates: Requirements 23.5, 23.14, 23.15, 1.8, 3.3**
+    - `// Feature: chara-collection, Property 34` タグ・`numRuns: 100`。対象 `InMemoryCharacterStore` ＋読み出し正規化。既存 Property 5 / Property 20 のテストは本 Property へ複数写真前提で統合/更新する
+
+- [x] 75. useRegistration を複数写真（追加・削除）へ拡張する（要件23.1, 23.3, 23.4, 23.6, 23.11, 23.13）
+  - `src/hooks/useRegistration.ts` の `draft.photo` を `draft.photos: PhotoData[]` に置き換える。`pickPhoto(files)` を `pickPhotos(files)` へ拡張し、各 File を `PhotoProcessor.validateAndProcess` で検証して成功分を PhotoData 化し `addPhotos` で既存へ連結（5枚上限・超過は truncated を通知するメッセージ、要件23.3）、非対応/過大/キャンセル/ブロックは draft を破棄せずエラー種別を保持する（要件23.6、要件1.11/8.2/8.3 の複数適用）
+  - `removePhoto(index: number)` を追加して個別削除する。編集モードは既存 `photos` を初期化する。`save()` は `validate`（1枚以上）→ `count < 1000` → `insert`/`update`。全削除で確定しようとした場合は保存を保留し「写真は1枚以上必須」を表示し入力を保持する（要件23.13）
+  - 既存の useRegistration テスト（写真取得・保存分岐）を複数写真前提へ更新する
+  - _Requirements: 23.1, 23.3, 23.4, 23.6, 23.11, 23.13_
+
+- [x] 76. PhotoInput を複数選択対応にし、PhotoGallery（詳細ギャラリー）を実装する（要件23.1, 23.8, 23.9, 23.10）
+  - `src/components/PhotoInput.tsx` を `multiple` 対応（`accept="image/*" multiple`）にし、選択された複数 File（空 FileList はキャンセル）をコールバックで返す。`capture` 等の既存属性は維持する
+  - `src/components/PhotoGallery.tsx`（新規）を実装する。`photos: PhotoData[]` を受け取り、CSS `scroll-snap`（`overflow-x: auto; scroll-snap-type: x mandatory;`）で横スクロールギャラリー表示する。各写真は `PhotoFrame` を再利用し `onError` でプレースホルダー（要件23.10）。横スクロールはギャラリー領域内に限定し画面全体には出さない（要件23.9）。操作要素は 44×44 CSS px・トークン経由（要件23.16, 9）
+  - _Requirements: 23.1, 23.8, 23.9, 23.10_
+
+- [x] 77. 代表画像表示への差し替えと詳細ギャラリー・編集フォームの配線（要件23.7, 23.8, 23.11, 23.12, 23.16）
+  - 一覧 `CharacterCard`・`DailyGachaView`・`RankingBattleView`・`TournamentBracketView`・`RelationshipMapView`（および `ResolvedBracketMatch`/`ResolvedRelationshipEdge` を Character 解決して表示する箇所）で、`character.photo` 参照を `character.photos[0]`（代表画像）へ差し替える。イメージカラー縁取り（`deriveImageColorStyle`）は代表画像枠へ従来どおり適用する（要件23.7）
+  - `src/components/CharacterDetailView.tsx` の単一 `PhotoFrame` を `PhotoGallery`（`photos`）へ差し替える。写真枠の縁取り（`deriveImageColorStyle`）はギャラリー枠へ適用し、Met_On 表示等は不変（要件23.8）
+  - `src/components/RegistrationForm.tsx` に取り込み済みサムネイル一覧（取り込み順）＋各サムネの削除ボタン（44×44 CSS px 以上）＋追加ボタンを配置し、`useRegistration` の `photos`/`pickPhotos`/`removePhoto` に接続する。5枚上限到達・写真0枚保存時のメッセージを表示し入力を保持する（要件23.3, 23.4, 23.11, 23.12, 23.13）
+  - 各 UI の `character.photo` 参照が残っていないことを確認し `tsc` を通す
+  - _Requirements: 23.7, 23.8, 23.11, 23.12, 23.16_
+
+- [x] 78. CSS: 詳細ギャラリーと登録/編集サムネ一覧のスタイルをトークン経由で追加する（要件23.9, 23.16, 9）
+  - `src/styles/global.css` に `.photo-gallery*`（`scroll-snap`・横スクロールはギャラリー内限定・各スライドは画面幅に収める）と `.photo-thumbnails*`（取り込み順サムネ一覧・各サムネの削除ボタン 44×44 CSS px）を、大人かわいいテーマのトークン（`--color-*` / `--radius-*` / `--shadow-*` / `--space-*`）経由で追加する。画面全体には横スクロールを出さない（320〜430 CSS px、要件23.9）。rem 追従・`prefers-reduced-motion` 尊重を維持する（要件9.4, 9.5, 9.6, 9.7）
+  - _Requirements: 23.9, 23.16, 9.1, 9.2, 9.6, 9.7_
+
+  - [x]* 78.1 複数写真 UI（複数選択・サムネ削除・詳細ギャラリー・代表画像）のユニットテスト
+    - React Testing Library で、(a) `PhotoInput` が `multiple` 属性を持つこと、(b) `RegistrationForm` で複数写真を取り込むとサムネが取り込み順に並び、個別削除で該当のみ消え、6枚目以降は上限メッセージで拒否されること（要件23.3, 23.11）、(c) 写真0枚で保存しようとすると「1枚以上必須」メッセージで保留されること（要件23.4, 23.13）、(d) `CharacterDetailView` が `PhotoGallery` で複数写真を表示すること（要件23.8）、(e) 一覧/ガチャ/対戦が `photos[0]` を代表表示すること（要件23.7）を例示確認する
+    - _Requirements: 23.1, 23.3, 23.4, 23.7, 23.8, 23.11, 23.13_
+
+- [ ] 79. Iteration 15 チェックポイント（複数写真対応）
+  - Ensure all tests pass, ask the user if questions arise. Windows 上で `npm run build`（＝ `tsc -b && vite build`）と `npm run test`（＝ `vitest run`）がグリーンであることを確認する。実装が一段落したらコミットして main へ push し、Vercel の自動デプロイまで行う（deployment.md に従い package.json は BOM なし UTF-8 を維持）。
+
 ## Notes
 
 - `*` が付いたサブタスクは任意（テスト）であり、MVP を急ぐ場合はスキップ可能である。トップレベルタスクには `*` を付けない。
@@ -723,7 +783,13 @@
     { "id": 45, "tasks": ["66"] },
     { "id": 46, "tasks": ["66.1", "66.2", "66.3", "67"] },
     { "id": 47, "tasks": ["68"] },
-    { "id": 48, "tasks": ["68.1", "69"] }
+    { "id": 48, "tasks": ["68.1", "69"] },
+    { "id": 49, "tasks": ["71"] },
+    { "id": 50, "tasks": ["72", "72.1", "73", "74"] },
+    { "id": 51, "tasks": ["74.1", "75"] },
+    { "id": 52, "tasks": ["76"] },
+    { "id": 53, "tasks": ["77", "78"] },
+    { "id": 54, "tasks": ["78.1"] }
   ]
 }
 ```

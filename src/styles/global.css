@@ -560,6 +560,87 @@ select {
   aspect-ratio: 1 / 1;
 }
 
+/* ---------------------------------------------------------------------------
+ * PhotoThumbnails — 登録/編集フォームの取り込み済みサムネ一覧 (要件23.1, 23.11, 23.12, 23.16)
+ * flex-wrap で折り返し（最大 5 枚）、画面全体に横スクロールを出さない (要件9.6, 9.7 / 7.6)。
+ * 各サムネは rem 固定の正方で、右上に 44×44 CSS px の円形削除ボタンを内側に重ねる
+ * （親からクリップされず、隣のサムネにも被らないよう top/right をサムネ内側に取る。要件7.7）。
+ * 色・影・角丸・余白・トランジションはすべてトークン経由 (要件9.1, 9.2, 9.4)。
+ * ------------------------------------------------------------------------- */
+.photo-thumbnails {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.photo-thumbnails__item {
+  position: relative;
+  /* 44px の削除ボタンを内側に収めても写真が見える大きさ（rem 追従）。 */
+  width: 6rem;
+  height: 6rem;
+  flex: 0 0 auto;
+}
+
+.photo-thumbnails__photo {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-soft);
+}
+
+/* プレースホルダーの最小高さ (6rem) をサムネ枠に合わせて解除する。 */
+.photo-thumbnails__photo .photo-frame__placeholder {
+  min-height: 0;
+}
+
+.photo-thumbnails__remove {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  box-shadow: var(--shadow-soft);
+  transition: background-color var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+}
+
+.photo-thumbnails__remove:hover {
+  background-color: var(--color-border);
+}
+
+.photo-thumbnails__remove:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* モーション低減環境ではギャラリー/サムネ/削除ボタンのトランジションとスムーズスクロールを
+   無効化する (要件9.5)。 */
+@media (prefers-reduced-motion: reduce) {
+  .photo-gallery,
+  .photo-gallery__item {
+    scroll-behavior: auto;
+    transition: none;
+  }
+
+  .photo-thumbnails__item,
+  .photo-thumbnails__photo,
+  .photo-thumbnails__remove {
+    transition: none;
+  }
+}
+
 /* 入力エラー・保存失敗などのメッセージ (要件1.3, 1.10〜1.12, 8.1〜8.5) */
 .registration-form__error {
   color: var(--color-primary-hover);
@@ -681,6 +762,66 @@ select {
   border-style: solid;
   border-width: var(--image-color-border-width);
   border-radius: var(--radius-large); /* 角丸大を明示的に維持 */
+}
+
+/* ---------------------------------------------------------------------------
+ * PhotoGallery — 詳細画面の複数写真ギャラリー (要件23.8, 23.9, 23.16)
+ * 横スクロールは .photo-gallery コンテナ内に限定し、ページ全体には出さない
+ * (width/max-width:100% + border-box + overscroll-behavior-x: contain。要件23.9, 7.6, 9.7)。
+ * 各スライド (.photo-gallery__item) は 100% 幅で 1 枚ずつ scroll-snap する。
+ * 詳細では .photo-gallery 自体に .character-detail__photo (+ --bordered) が付くため、
+ * 縁取り (border) と角丸大はコンテナが担い、内側の .photo-frame には二重に縁取りを
+ * 掛けない。縁取り色は CharacterDetailView のインライン var(--image-color-*)。
+ * 角丸・影・余白はトークン経由 (要件9.1, 9.2)。
+ * ------------------------------------------------------------------------- */
+.photo-gallery {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: min(20rem, 100%);
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  /* ギャラリー内のスクロールバーは隠し、スナップ操作とドット無しのすっきりした見た目にする。 */
+  scrollbar-width: none;
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-soft);
+}
+
+.photo-gallery::-webkit-scrollbar {
+  display: none;
+}
+
+/* 詳細では既存 .character-detail__photo の幅/比率/透明 border とそのまま整合させる。
+   縁取り (border) 分も含めて border-box で画面幅に収め、縁取り有無で外形を変えない。 */
+.photo-gallery.character-detail__photo {
+  box-sizing: border-box;
+  max-width: min(20rem, 100%);
+}
+
+.photo-gallery__item {
+  /* 1 枚ずつスナップ表示: 各スライドはコンテナ幅いっぱい。 */
+  flex: 0 0 100%;
+  min-width: 0;
+  display: flex;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+/* スライド内の写真枠は余白なしで埋め、内側の角丸はコンテナ角丸から縁取り分を引いて
+   外側の縁取りとなじませる（二重縁取りを作らない）。 */
+.photo-gallery__item > .photo-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  border-radius: calc(var(--radius-large) - var(--image-color-border-width));
 }
 
 .character-detail__body {
